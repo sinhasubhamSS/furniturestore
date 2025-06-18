@@ -243,57 +243,42 @@ CartItem
           | resolvedAt           |
           +----------------------+
 
-├── src/
-│ ├── app/
-│ │ ├── layout.tsx ← Global layout
-│ │ ├── page.tsx ← Home page (/)
-│ │
-│ │ ├── about/
-│ │ │ └── page.tsx ← About us page (/about)
-│ │
-│ │ ├── contact/
-│ │ │ └── page.tsx ← Contact page (/contact)
-│ │
-│ │ ├── products/
-│ │ │ ├── page.tsx ← Product listing (/products)
-│ │ │ └── [slug]/
-│ │ │ └── page.tsx ← Product detail (/products/product-name)
-│ │
-│ │ ├── cart/
-│ │ │ └── page.tsx ← Cart (/cart)
-│ │
-│ │ ├── wishlist/
-│ │ │ └── page.tsx ← Wishlist (/wishlist)
-│ │
-│ │ ├── orders/
-│ │ │ └── page.tsx ← Orders history (/orders)
-│ │
-│ │ ├── auth/
-│ │ │ ├── login/page.tsx ← Login (/auth/login)
-│ │ │ └── signup/page.tsx ← Signup (/auth/signup)
-│ │
-│ │ ├── dashboard/ ← Protected user dashboard
-│ │ │ └── page.tsx
-│ │
-│ │ ├── api/ ← API routes (handled by server)
-│ │ │ ├── auth/
-│ │ │ │ ├── login/route.ts
-│ │ │ │ └── signup/route.ts
-│ │ │ ├── products/
-│ │ │ │ └── route.ts
-│ │ │ └── ...
-│
-│ ├── components/ ← All UI components (Navbar, Footer, Cards, etc)
-│ ├── models/ ← Mongoose models
-│ ├── lib/ ← DB connect, JWT helpers
-│ ├── styles/ ← Global + modular styles
-│ └── utils/ ← Price formatting, slugify, etc.
-│
-├── public/ ← Assets
-├── .env.local ← Mongo URI, JWT_SECRET etc
-├── next.config.js
-├── package.json
-└── README.md
+/app
+/products
+/cart
+/checkout
+/register
+/login
+/profile
+/orders
+layout.tsx
+page.tsx
+
+/components
+Navbar.tsx
+Footer.tsx
+ProductCard.tsx
+ProductList.tsx
+CartItem.tsx
+InputField.tsx
+Button.tsx
+
+/features
+/auth
+/products
+/cart
+/orders
+/user
+
+/types
+product.ts
+user.ts
+cart.ts
+order.ts
+
+/utils
+axios.ts
+cookieHelper.ts
 
 Feature Use
 Frontend Next.js + TypeScript
