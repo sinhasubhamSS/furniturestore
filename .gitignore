@@ -1,0 +1,41 @@
+# Node modules
+node_modules/
+**/node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# dotenv files
+# Backend
+/backend/.env
+
+# Frontend
+/frontend/.env
+/frontend/.env.local
+/frontend/.env.development.local
+/frontend/.env.test.local
+/frontend/.env.production.local
+
+# Build outputs
+# Backend (if using tsc build)
+/backend/dist/
+/backend/build/
+
+# Frontend (Next.js build outputs)
+/frontend/.next/
+/frontend/out/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# IDE settings
+.vscode/
+.idea/
+
+# Misc
+*.tgz
+.env.*
+.env
