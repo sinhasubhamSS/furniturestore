@@ -41,7 +41,7 @@ const Input: React.FC<InputProps> = ({
         onChange={onChange}
         placeholder={placeholder}
         required={required}
-        className="w-full px-4 py-2 rounded-md bg-[var(--color-secondary)] text-[var(--foreground)] border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+        className="w-full px-2 py-2 rounded-md bg-[var(--color-secondary)] text-[var(--foreground)] border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
       />
     </div>
   );

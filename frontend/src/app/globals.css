@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --color-primary: #FDEAD9;
+  --color-primary: #fbeddd;
   --color-secondary: #f3e0d2;
-  --color-accent: #8b5a2b;
+  --color-accent: #6b3c1a;
 
   --text-dark: #000000;
   --text-light: #ffffff;
@@ -15,7 +15,7 @@
 .dark {
   --color-primary: #1f1f1f;
   --color-secondary: #373737;
-  --color-accent: #8b5a2b; /* accent stays same or adjust if needed */
+  --color-accent: #6b3c1a; /* accent stays same or adjust if needed */
 
   --text-dark: #ffffff;
   --text-light: #000000;
