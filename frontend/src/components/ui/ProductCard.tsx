@@ -23,6 +23,7 @@ const ProductCard = ({ id, title, price, images }: Product) => {
         <img
           src={mainImage}
           alt={title}
+          loading="lazy"
           className="w-full h-full object-contain" // shows full image without crop
         />
       </div>

@@ -34,3 +34,20 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+
+
+
+
+Frontend Framework	Next.js (App Router preferred for better structure)
+Styling	Tailwind CSS + CSS Variables (You’re already using it!)
+State Management	Redux Toolkit (For global UI/auth/cart) + React Query (for data fetching/caching)
+Forms	react-hook-form + zod for validation
+Backend/API	Node.js + Express or Next.js API routes + MongoDB or PostgreSQL
+Authentication	NextAuth.js or custom JWT-based auth
+Image Storage	Cloudinary
+Payments	Stripe
+File Uploads	Cloudinary or S3
+Admin Panel	Optional: Sanity, Strapi, or custom panel
+SEO	Built-in Next.js SEO features + next-sitemap
+Deployment	Vercel / AWS Amplify / Railway / Render

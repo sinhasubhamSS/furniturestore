@@ -1,26 +1,25 @@
-// components/Input.tsx
+// components/ui/Input.tsx
 import React from "react";
+import { UseFormRegisterReturn } from "react-hook-form";
 
-// 👇 Interface defines props types. Helps with IntelliSense and safety
 interface InputProps {
-  label?: string; // Optional label text
-  type?: string;  // input type (text, email, password, etc.)
-  name: string;   // input name/id
-  value: string;  // current value
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; // change handler
+  label?: string;
+  type?: string;
+  name: string;
   placeholder?: string;
   required?: boolean;
+  register?: UseFormRegisterReturn;
+  error?: string;
 }
 
-// 👇 Functional component with props
 const Input: React.FC<InputProps> = ({
   label,
-  type = "text",        // default type = text
+  type = "text",
   name,
-  value,
-  onChange,
   placeholder,
   required = false,
+  register,
+  error,
 }) => {
   return (
     <div className="mb-4 w-full">
@@ -32,17 +31,20 @@ const Input: React.FC<InputProps> = ({
           {label}
         </label>
       )}
-
       <input
         id={name}
         name={name}
         type={type}
-        value={value}
-        onChange={onChange}
         placeholder={placeholder}
         required={required}
-        className="w-full px-2 py-2 rounded-md bg-[var(--color-secondary)] text-[var(--foreground)] border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+        {...register}
+        className={`w-full px-2 py-2 rounded-md bg-[var(--color-secondary)] text-[var(--foreground)] border ${
+          error
+            ? "border-red-500 focus:ring-red-500"
+            : "border-gray-300 dark:border-gray-600 focus:ring-[var(--color-accent)]"
+        } focus:outline-none focus:ring-2`}
       />
+      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
   );
 };
