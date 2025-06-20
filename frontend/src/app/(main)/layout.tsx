@@ -9,12 +9,9 @@ export default function MainLayout({
   return (
     <main>
       <div className="max-w-[1440px] mx-auto">
-        {/* Fixed Navbar (height: 4rem = h-16) */}
         <Navbar />
-
-        {/* Content with automatic spacing (pt-16 = Navbar height) */}
         <div className="">
-          {children} {/* HeroSection, etc. ko extra padding ki zaroorat nahi */}
+          {children} 
         </div>
       </div>
     </main>
