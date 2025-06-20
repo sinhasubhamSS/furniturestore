@@ -2,10 +2,9 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import User from "../models/user.models";
 import { uploadToCloudinary } from "../utils/cloudinaryUpload";
-import {
-  generateAccessToken,
-  generateRefreshToken,
-} from "../utils/generateTokens";
+import { sendTokenResponse } from "../utils/auth/sendToken";
+import { clearAuthCookies } from "../utils/auth/cookieHelper";
+
 export const registerUser = async (
   req: Request,
   res: Response
@@ -41,17 +40,14 @@ export const registerUser = async (
     });
 
     await newUser.save();
-   console.log("user registers", newUser);
+   
 
-    
-    res.status(201).json({
-      message: "User registered successfully",
-      user: {
-        _id: newUser._id,
-        name: newUser.name,
-        email: newUser.email,
-        avatar: newUser.avatar,
-      },
+    // Send token response
+    sendTokenResponse(res, newUser._id.toString(), "Registration successful", {
+      _id: newUser._id,
+      name: newUser.name,
+      email: newUser.email,
+      avatar: newUser.avatar,
     });
   } catch (error) {
     console.error("Register Error:", error);
@@ -78,32 +74,11 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const accessToken = generateAccessToken(user._id.toString());
-    const refreshToken = generateRefreshToken(user._id.toString());
-
-    res.cookie("accessToken", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 15 * 60 * 1000,
-    });
-
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/api/auth/refresh-token",
-    });
-
-    res.status(200).json({
-      message: "Login successful",
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        avatar: user.avatar,
-      },
+    sendTokenResponse(res, user._id.toString(), "Login successful", {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -116,19 +91,7 @@ export const logoutUser = async (
   res: Response
 ): Promise<void> => {
   try {
-    res.clearCookie("accessToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-    });
-
-    res.clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/api/auth/refresh-token", // same path as you set
-    });
-
+    clearAuthCookies(res);
     res.status(200).json({ message: "Logout successful" });
   } catch (error) {
     console.error("Logout Error:", error);

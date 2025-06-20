@@ -1,44 +1,32 @@
 "use client";
 
 import { useForm } from "react-hook-form";
-import { useSignup } from "@/hooks/useSignup";
+import { useLogin } from "@/hooks/useLogin";
 import Input from "@/components/ui/Input";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
-import { useDispatch } from "react-redux";
-import { setActiveUser } from "@/redux/slices/userSlice";
-import type { AppDispatch } from "@/redux/store";
-type SignupFormValues = {
-  name: string;
+
+type LoginFormValues = {
   email: string;
   password: string;
-  confirmPassword: string;
 };
 
-const SignupPage = () => {
+const LoginPage = () => {
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<SignupFormValues>({ mode: "onChange" });
-  const dispatch = useDispatch<AppDispatch>();
-  const { signup, loading, error } = useSignup();
+  } = useForm<LoginFormValues>({ mode: "onChange" });
+
+  const { login, loading, error } = useLogin();
   const router = useRouter();
 
-  const onSubmit = async (data: SignupFormValues) => {
-    const res = await signup(data);
-
+  const onSubmit = async (data: LoginFormValues) => {
+    const res = await login(data);
     if (res?.user?._id) {
-      toast.success("Signup successful! 🎉");
+      toast.success("Login successful! 🎉");
       router.push("/");
-      dispatch(
-        setActiveUser({
-          _id: res.user._id,
-          name: res.user.name,
-          avatar: res.user.avatar,
-        })
-      );
     }
   };
 
@@ -49,16 +37,9 @@ const SignupPage = () => {
         className="w-full max-w-md bg-[var(--card-bg)] text-[var(--foreground)] p-8 rounded-2xl shadow-md transition-colors duration-300"
       >
         <h2 className="text-3xl font-bold mb-6 text-center text-[var(--text-accent)]">
-          Create Account
+          Welcome Back
         </h2>
 
-        <Input
-          label="Name"
-          name="name"
-          placeholder="Enter your name"
-          register={register("name", { required: "Name is required" })}
-          error={errors.name?.message}
-        />
         <Input
           label="Email"
           name="email"
@@ -80,19 +61,8 @@ const SignupPage = () => {
           placeholder="Enter your password"
           register={register("password", {
             required: "Password is required",
-            minLength: { value: 6, message: "Minimum 6 characters" },
           })}
           error={errors.password?.message}
-        />
-        <Input
-          label="Confirm Password"
-          name="confirmPassword"
-          type="password"
-          placeholder="Confirm your password"
-          register={register("confirmPassword", {
-            required: "Please confirm your password",
-          })}
-          error={errors.confirmPassword?.message}
         />
 
         <button
@@ -100,7 +70,7 @@ const SignupPage = () => {
           disabled={loading}
           className="w-full py-2 mt-3 bg-[var(--color-accent)] text-white rounded-md font-medium hover:opacity-90 transition-all duration-200 disabled:opacity-60"
         >
-          {loading ? "Signing up..." : "Sign up"}
+          {loading ? "Logging in..." : "Log in"}
         </button>
 
         {error && (
@@ -111,13 +81,13 @@ const SignupPage = () => {
 
         <div className="mt-4 text-sm text-center">
           <span className="text-[var(--foreground)]">
-            Already have an account?{" "}
+            Don&apos;t have an account?{" "}
           </span>
           <Link
-            href="/auth/login"
+            href="/auth/signup"
             className="text-[var(--text-accent)] font-medium hover:underline"
           >
-            Log in
+            Sign up
           </Link>
         </div>
       </form>
@@ -125,4 +95,4 @@ const SignupPage = () => {
   );
 };
 
-export default SignupPage;
+export default LoginPage;

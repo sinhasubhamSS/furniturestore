@@ -24,6 +24,7 @@ export const useSignup = () => {
     try {
       const { confirmPassword, ...signupPayload } = data;
       const res = await axiosClient.post("/user/register", signupPayload);
+      console.log(res.data);
       return res.data;
     } catch (err: any) {
       setError(err?.response?.data?.message || err.message || "Signup failed");

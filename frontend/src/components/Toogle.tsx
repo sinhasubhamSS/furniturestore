@@ -5,19 +5,22 @@ const Toggle = () => {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    // Check local storage or system preference
+    // Always default to light unless user explicitly chose dark
     const stored = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
 
-    if (stored === "dark" || (!stored && prefersDark)) {
+    if (stored === "dark") {
       document.documentElement.classList.add("dark");
       setIsDark(true);
+    } else {
+      document.documentElement.classList.remove("dark");
+      setIsDark(false);
     }
   }, []);
 
   const toggleTheme = () => {
     const newTheme = isDark ? "light" : "dark";
     localStorage.setItem("theme", newTheme);
+
     document.documentElement.classList.toggle("dark");
     setIsDark(!isDark);
   };
