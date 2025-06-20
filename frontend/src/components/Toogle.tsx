@@ -28,7 +28,7 @@ const Toggle = () => {
   return (
     <button
       onClick={toggleTheme}
-      className="px-4 py-2 rounded-sm bg-[var(--color-accent)] text-white"
+      className="px-4 py-2 rounded-sm  text-xl"
     >
       {isDark ? "🌞" : "🌙"}
     </button>

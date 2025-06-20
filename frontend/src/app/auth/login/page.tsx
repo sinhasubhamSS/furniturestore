@@ -31,7 +31,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--background)] px-4">
+    <div className="flex justify-center items-center min-h-[calc(100vh-64px)] bg-[var(--background)] px-4 py-8">
       <form
         onSubmit={handleSubmit(onSubmit)}
         className="w-full max-w-md bg-[var(--card-bg)] text-[var(--foreground)] p-8 rounded-2xl shadow-md transition-colors duration-300"
