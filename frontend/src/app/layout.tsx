@@ -1,6 +1,6 @@
 // app/layout.tsx
 import "./globals.css";
-import ReduxProviders from "./ReduxProviders"; // New component
+import ReduxProviders from "./ReduxProviders";
 
 export default function RootLayout({
   children,
@@ -8,16 +8,29 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `...(your dark mode script)...`,
+            __html: `
+              (function() {
+                try {
+                  const theme = localStorage.getItem("theme");
+                  if (theme === "dark") {
+                    document.documentElement.classList.add("dark");
+                  } else {
+                    document.documentElement.classList.remove("dark");
+                  }
+                } catch(_) {}
+              })();
+            `,
           }}
         />
       </head>
-      <body className=" max-w-[1440px] mx-auto min-h-screen bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300">
-        <ReduxProviders>{children}</ReduxProviders>
+      <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300">
+        <ReduxProviders>
+          <div className="max-w-[1440px] mx-auto">{children}</div>
+        </ReduxProviders>
       </body>
     </html>
   );

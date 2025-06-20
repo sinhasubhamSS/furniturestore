@@ -5,7 +5,6 @@ import { FiShoppingCart, FiSearch, FiUser, FiArrowRight } from "react-icons/fi";
 import type { RootState } from "@/redux/store";
 import Toggle from "@/components/Toogle";
 
-
 const Navbar = () => {
   const activeUser = useSelector((state: RootState) => state.user.activeUser);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
