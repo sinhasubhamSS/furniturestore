@@ -37,6 +37,7 @@ export const registerUser = async (
       email,
       password: hashedPassword,
       avatar: avatarUrl,
+      role: "buyer"
     });
 
     await newUser.save();

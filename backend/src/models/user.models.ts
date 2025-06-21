@@ -1,4 +1,4 @@
-import { Schema, model, models, Document } from "mongoose";
+import { Schema, model, models, Document,} from "mongoose";
 
 // 1. Interface (avoid using Document directly with generics, better to extend)
 export interface IUser extends Document {
@@ -6,6 +6,7 @@ export interface IUser extends Document {
   email: string;
   password: string;
   avatar?: string;
+  role: string;
   refreshToken?: string;
   createdAt: Date;
 }
@@ -34,6 +35,12 @@ const userSchema = new Schema<IUser>(
       type: String,
       default: "",
     },
+    role: {
+      type: String,
+      enum: ["buyer", "admin"], // seller hata de
+      default: "buyer",
+    },
+
     refreshToken: {
       type: String,
       select: false, // optional: hide refresh token from queries by default

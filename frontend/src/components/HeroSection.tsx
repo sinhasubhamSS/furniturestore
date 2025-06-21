@@ -1,104 +1,157 @@
 "use client";
 
-import { useKeenSlider } from "keen-slider/react";
-import "keen-slider/keen-slider.min.css";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const images = [
-  "/products/sofa.jpg",
-  "/products/bed.jpg",
-  "/products/chair.jpg",
+  "/products/project1.png",
+  "/products/project2.png",
+  "/products/image01.webp",
 ];
+
+const slideDuration = 6000;
 
 const HeroSection = () => {
   const router = useRouter();
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
 
-  const [sliderRef, instanceRef] = useKeenSlider<HTMLDivElement>({
-    loop: true,
-    slideChanged(slider) {
-      setCurrentSlide(slider.track.details.rel);
+  const animationRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const pauseTimeRef = useRef<number | null>(null);
+  const accumulatedTimeRef = useRef(0);
+
+  const nextSlide = useCallback(() => {
+    setCurrentIndex((prev) => (prev + 1) % images.length);
+    setProgress(0);
+    accumulatedTimeRef.current = 0;
+  }, []);
+
+  const animateProgress = useCallback(
+    (timestamp: number) => {
+      if (!startTimeRef.current) startTimeRef.current = timestamp;
+      const elapsed =
+        timestamp - startTimeRef.current + accumulatedTimeRef.current;
+      const percent = Math.min(100, (elapsed / slideDuration) * 100);
+      setProgress(percent);
+
+      if (percent >= 100) {
+        nextSlide();
+        startTimeRef.current = timestamp;
+        accumulatedTimeRef.current = 0;
+      }
+
+      animationRef.current = requestAnimationFrame(animateProgress);
     },
-    created() {
-      startTimer();
-    },
-  });
+    [nextSlide]
+  );
 
-  const startTimer = () => {
-    timerRef.current = setInterval(() => {
-      instanceRef.current?.next();
-    }, 4000);
-  };
+  const startAnimation = useCallback(() => {
+    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    if (pauseTimeRef.current) {
+      accumulatedTimeRef.current += performance.now() - pauseTimeRef.current;
+      pauseTimeRef.current = null;
+    }
+    animationRef.current = requestAnimationFrame(animateProgress);
+  }, [animateProgress]);
 
-  const stopTimer = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
+  const pauseAnimation = () => {
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+    pauseTimeRef.current = performance.now();
   };
 
   useEffect(() => {
-    return () => stopTimer();
-  }, []);
+    if (!isPaused) startAnimation();
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
+  }, [isPaused, startAnimation]);
+
+  const handlePause = () => {
+    setIsPaused(true);
+    pauseAnimation();
+  };
+
+  const handleResume = () => {
+    setIsPaused(false);
+    startAnimation();
+  };
 
   return (
-    <section className="px-8 py-10 md:py-24">
-      <div className="grid grid-cols-1 md:grid-cols-12 lg:grid-cols-10 gap-2 md:gap-6 lg:gap-8 xl:gap-6 max-w-7xl mx-auto items-center">
-        {/* Left Text */}
-        <div className="md:col-span-6 lg:col-span-5 text-center md:text-left space-y-4">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[var(--text-accent)] leading-tight">
-            Suvidha <br /> Furniture Store
-          </h1>
-          <p className="text-lg xl:text-xl font-medium text-[var(--foreground)]">
-            Quality Furniture For Every Home
-          </p>
-          <button
-            onClick={() => router.push("/products")}
-            className="bg-[var(--color-accent)] text-[var(--text-light)] px-6 py-3 rounded-md text-lg font-semibold hover:opacity-90 transition"
-          >
-            SHOP NOW
-          </button>
-        </div>
-
-        {/* Right Slider */}
-        <div className="md:col-span-6 lg:col-span-5 flex justify-center md:justify-end relative">
-          <div
-            ref={sliderRef}
-            className="keen-slider w-full max-w-xl h-64 sm:h-72 rounded-xl overflow-hidden bg-[var(--color-secondary)]"
-            onMouseEnter={stopTimer}
-            onMouseLeave={startTimer}
-            onTouchStart={stopTimer}
-            onTouchEnd={startTimer}
-          >
-            {images.map((src, i) => (
-              <div
-                key={i}
-                className="keen-slider__slide flex items-center justify-center"
-              >
-                <img
-                  src={src}
-                  alt={`Slide ${i + 1}`}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Slide Indicators */}
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
-            {images.map((_, i) => (
-              <div
-                key={i}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  i === currentSlide
-                    ? "bg-[var(--color-accent)] w-10"
-                    : "bg-gray-400 w-6"
-                }`}
-              />
-            ))}
-          </div>
-        </div>
+   <section className="px-4 sm:px-8 py-6 md:py-12">
+  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl mx-auto items-center">
+    
+    {/* Left - Text */}
+    <div className="col-span-1 md:col-span-5 text-center md:text-left space-y-4">
+      <h1 className="text-4xl sm:text-5xl lg:text-[2.75rem] xl:text-[3.25rem] font-extrabold text-[var(--text-accent)] leading-tight">
+        Suvidha <br className="md:hidden" /> Furniture Store
+      </h1>
+      <p className="text-base sm:text-lg xl:text-xl font-medium text-[var(--foreground)]">
+        Quality Furniture For Every Home
+      </p>
+      <div className="flex justify-center md:justify-start">
+        <button
+          onClick={() => router.push("/products")}
+          className="bg-[var(--color-accent)] text-[var(--text-light)] px-10 py-4 rounded-xl text-lg sm:text-xl font-semibold shadow-md hover:scale-105 hover:shadow-lg transition-all duration-300 ease-in-out"
+        >
+          🛒 SHOP NOW
+        </button>
       </div>
-    </section>
+    </div>
+
+    {/* Right - Image Slider */}
+    <div className="col-span-1 md:col-span-7 flex justify-center md:justify-end relative">
+      <div
+        className="relative w-full max-w-xl h-72 sm:h-80 md:h-88 lg:h-96 xl:h-104 2xl:h-112 rounded-xl overflow-hidden bg-[var(--color-secondary)]"
+        onMouseEnter={handlePause}
+        onMouseLeave={handleResume}
+        onTouchStart={handlePause}
+        onTouchEnd={handleResume}
+      >
+        {images.map((src, index) => (
+          <img
+            key={index}
+            src={src}
+            alt={`Slide ${index + 1}`}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${
+              index === currentIndex ? "opacity-100" : "opacity-0"
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Progress Bars */}
+      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
+        {images.map((_, index) => (
+          <div
+            key={index}
+            className="h-1.5 w-10 bg-gray-300 rounded-full overflow-hidden"
+          >
+            {index === currentIndex && (
+              <div
+                className="h-full bg-[var(--color-accent)] rounded-full"
+                style={{
+                  width: `${progress}%`,
+                  transform:
+                    progress > 0 && progress < 100 ? "scaleY(1.5)" : "scaleY(1)",
+                  transition: isPaused
+                    ? "none"
+                    : "width 0.1s linear, transform 0.3s ease-in-out",
+                  transformOrigin: "center",
+                }}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
+
   );
 };
 
