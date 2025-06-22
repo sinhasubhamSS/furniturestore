@@ -13,4 +13,11 @@ router.post(
   upload.array("images", 5),
   createProduct
 );
+router.put(
+  "/editproduct/:id",
+  authVerify,
+  isAdmin,
+  upload.array("images", 5),
+  updateProduct
+);
 export default router

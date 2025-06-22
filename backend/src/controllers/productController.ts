@@ -9,6 +9,7 @@ export const createProduct = async (
   try {
     const { name, title, description, price, stock, category } = req.body;
     const files = req.files as Express.Multer.File[];
+    console.log("FILES RECEIVED:", req.files);
 
     if (!name || !title || !description || !price || !stock || !category) {
       res.status(400).json({ message: "All fields are required" });
@@ -55,6 +56,7 @@ export const updateProduct = async (
     const { id } = req.params;
     const { name, title, description, price, stock, category } = req.body;
     const files = req.files as Express.Multer.File[];
+    console.log("FILES RECEIVED:", req.files);
 
     if (!id) {
       res.status(400).json({ message: "Product ID is required" });
