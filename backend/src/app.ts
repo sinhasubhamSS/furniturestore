@@ -10,7 +10,9 @@ app.use(cookieParser());
 app.use(express.json());
 
 
-import userRoutes from "./routes/userRoutes";   
+import userRoutes from "./routes/userRoutes";
+import productRoutes from "./routes/productRoutes"   
 app.use("/api/user", userRoutes);
+app.use("/api/products", productRoutes);
 
 export default app;

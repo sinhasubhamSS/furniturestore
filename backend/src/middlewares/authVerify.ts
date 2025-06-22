@@ -1,17 +1,13 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-
-// Custom Request interface to add userId (so TypeScript doesn't complain)
-interface AuthRequest extends Request {
-  userId?: string;
-}
-
-export const authVerify = (
+import User from "../models/user.models";
+import { AuthRequest } from "../types/app-request";
+export const authVerify = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
-) => {
-  const token = req.cookies.accessToken; // 👈 Reading from cookies
+): Promise<void> => {
+  const token = req.cookies.accessToken;
 
   if (!token) {
     res.status(401).json({ message: "Unauthorized: Token not found" });
@@ -19,17 +15,22 @@ export const authVerify = (
   }
 
   try {
-    // Verifying token
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET!) as {
       userId: string;
     };
 
-    // Adding userId to request object for later use
-    req.userId = decoded.userId;
+    const user = await User.findById(decoded.userId).select(
+      "-password -refreshToken"
+    );
 
-    next(); // Proceed to the next middleware/route
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    req.user = user;
+    next(); // continue to next middleware
   } catch (error) {
     res.status(401).json({ message: "Invalid or expired token" });
-    return;
   }
 };

@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import Product from "../models/product.models";
 import { uploadToCloudinary } from "../utils/cloudinaryUpload";
-
+import { AuthRequest } from "../types/app-request";
 export const createProduct = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
 ): Promise<void> => {
   try {
@@ -35,7 +35,7 @@ export const createProduct = async (
       stock,
       category,
       images: imageUrls,
-      createdBy: req.userId, // this works if you've set `userId` globally in types
+      createdBy: req.user?._id, //
     });
 
     await newProduct.save();
