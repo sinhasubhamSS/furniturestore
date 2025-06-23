@@ -1,7 +1,8 @@
-import { Schema, model, models, Document,} from "mongoose";
+import { Schema, model, models, Document ,Types} from "mongoose";
 
 // 1. Interface (avoid using Document directly with generics, better to extend)
 export interface IUser extends Document {
+  _id: Types.ObjectId;
   name: string;
   email: string;
   password: string;
