@@ -14,5 +14,4 @@ const cartSchema = new Schema<CartDocument>(
   },
   { timestamps: true }
 );
-
 export const Cart = model<CartDocument>("Cart", cartSchema);
