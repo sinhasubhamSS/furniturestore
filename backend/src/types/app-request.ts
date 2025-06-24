@@ -4,4 +4,5 @@ import { IUser } from "../models/user.models";
 
 export interface AuthRequest extends Request {
   user?: IUser;
+  userId?: string;
 }

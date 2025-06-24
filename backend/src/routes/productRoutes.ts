@@ -1,6 +1,18 @@
-import { Router } from "express";
 
-import { createProduct, updateProduct } from "../controllers/productController";
+// updateProductImages,
+// softDeleteProduct,
+// paginateProducts,
+
+import { Router } from "express";
+import {
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  getAllProducts,
+  getProductById,
+  searchProducts,
+  getProductsByCategory,
+} from "../controllers/productController";
 import upload from "../middlewares/multer";
 import { authVerify } from "../middlewares/authVerify";
 import { isAdmin } from "../middlewares/isAdmin";
@@ -14,10 +26,16 @@ router.post(
   createProduct
 );
 router.put(
-  "/editproduct/:id",
+  "/editproduct/:productId",
   authVerify,
   isAdmin,
   upload.array("images", 5),
   updateProduct
 );
-export default router
+router.delete("/deleteproduct/:productId", authVerify, isAdmin, deleteProduct);
+router.get("/getallproducts", getAllProducts);
+router.get("/getproductbyid/:productId", getProductById);
+router.get("/search", searchProducts);
+router.get("/category/:category", getProductsByCategory);
+
+export default router;

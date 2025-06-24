@@ -29,6 +29,7 @@ export const authVerify = async (
     }
 
     req.user = user;
+    req.userId = user._id.toString();
     next(); // continue to next middleware
   } catch (error) {
     res.status(401).json({ message: "Invalid or expired token" });
