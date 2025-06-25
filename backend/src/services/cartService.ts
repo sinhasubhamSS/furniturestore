@@ -22,6 +22,7 @@ class CartService {
     if (existingItem) {
       existingItem.quantity += quantity;
       await existingItem.save();
+      return cart;
     } else {
       const newItem = await CartItem.create({
         user: userId,
@@ -38,12 +39,45 @@ class CartService {
   async getCart(userId: string) {
     //ab what is next step ki user id sa find karte hai uska cart thik hai
     // then cart me item ka id hai and uss item ka andar product ka id hai usko populate kar denge
-    const cart = await Cart.findOne({ user: userId }).populate({
-      path: "items",
-      populate: {
-        path: "product",
+    // const cart = await Cart.findOne({ user: userId }).populate({
+    //   path: "items",
+    //   populate: {
+    //     path: "product",
+    //   },
+    // });
+    const cart = await Cart.aggregate([
+      { $match: { user:new Types.ObjectId (userId) } },
+      {
+        $lookup: {
+          from: "cartitems",
+          localField: "items",
+          foreignField: "_id",
+          as: "items",
+        },
       },
-    });
+      { $unwind: "$items" },
+      {
+        $lookup: {
+          from: "products",
+          localField: "items.product",
+          foreignField: "_id",
+          as: "items.product",
+        },
+      },
+      { $unwind: "$items.product" },
+      {
+        $project: {
+          "items._id": 1,
+          "items.quantity": 1,
+          "items.product._id": 1,
+          "items.product.name": 1,
+          "items.product.price": 1,
+          "items.product.image": 1,
+          // Remove unnecessary fields
+          
+        },
+      },
+    ]);
 
     if (!cart) throw new AppError("Cart not found", 404);
     return cart;
@@ -83,8 +117,8 @@ class CartService {
     return { message: "Cart cleared" };
   }
   async getCartCount(userId: string) {
-    const cart = await Cart.findOne({ user: userId });
-    return cart ? cart.items.length : 0;
+    const items = await CartItem.find({ user: userId });
+    return items.reduce((acc, item) => acc + item.quantity, 0);
   }
 }
 export const cartService = new CartService();
