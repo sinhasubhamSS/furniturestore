@@ -16,5 +16,6 @@ const cartItemSchema = new Schema<CartItemDocument>(
   },
   { timestamps: true }
 );
+cartItemSchema.index({ user: 1, product: 1 }, { unique: true });
 
 export const CartItem = model<CartItemDocument>("CartItem", cartItemSchema);
