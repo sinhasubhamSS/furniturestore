@@ -82,11 +82,13 @@ class ProductService {
     return await Product.find(filter).sort({ createdAt: -1 });
   }
   async searchProducts(query: string) {
-    const regex = new RegExp(query, "i");
     return await Product.find({
-      $or: [{ name: { $regex: regex } }, { description: { $regex: regex } }],
-    }).sort({ createdAt: -1 });
+      $text: { $search: query },
+    })
+      .sort({ score: { $meta: "textScore" } }) // Sort by match relevance
+      .select({ score: { $meta: "textScore" } }); // Optionally include score in result
   }
+
   async getProductsByCategory(category: string) {
     return await Product.find({ category: category.trim() }).sort({
       createdAt: -1,

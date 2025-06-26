@@ -1,4 +1,4 @@
-//if agar mongoose instance bnnane ki need hai tab document ka use karna hota hai 
+//if agar mongoose instance bnnane ki need hai tab document ka use karna hota hai
 
 import { Schema, model, Document, Types } from "mongoose";
 
@@ -9,8 +9,19 @@ export interface CartDocument extends Document {
 
 const cartSchema = new Schema<CartDocument>(
   {
-    user: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true },
-    items: [{ type: Schema.Types.ObjectId, ref: "CartItem" }],
+    user: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      unique: true,
+    },
+    items: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "CartItem",
+        default: [],
+      },
+    ],
   },
   { timestamps: true }
 );

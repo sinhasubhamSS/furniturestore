@@ -19,8 +19,22 @@ export const createProduct = catchAsync(
     if (!files || files.length === 0)
       throw new AppError("No files uploaded", 400);
 
+    let { basePrice, gstRate, ...rest } = parsedData;
+
+    // ✅ Convert GST to decimal if it's greater than 1 (e.g., 18 -> 0.18)
+    gstRate = gstRate > 1 ? gstRate / 100 : gstRate;
+
+    const finalPrice = basePrice + basePrice * gstRate;
+
+    const productInput = {
+      ...rest,
+      basePrice,
+      gstRate, // ✅ Store as decimal
+      price: finalPrice, // ✅ price includes GST (no shipping)
+    };
+
     const product = await productService.createProduct(
-      parsedData,
+      productInput,
       files,
       req.userId
     );

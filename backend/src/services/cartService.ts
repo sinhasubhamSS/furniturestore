@@ -6,23 +6,21 @@ import { AppError } from "../utils/AppError";
 class CartService {
   async addToCart(userId: string, productId: string, quantity: number) {
     if (!productId || quantity <= 0)
-      throw new AppError("product id or quantity is required", 403);
+      throw new AppError("Product ID or quantity is required", 403);
 
     let cart = await Cart.findOne({ user: userId });
-    //we chaecked cart hai ki nhi ab hai to thik hai but nahi hai to cart create karna hoga
     if (!cart) {
       cart = await Cart.create({ user: userId, items: [] });
     }
-    //ab agar  jo product add to cart kar rhe hai agar wo pahla sa hai then check karte hai
+
     let existingItem = await CartItem.findOne({
       user: userId,
       product: productId,
     });
-    //ab agar wahi product available hai to uska count quantity increase kar date hi aur agar nahi hai to naya bana ke add kar data hu
+
     if (existingItem) {
       existingItem.quantity += quantity;
       await existingItem.save();
-      return cart;
     } else {
       const newItem = await CartItem.create({
         user: userId,
@@ -31,57 +29,96 @@ class CartService {
         addedAt: new Date(),
       });
       cart.items.push(newItem._id as Types.ObjectId);
+      await cart.save();
     }
 
-    await cart.save();
-    return cart;
+    return this.getCart(userId);
   }
-  async getCart(userId: string) {
-    //ab what is next step ki user id sa find karte hai uska cart thik hai
-    // then cart me item ka id hai and uss item ka andar product ka id hai usko populate kar denge
-    // const cart = await Cart.findOne({ user: userId }).populate({
-    //   path: "items",
-    //   populate: {
-    //     path: "product",
-    //   },
-    // });
-    const cart = await Cart.aggregate([
-      { $match: { user:new Types.ObjectId (userId) } },
-      {
-        $lookup: {
-          from: "cartitems",
-          localField: "items",
-          foreignField: "_id",
-          as: "items",
-        },
-      },
-      { $unwind: "$items" },
-      {
-        $lookup: {
-          from: "products",
-          localField: "items.product",
-          foreignField: "_id",
-          as: "items.product",
-        },
-      },
-      { $unwind: "$items.product" },
-      {
-        $project: {
-          "items._id": 1,
-          "items.quantity": 1,
-          "items.product._id": 1,
-          "items.product.name": 1,
-          "items.product.price": 1,
-          "items.product.image": 1,
-          // Remove unnecessary fields
-          
-        },
-      },
-    ]);
 
-    if (!cart) throw new AppError("Cart not found", 404);
-    return cart;
-  }
+ async getCart(userId: string) {
+  const cart = await Cart.aggregate([
+    { $match: { user: new Types.ObjectId(userId) } },
+    
+    // Lookup and process items in a single stage
+    {
+      $lookup: {
+        from: "cartitems",
+        localField: "items",
+        foreignField: "_id",
+        as: "items",
+        pipeline: [
+          // Lookup product details
+          {
+            $lookup: {
+              from: "products",
+              localField: "product",
+              foreignField: "_id",
+              as: "product",
+            }
+          },
+          // Unwind product while preserving items
+          { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
+          
+          // Add calculated fields
+          {
+            $addFields: {
+              subtotal: {
+                $cond: [
+                  { $ifNull: ["$product", false] },
+                  { $multiply: ["$quantity", "$product.basePrice"] },
+                  0
+                ]
+              },
+              gstAmount: {
+                $cond: [
+                  { $ifNull: ["$product", false] },
+                  {
+                    $multiply: [
+                      { $multiply: ["$quantity", "$product.basePrice"] },
+                      "$product.gstRate"
+                    ]
+                  },
+                  0
+                ]
+              },
+              totalWithGST: {
+                $cond: [
+                  { $ifNull: ["$product", false] },
+                  { $multiply: ["$quantity", "$product.price"] },
+                  0
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    
+    // Calculate cart totals
+    {
+      $addFields: {
+        cartSubtotal: { $sum: "$items.subtotal" },
+        cartGST: { $sum: "$items.gstAmount" },
+        cartTotal: { $sum: "$items.totalWithGST" }
+      }
+    },
+    
+    // Add verification field
+    {
+      $addFields: {
+        totalVerification: {
+          $eq: [
+            { $round: ["$cartTotal", 2] },
+            { $round: [{ $add: ["$cartSubtotal", "$cartGST"] }, 2] }
+          ]
+        }
+      }
+    }
+  ]);
+
+  if (!cart.length) throw new AppError("Cart not found", 404);
+  return cart[0];
+}
   async updateQuantity(userId: string, productId: string, quantity: number) {
     if (quantity <= 0) {
       return this.removeItem(userId, productId);
@@ -93,8 +130,9 @@ class CartService {
     item.quantity = quantity;
     await item.save();
 
-    return item;
+    return this.getCart(userId);
   }
+
   async removeItem(userId: string, productId: string) {
     const item = await CartItem.findOneAndDelete({
       user: userId,
@@ -104,8 +142,9 @@ class CartService {
 
     await Cart.updateOne({ user: userId }, { $pull: { items: item._id } });
 
-    return { message: "Item removed from cart" };
+    return this.getCart(userId);
   }
+
   async clearCart(userId: string) {
     const cart = await Cart.findOne({ user: userId });
     if (!cart) throw new AppError("Cart not found", 404);
@@ -114,11 +153,13 @@ class CartService {
     cart.items = [];
     await cart.save();
 
-    return { message: "Cart cleared" };
+    return this.getCart(userId);
   }
+
   async getCartCount(userId: string) {
     const items = await CartItem.find({ user: userId });
     return items.reduce((acc, item) => acc + item.quantity, 0);
   }
 }
+
 export const cartService = new CartService();
