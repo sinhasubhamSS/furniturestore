@@ -4,7 +4,7 @@ import { Order } from "../models/order.models";
 
 interface ShippingAddress {
   address: string;
-  Landmark: string;
+  landmark: string;
   city: string;
   pincode: string;
   state: string;
