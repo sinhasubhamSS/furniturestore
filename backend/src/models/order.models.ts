@@ -1,18 +1,60 @@
 import { Schema, model, Document, Types } from "mongoose";
 
-export type OrderStatus =
-  | "pending"
-  | "confirmed"
-  | "shipped"
-  | "delivered"
-  | "cancelled"
-  | "refunded";
+// Enum for order status
+export enum OrderStatus {
+  Pending = "pending",
+  Confirmed = "confirmed",
+  Shipped = "shipped",
+  Delivered = "delivered",
+  Cancelled = "cancelled",
+  Refunded = "refunded",
+}
 
+// Enum for payment method (optional but good practice)
+export enum PaymentMethod {
+  COD = "Cash on Delivery",
+  UPI = "UPI",
+  Card = "Card",
+  NetBanking = "Net Banking",
+}
+
+// Order Item snapshot interface
+export interface OrderItemSnapshot {
+  productId: Types.ObjectId;
+  name: string;
+  image?: string;
+  quantity: number;
+  price: number;
+}
+
+// Shipping Address snapshot interface
+export interface ShippingAddressSnapshot {
+  fullName: string;
+  mobile: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  landmark?: string;
+  state: string;
+  pincode: string;
+  country: string;
+}
+
+// Payment Snapshot interface
+export interface PaymentSnapshot {
+  method?: PaymentMethod;
+  status?: string;
+  transactionId?: string;
+  provider?: string;
+  paidAt?: Date;
+}
+
+// Final Order Document interface
 export interface OrderDocument extends Document {
   user: Types.ObjectId;
-  orderItems: Types.ObjectId[];
-  shippingAddress: Types.ObjectId;
-  payment: Types.ObjectId;
+  orderItemsSnapshot: OrderItemSnapshot[];
+  shippingAddressSnapshot: ShippingAddressSnapshot;
+  paymentSnapshot: PaymentSnapshot;
   status: OrderStatus;
   totalAmount: number;
   placedAt: Date;
@@ -20,53 +62,54 @@ export interface OrderDocument extends Document {
 
 const orderSchema = new Schema<OrderDocument>(
   {
-    user: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    orderItems: [
+    user: { type: Schema.Types.ObjectId, ref: "User", required: true },
+
+    orderItemsSnapshot: [
       {
-        type: Schema.Types.ObjectId,
-        ref: "OrderItem",
-        required: true,
+        productId: { type: Schema.Types.ObjectId, required: true },
+        name: { type: String, required: true },
+        image: String,
+        quantity: { type: Number, required: true },
+        price: { type: Number, required: true },
       },
     ],
-    shippingAddress: {
-      type: Schema.Types.ObjectId,
-      ref: "Address",
-      required: true,
+
+    shippingAddressSnapshot: {
+      fullName: { type: String, required: true },
+      mobile: { type: String, required: true },
+      addressLine1: { type: String, required: true },
+      addressLine2: String,
+      city: { type: String, required: true },
+      landmark: String,
+      state: { type: String, required: true },
+      pincode: { type: String, required: true },
+      country: { type: String, required: true },
     },
-    payment: {
-      type: Schema.Types.ObjectId,
-      ref: "Payment",
-      required: true,
+
+    paymentSnapshot: {
+      method: {
+        type: String,
+        enum: Object.values(PaymentMethod),
+      },
+      status: String,
+      transactionId: String,
+      provider: String,
+      paidAt: Date,
     },
+
     status: {
       type: String,
-      enum: [
-        "pending",
-        "confirmed",
-        "shipped",
-        "delivered",
-        "cancelled",
-        "refunded",
-      ],
-      default: "pending",
+      enum: Object.values(OrderStatus),
+      default: OrderStatus.Pending,
     },
-    totalAmount: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-    placedAt: {
-      type: Date,
-      default: Date.now,
-    },
+
+    totalAmount: { type: Number, required: true },
+    placedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
 
-orderSchema.index({ user: 1, placedAt: -1 }); // Fast recent order lookup per user
+// Index for recent user orders
+orderSchema.index({ user: 1, placedAt: -1 });
 
 export const Order = model<OrderDocument>("Order", orderSchema);

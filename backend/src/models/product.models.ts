@@ -1,5 +1,4 @@
 import { Schema, model, models, Document, Types } from "mongoose";
-import { title } from "process";
 
 // Interface
 export interface IProduct extends Document {
