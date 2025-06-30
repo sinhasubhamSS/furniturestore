@@ -1,5 +1,5 @@
 import { Response, NextFunction } from "express";
-import { orderService } from "../services/orderService";
+import { createOrderFromProductPage } from "../services/orderService";
 import { ApiResponse } from "../utils/ApiResponse";
 import { PaymentMethod } from "../models/order.models";
 import { AuthRequest } from "../types/app-request";
@@ -12,16 +12,27 @@ export const buyNowOrder = async (
   try {
     const userId = req.userId;
 
-    const { productId, quantity, address, paymentMethod } = req.body;
     if (!userId) {
       return next(new Error("User ID is missing from request"));
     }
-    const order = await orderService.createOrder(userId, "buy-now", {
-      productId,
-      quantity,
-      address,
-      paymentMethod,
-    });
+
+    const { productId, quantity, address, paymentMethod } = req.body;
+
+    // Construct PlaceOrderRequest object
+    const orderData = {
+      items: [
+        {
+          productId,
+          quantity,
+        },
+      ],
+      shippingAddress: address,
+      payment: {
+        method: paymentMethod,
+      },
+    };
+
+    const order = await createOrderFromProductPage(userId, orderData);
 
     return res
       .status(201)
