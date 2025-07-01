@@ -1,92 +1,27 @@
-import { Response, NextFunction } from "express";
-import { createOrderFromProductPage } from "../services/orderService";
-import { ApiResponse } from "../utils/ApiResponse";
-import { PaymentMethod } from "../models/order.models";
+import { Response } from "express";
+
+import OrderService from "../services/orderService";
 import { AuthRequest } from "../types/app-request";
+import { catchAsync } from "../utils/catchAsync";
 
-export const buyNowOrder = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
+const orderService = new OrderService();
+
+export const placeOrder = catchAsync(
+  async (req: AuthRequest, res: Response) => {
     const userId = req.userId;
-
     if (!userId) {
-      return next(new Error("User ID is missing from request"));
+      return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    const { productId, quantity, address, paymentMethod } = req.body;
+    const order = await orderService.placeOrderFromProductPage(
+      userId,
+      req.body
+    );
 
-    // Construct PlaceOrderRequest object
-    const orderData = {
-      items: [
-        {
-          productId,
-          quantity,
-        },
-      ],
-      shippingAddress: address,
-      payment: {
-        method: paymentMethod,
-      },
-    };
-
-    const order = await createOrderFromProductPage(userId, orderData);
-
-    return res
-      .status(201)
-      .json(new ApiResponse(201, order, "Order placed successfully"));
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const buyAllCartOrder = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const userId = req.userId;
-    const { address, paymentMethod } = req.body;
-    if (!userId) {
-      return next(new Error("User ID is missing from request"));
-    }
-    const order = await orderService.createOrder(userId, "cart-all", {
-      address,
-      paymentMethod,
+    res.status(201).json({
+      success: true,
+      message: "Order placed successfully",
+      orderId: order._id,
     });
-
-    return res
-      .status(201)
-      .json(new ApiResponse(201, order, "Order placed from full cart"));
-  } catch (error) {
-    next(error);
   }
-};
-
-export const buySelectedCartOrder = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const userId = req.userId;
-    const { selectedIds, address, paymentMethod } = req.body;
-    if (!userId) {
-      return next(new Error("User ID is missing from request"));
-    }
-    const order = await orderService.createOrder(userId, "cart-selected", {
-      selectedIds,
-      address,
-      paymentMethod,
-    });
-
-    return res
-      .status(201)
-      .json(new ApiResponse(201, order, "Selected cart items ordered"));
-  } catch (error) {
-    next(error);
-  }
-};
+);

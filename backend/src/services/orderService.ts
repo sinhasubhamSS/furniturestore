@@ -1,59 +1,54 @@
-import { Types } from "mongoose";
 import Product from "../models/product.models";
 import { Order } from "../models/order.models";
-import { PlaceOrderRequest, PlaceOrderItem } from "../types/orderservicetypes";
-import { OrderStatus } from "../models/order.models";
+import { PlaceOrderRequest } from "../types/orderservicetypes";
 
-export const createOrderFromProductPage = async (
-  userId: Types.ObjectId,
-  orderData: PlaceOrderRequest
-) => {
-  const { items, shippingAddress, payment } = orderData;
+class OrderService {
+  async placeOrderFromProductPage(
+    userId: string,
+    orderData: PlaceOrderRequest
+  ) {
+    const { items, shippingAddress, payment } = orderData;
 
-  // Step 1: Get all product IDs
-  const productIds = items.map((item) => item.productId);
-  const products = await Product.find({ _id: { $in: productIds } });
+    const orderItemsSnapshot = [];
+    let totalAmount = 0;
 
-  // Step 2: Create snapshot of each order item
-  const orderItemsSnapshot = items.map((item) => {
-    const product = products.find((p) => p._id.toString() === item.productId);
+    for (const item of items) {
+      const product = await Product.findById(item.productId);
+      if (!product) throw new Error(`Product not found: ${item.productId}`);
 
-    if (!product) {
-      throw new Error("Product not found: " + item.productId);
+      if (product.stock < item.quantity) {
+        throw new Error(`Insufficient stock for product: ${product.name}`);
+      }
+
+      const itemTotal = product.price * item.quantity;
+      totalAmount += itemTotal;
+
+      orderItemsSnapshot.push({
+        productId: product._id,
+        name: product.name,
+        image: product.images?.[0] || "",
+        quantity: item.quantity,
+        price: product.price,
+      });
+
+      product.stock -= item.quantity;
+      await product.save();
     }
 
-    return {
-      productId: product._id,
-      name: product.name,
-      image: product.image,
-      quantity: item.quantity,
-      price: product.price,
-    };
-  });
-
-  // Step 3: Calculate total
-  const totalAmount = orderItemsSnapshot.reduce(
-    (sum, item) => sum + item.quantity * item.price,
-    0
-  );
-
-  // Step 4: Create the order
-  const newOrder = new Order({
-    user: userId,
-    orderItemsSnapshot,
-    shippingAddressSnapshot: shippingAddress,
-    paymentSnapshot: {
-      ...payment,
+    const newOrder = await Order.create({
+      user: userId,
+      orderItemsSnapshot,
+      shippingAddressSnapshot: shippingAddress,
+      paymentSnapshot: {
+        ...payment,
+        status: "pending",
+      },
+      totalAmount,
       status: "pending",
-    },
-    status: OrderStatus.Pending,
-    totalAmount,
-  });
+    });
 
-  await newOrder.save();
+    return newOrder;
+  }
+}
 
-  return {
-    message: "Order placed successfully",
-    orderId: newOrder._id,
-  };
-};
+export default OrderService;
