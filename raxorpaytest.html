@@ -1,0 +1,48 @@
+<!-- test-razorpay.html -->
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+
+<body>
+    <button id="rzp-button1">Pay</button>
+    <script>
+        const options = {
+            key: "rzp_test_YwrRDqrQp0C8TA", // test key
+            amount: 18880000, // same as backend
+            currency: "INR",
+            name: "Test Payment",
+            description: "Testing Manual",
+            order_id: "order_Qo7yuWacMytZUG", // order id from backend
+            handler: function (response) {
+                console.log("Payment success");
+                console.log(response);
+
+                // You’ll get these 3:
+                // response.razorpay_payment_id
+                // response.razorpay_order_id
+                // response.razorpay_signature
+
+                // You can copy-paste these into Postman to hit verifyPayment API
+            },
+            prefill: {
+                name: "Your Name",
+                email: "test@example.com",
+                contact: "9999999999",
+            },
+            theme: {
+                color: "#3399cc",
+            },
+        };
+
+        const rzp1 = new Razorpay(options);
+        document.getElementById("rzp-button1").onclick = function (e) {
+            rzp1.open();
+            e.preventDefault();
+        };
+    </script>
+</body>
+
+</html>

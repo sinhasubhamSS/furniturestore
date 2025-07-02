@@ -22,6 +22,7 @@ export interface PlaceOrderPayment {
   transactionId?: string;
   provider?: string;
   paidAt?: Date;
+  razorpayOrderId?: string;
 }
 
 export interface PlaceOrderRequest {

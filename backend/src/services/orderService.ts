@@ -40,8 +40,10 @@ class OrderService {
       orderItemsSnapshot,
       shippingAddressSnapshot: shippingAddress,
       paymentSnapshot: {
-        ...payment,
+        method: payment.method,
         status: "pending",
+        provider: payment.method === "COD" ? "CASH" : "RAZORPAY",
+        razorpayOrderId: payment.razorpayOrderId || null,
       },
       totalAmount,
       status: "pending",

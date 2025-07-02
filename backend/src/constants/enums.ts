@@ -3,6 +3,7 @@ export enum PaymentMethodEnum {
   UPI = "UPI",
   CARD = "CARD",
   NETBANKING = "NETBANKING",
+
 }
 
 export enum PaymentStatusEnum {
