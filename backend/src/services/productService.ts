@@ -89,10 +89,18 @@ class ProductService {
       .select({ score: { $meta: "textScore" } }); // Optionally include score in result
   }
 
-  async getProductsByCategory(category: string) {
-    return await Product.find({ category: category.trim() }).sort({
-      createdAt: -1,
-    });
+  async getProductsByCategory(category: string, limit?: number) {
+    return await Product.find({ category: category.trim() })
+      .sort({
+        createdAt: -1,
+      })
+      .lean();
+  }
+  async getLatestProducts(limit: number = 8) {
+    return Product.find({})
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .select("name price images createdAt"); // Only necessary fields
   }
 }
 // ✅ Export instance

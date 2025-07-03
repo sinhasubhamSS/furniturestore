@@ -12,6 +12,7 @@ import {
   getProductById,
   searchProducts,
   getProductsByCategory,
+  getLatestProducts,
 } from "../controllers/productController";
 import upload from "../middlewares/multer";
 import { authVerify } from "../middlewares/authVerify";
@@ -37,5 +38,6 @@ router.get("/getallproducts", getAllProducts);
 router.get("/getproductbyid/:productId", getProductById);
 router.get("/search", searchProducts);
 router.get("/category/:category", getProductsByCategory);
+router.get("/latest-products", getLatestProducts);
 
 export default router;

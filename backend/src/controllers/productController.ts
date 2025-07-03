@@ -128,3 +128,12 @@ export const getProductsByCategory = catchAsync(
       );
   }
 );
+export const getLatestProducts = catchAsync(
+  async (req: AuthRequest, res: Response) => {
+    const limit = parseInt(req.query.limit as string) || 8;
+    const products = await productService.getLatestProducts(limit);
+    res
+      .status(200)
+      .json(new ApiResponse(200, products, "Latest products fetched"));
+  }
+);
