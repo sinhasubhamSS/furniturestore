@@ -1,3 +1,4 @@
+import Category from "../models/category.model";
 import Product from "../models/product.models";
 import { IProductInput } from "../types/productservicetype";
 import { AppError } from "../utils/AppError";
@@ -89,11 +90,13 @@ class ProductService {
       .select({ score: { $meta: "textScore" } }); // Optionally include score in result
   }
 
-  async getProductsByCategory(category: string, limit?: number) {
-    return await Product.find({ category: category.trim() })
-      .sort({
-        createdAt: -1,
-      })
+  async getProductsByCategory(slug: string, limit?: number) {
+    const category = await Category.findOne({ slug });
+    if (!category) throw new AppError("Category not found", 404);
+
+    return await Product.find({ category: category._id })
+      .sort({ createdAt: -1 })
+      .limit(limit || 0)
       .lean();
   }
   async getLatestProducts(limit: number = 8) {

@@ -1,8 +1,10 @@
 import { Schema, model, models, Document, Types } from "mongoose";
+import slugify from "slugify";
 
 // Interface
 export interface IProduct extends Document {
   name: string;
+  slug: string;
   title: string;
   description: string;
   gstRate: number;
@@ -10,7 +12,7 @@ export interface IProduct extends Document {
   basePrice: number;
   images: string[]; // Cloudinary URLs
   stock: number;
-  category: string;
+  category: Types.ObjectId;
   createdBy: Types.ObjectId; // userId of admin (ref to User model)
   createdAt: Date;
 }
@@ -22,6 +24,11 @@ const productSchema = new Schema<IProduct>(
       type: String,
       required: [true, "Product name is required"],
       trim: true,
+    },
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
     },
     title: {
       type: String,
@@ -42,7 +49,7 @@ const productSchema = new Schema<IProduct>(
     },
     basePrice: {
       type: Number,
-      required: [true, "Price is required"],
+      required: [true, "Base price is required"],
     },
     images: [
       {
@@ -56,9 +63,9 @@ const productSchema = new Schema<IProduct>(
       default: 1,
     },
     category: {
-      type: String,
+      type: Schema.Types.ObjectId,
+      ref: "Category",
       required: true,
-      trim: true,
     },
     createdBy: {
       type: Schema.Types.ObjectId,
@@ -73,23 +80,33 @@ const productSchema = new Schema<IProduct>(
   { timestamps: true }
 );
 
+// ✅ Slugify before saving
+productSchema.pre("save", function (next) {
+  if (!this.isModified("name")) return next();
+  this.slug = slugify(this.name, { lower: true, strict: true });
+  next();
+});
+
+// ✅ Text Index
 productSchema.index(
   {
     name: "text",
     title: "text",
     description: "text",
-    category: "text",
   },
   {
     weights: {
       name: 10,
       title: 5,
       description: 3,
-      category: 2,
     },
     name: "productSearchIndex",
   }
 );
+
+// ✅ Category + Price index
 productSchema.index({ category: 1, price: -1 });
+
+// ✅ Export model
 const Product = models.Product || model<IProduct>("Product", productSchema);
 export default Product;

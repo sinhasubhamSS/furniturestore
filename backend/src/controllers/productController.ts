@@ -4,6 +4,7 @@ import { AuthRequest } from "../types/app-request";
 import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 import { ApiResponse } from "../utils/ApiResponse";
+import slugify from "slugify";
 import {
   createProductSchema,
   updateProductSchema,
@@ -19,18 +20,20 @@ export const createProduct = catchAsync(
     if (!files || files.length === 0)
       throw new AppError("No files uploaded", 400);
 
-    let { basePrice, gstRate, ...rest } = parsedData;
+    let { basePrice, gstRate, name, ...rest } = parsedData;
 
-    // ✅ Convert GST to decimal if it's greater than 1 (e.g., 18 -> 0.18)
     gstRate = gstRate > 1 ? gstRate / 100 : gstRate;
-
     const finalPrice = basePrice + basePrice * gstRate;
 
+    const slug = slugify(name, { lower: true, strict: true });
+
     const productInput = {
-      ...rest,
+      name,
+      slug,
       basePrice,
-      gstRate, // ✅ Store as decimal
-      price: finalPrice, // ✅ price includes GST (no shipping)
+      gstRate,
+      price: finalPrice,
+      ...rest,
     };
 
     const product = await productService.createProduct(
@@ -53,8 +56,18 @@ export const updateProduct = catchAsync(
 
     if (!req.userId) throw new AppError("Unauthorized", 401);
 
+    let updatedData = { ...parsedData };
+
+    // ✅ If name is updated, regenerate slug
+    if (parsedData.name) {
+      updatedData.slug = slugify(parsedData.name, {
+        lower: true,
+        strict: true,
+      });
+    }
+
     const updated = await productService.updateProduct(
-      parsedData,
+      updatedData,
       files,
       req.params.productId,
       req.userId
@@ -82,7 +95,7 @@ export const deleteProduct = catchAsync(
   }
 );
 
-// ✅ Get Single Product (No auth required here)
+// ✅ Get Single Product by ID
 export const getProductById = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const product = await productService.getProductById(req.params.productId);
@@ -93,7 +106,7 @@ export const getProductById = catchAsync(
   }
 );
 
-// ✅ Get All Products (public)
+// ✅ Get All Products
 export const getAllProducts = catchAsync(
   async (_req: AuthRequest, res: Response) => {
     const products = await productService.getAllProducts();
@@ -104,10 +117,13 @@ export const getAllProducts = catchAsync(
       );
   }
 );
+
+// ✅ Search Products
 export const searchProducts = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const keyword = req.query.q?.toString().trim();
-    if (!keyword) throw new AppError("search query is  requuired", 400);
+    if (!keyword) throw new AppError("Search query is required", 400);
+
     const products = await productService.searchProducts(keyword);
     res
       .status(200)
@@ -116,18 +132,27 @@ export const searchProducts = catchAsync(
       );
   }
 );
+
+// ✅ Get Products by Category (by category slug)
 export const getProductsByCategory = catchAsync(
   async (req: AuthRequest, res: Response) => {
-    const category = req.query.category?.toString().trim();
-    if (!category) throw new AppError("category is required", 400);
-    const products = await productService.getProductsByCategory(category);
+    const slug = req.params.slug?.toString().trim();
+    if (!slug) throw new AppError("Slug is required", 400);
+
+    const products = await productService.getProductsByCategory(slug);
     res
       .status(200)
       .json(
-        new ApiResponse(200, products, "Search results fetched successfully")
+        new ApiResponse(
+          200,
+          products,
+          "Products by category fetched successfully"
+        )
       );
   }
 );
+
+// ✅ Latest Products
 export const getLatestProducts = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 8;

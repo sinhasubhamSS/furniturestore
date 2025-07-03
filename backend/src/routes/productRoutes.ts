@@ -1,4 +1,3 @@
-
 // updateProductImages,
 // softDeleteProduct,
 // paginateProducts,
@@ -37,7 +36,7 @@ router.delete("/deleteproduct/:productId", authVerify, isAdmin, deleteProduct);
 router.get("/getallproducts", getAllProducts);
 router.get("/getproductbyid/:productId", getProductById);
 router.get("/search", searchProducts);
-router.get("/category/:category", getProductsByCategory);
+router.get("/category/:slug", getProductsByCategory);
 router.get("/latest-products", getLatestProducts);
 
 export default router;
