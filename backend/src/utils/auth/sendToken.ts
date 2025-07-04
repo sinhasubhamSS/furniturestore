@@ -7,7 +7,8 @@ export const sendTokenResponse=(res:Response,userId:string,message:string,
         _id: string;
         name: string;
         email: string;
-        avatar?: string;            
+        avatar?: string; 
+        role?:string;           
     }
 )=>{
     const accessToken = generateAccessToken(userId);

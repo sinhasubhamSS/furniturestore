@@ -21,7 +21,7 @@ const categorySchema = new Schema<ICategory>(
     },
     slug: {
       type: String,
-      required: true,
+      required: false,
       unique: true,
     },
     image: {

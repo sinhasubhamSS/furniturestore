@@ -12,6 +12,7 @@ import {
 import { RiLoginCircleLine } from "react-icons/ri";
 import type { RootState } from "@/redux/store";
 import Toggle from "@/components/Toogle";
+import Link from "next/link"; // upar add kar lo
 
 const Navbar = () => {
   const activeUser = useSelector((state: RootState) => state.user.activeUser);
@@ -125,6 +126,19 @@ const Navbar = () => {
                           {activeUser.name}
                         </p>
                       </div>
+
+                      {/* 👇 Add Dashboard Link based on role */}
+                      {activeUser.role === "admin" && (
+                        <div className="py-1">
+                          <Link
+                            href="/admin/dashboard"
+                            className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-secondary)] transition-colors"
+                          >
+                            Admin Dashboard
+                          </Link>
+                        </div>
+                      )}
+
                       <div className="py-1">
                         <a
                           href="#"
@@ -136,9 +150,10 @@ const Navbar = () => {
                           href="#"
                           className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-secondary)] transition-colors"
                         >
-                          Orders
+                          My Orders
                         </a>
                       </div>
+
                       <div className="py-1">
                         <div className="flex items-center justify-between px-4 py-2">
                           <span className="text-sm text-[var(--foreground)]">

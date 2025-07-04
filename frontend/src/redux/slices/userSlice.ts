@@ -4,6 +4,7 @@ type LoggedInUser = {
   _id: string;
   name: string;
   avatar?: string;
+  role: "buyer" | "admin";
 };
 type UserState = {
   activeUser: LoggedInUser | null;

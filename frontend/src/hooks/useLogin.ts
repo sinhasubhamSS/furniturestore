@@ -19,13 +19,12 @@ export const useLogin = () => {
     setLoading(true);
     setError(null);
 
-
     try {
       const res = await axiosClient.post("/user/login", data);
       console.log("Login success:", res.data);
-      dispatch(setActiveUser(res.data.user))
+      dispatch(setActiveUser(res.data.user));
+      console.log("User data:", res.data.user);
       return res.data;
-
     } catch (err: any) {
       console.error("Login error:", err);
       setError(err?.response?.data?.message || "Login failed");

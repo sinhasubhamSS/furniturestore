@@ -3,9 +3,8 @@ import { categoryService } from "../services/categoryService";
 import { ApiResponse } from "../utils/ApiResponse";
 import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
+import { uploadToCloudinary} from "../utils/cloudinaryUpload"; // Assuming this is your helper
 
-
-// ✅ Create Category (Admin only)
 export const createCategory = catchAsync(
   async (req: Request, res: Response) => {
     const { name } = req.body;
@@ -14,8 +13,9 @@ export const createCategory = catchAsync(
     if (!name) throw new AppError("Name is required", 400);
     if (!file) throw new AppError("Image is required", 400);
 
-    // Assume image is already uploaded to cloudinary and URL available
-    const imageUrl = file.path;
+    // ✅ Upload to Cloudinary
+    const result = await uploadToCloudinary(file.buffer, "categories");
+    const imageUrl = result.secure_url;
 
     const category = await categoryService.createCategory({
       name,
