@@ -37,6 +37,7 @@ const SignupPage = () => {
           _id: res.user._id,
           name: res.user.name,
           avatar: res.user.avatar,
+          role: res.user.role ?? "buyer",
         })
       );
     }
