@@ -3,7 +3,7 @@ import Product from "../models/product.models";
 import { IProductInput } from "../types/productservicetype";
 import { AppError } from "../utils/AppError";
 import { uploadToCloudinary } from "../utils/cloudinaryUpload";
-
+ 
 class ProductService {
   // ✅ Create Product
   async createProduct(

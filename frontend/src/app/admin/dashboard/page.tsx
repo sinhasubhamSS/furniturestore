@@ -1,9 +1,5 @@
 "use client"; // Only needed if using hooks/state
 
-export default function DashboardPage() {
-  return (
-    <div>
-      <h1>Admin Dashboard Page</h1>
-    </div>
-  );
+export default function AdminDashboard() {
+  return <h1 className="text-2xl font-bold">Dashboard Test Page</h1>;
 }
