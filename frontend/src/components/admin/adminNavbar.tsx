@@ -1,38 +1,28 @@
+// components/admin/AdminNavbar.tsx
 "use client";
 
-import { FiMenu } from "react-icons/fi";
-import { MdClose } from "react-icons/md";
+import { FiBell } from "react-icons/fi";
 
-type AdminNavbarProps = {
-  toggleSidebar: () => void;
-  isSidebarOpen: boolean;
-};
-
-export default function AdminNavbar({
-  toggleSidebar,
-  isSidebarOpen,
-}: AdminNavbarProps) {
+export default function AdminNavbar() {
   return (
-    <header className="bg-[var(--color-secondary)] text-[var(--foreground)] shadow px-6 py-4 flex items-center justify-between z-40 border-b border-[var(--color-accent)]">
-      <div className="flex items-center space-x-4">
-        {/* Sidebar toggle button - only show on mobile */}
-        <button
-          className="md:hidden text-2xl text-[var(--foreground)]"
-          onClick={toggleSidebar}
-        >
-          {isSidebarOpen ? <MdClose size={24} /> : <FiMenu size={24} />}
-        </button>
-        <h1 className="text-lg font-semibold">Dashboard Overview</h1>
-      </div>
+    <header className="w-full h-16 px-4 flex items-center justify-between bg-[var(--color-secondary)] text-[var(--foreground)] rounded-none">
+      {/* Left: Page title or breadcrumb */}
+      <h1 className="text-xl font-semibold">Dashboard</h1>
 
-      {/* User profile */}
-      <div className="flex items-center">
-        <div className="relative">
-          <button className="p-1 rounded-full hover:bg-[var(--color-accent)] hover:text-white transition-colors">
-            <div className="w-8 h-8 rounded-full bg-[var(--color-accent)] flex items-center justify-center text-white text-sm">
-              JD
-            </div>
-          </button>
+      {/* Right: Notification + Admin Profile */}
+      <div className="flex items-center space-x-6">
+        {/* Notification Icon */}
+        <button className="relative text-[var(--foreground)] hover:text-[var(--color-accent)] transition-colors">
+          <FiBell size={22} />
+          <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+        </button>
+
+        {/* Admin Profile */}
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 bg-[var(--color-accent)] text-white rounded-full flex items-center justify-center font-medium">
+            AD
+          </div>
+          <span className="hidden md:inline font-medium">Admin</span>
         </div>
       </div>
     </header>

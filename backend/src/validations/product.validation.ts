@@ -22,6 +22,7 @@ export const createProductSchema = z.object({
     })
   ),
   slug: z.string().optional(),
+  isPublished: z.boolean().optional(),
 });
 
 export const updateProductSchema = createProductSchema.partial();

@@ -1,5 +1,6 @@
 "use client";
 
+import AdminNavbar from "@/components/admin/adminNavbar";
 import Sidebar from "@/components/admin/sidebar";
 import { useState, useEffect } from "react";
 
@@ -42,11 +43,12 @@ export default function AdminLayout({
 
       <div className="flex-1 overflow-hidden transition-all duration-300">
         <main
-          className={`h-full overflow-y-auto p-4 md:p-6 bg-[var(--card-bg)] transition-all duration-300 ${
-            isSidebarOpen ? "ml-0 md:ml-64" : "ml-0"
+          className={`h-full overflow-y-auto transition-all duration-300 ${
+            isSidebarOpen && !isMobile ? "ml-64" : "ml-0"
           }`}
         >
-          {children}
+          <AdminNavbar /> {/* 👈 Use navbar here */}
+          <div className="">{children}</div>
         </main>
       </div>
     </div>

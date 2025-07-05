@@ -29,7 +29,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300">
         <ReduxProviders>
-          <div className="max-w-[1440px] mx-auto">{children}</div>
+          <div className="">{children}</div>
         </ReduxProviders>
       </body>
     </html>

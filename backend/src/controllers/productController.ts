@@ -20,7 +20,7 @@ export const createProduct = catchAsync(
     if (!files || files.length === 0)
       throw new AppError("No files uploaded", 400);
 
-    let { basePrice, gstRate, name, ...rest } = parsedData;
+    let { basePrice, gstRate, name, isPublished = false, ...rest } = parsedData;
 
     gstRate = gstRate > 1 ? gstRate / 100 : gstRate;
     const finalPrice = basePrice + basePrice * gstRate;
@@ -33,6 +33,7 @@ export const createProduct = catchAsync(
       basePrice,
       gstRate,
       price: finalPrice,
+      isPublished,
       ...rest,
     };
 

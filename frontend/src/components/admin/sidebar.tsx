@@ -59,29 +59,21 @@ export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
       ],
     },
     {
+      name: "orders",
+      icon: <FiFileText size={20} />,
+      label: "Orders",
+      subItems: [
+        { name: "all-orders", label: "All Orders" },
+        { name: "returns", label: "Returns" },
+      ],
+    },
+    {
       name: "users",
       icon: <FiUsers size={20} />,
       label: "Users",
       subItems: [
         { name: "all-users", label: "All Users" },
         { name: "roles", label: "User Roles" },
-        { name: "permissions", label: "Permissions" },
-      ],
-    },
-    {
-      name: "reports",
-      icon: <FiPieChart size={20} />,
-      label: "Reports",
-      subItems: [],
-    },
-    {
-      name: "content",
-      icon: <FiFileText size={20} />,
-      label: "Content",
-      subItems: [
-        { name: "pages", label: "Pages" },
-        { name: "posts", label: "Blog Posts" },
-        { name: "media", label: "Media Library" },
       ],
     },
     {
@@ -106,14 +98,14 @@ export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
       {!isOpen && (
         <button
           onClick={toggle}
-          className="fixed left-0 top-1/2 z-40 p-2 bg-[var(--color-accent)] text-white rounded-r-lg shadow-lg transform -translate-y-1/2 hover:bg-[var(--color-accent-dark)] transition-all"
+          className="fixed left-0 top-1/2 z-40 p-2 bg-[var(--color-accent)] text-white rounded-r-lg shadow-lg transform -translate-y-1/2 hover:scale-[1.05] transition-transform duration-200 ease-in-out"
         >
           <MdChevronRight size={24} />
         </button>
       )}
 
       <aside
-        className={`fixed top-0 bottom-0 z-50 w-64 bg-[var(--color-secondary)] text-[var(--foreground)] border-r border-[var(--color-accent)] transition-all duration-300 ${
+        className={`fixed top-0 bottom-0 z-50 w-64 bg-[var(--color-secondary)] text-[var(--foreground)] transition-all duration-300 ${
           isOpen ? "left-0" : "-left-full"
         }`}
       >

@@ -3,9 +3,10 @@
 
 :root {
   --color-primary: #fdf6f0;
-  --color-secondary: #E4D1BB;
+  --color-secondary: #e4d1bb;
   --color-accent: #6b3c1a;
-
+  --secondary-light: #f2e8d9;
+  --border: #e5e7eb;
   --text-dark: #1a1a1a;
   --text-light: #ffffff;
 
@@ -23,14 +24,13 @@
 .dark {
   --color-primary: #121212; /* deep black */
   --color-secondary: #1e1e1e; /* slightly lighter for card */
---color-accent: #2196f3;
---text-accent: #bbdefb;
-
-
+  --color-accent: #2196f3;
+  --text-accent: #bbdefb;
+  --secondary-light: #2a2a2a;
   --text-dark: #ffffff;
   --background: var(--color-primary);
   --foreground: var(--text-dark);
-
+  --border: #374151;
   /* Dark theme card background - slate/charcoal */
   --card-bg: #292929;
 

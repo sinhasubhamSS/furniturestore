@@ -8,7 +8,6 @@
 //   category: string;
 // }
 
-
 import { Types } from "mongoose";
 
 export interface IProductInput {
@@ -21,4 +20,5 @@ export interface IProductInput {
 
   // ✅ category should be a MongoDB ObjectId type
   category: Types.ObjectId;
+  isPublished?: boolean;
 }
