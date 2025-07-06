@@ -45,7 +45,7 @@ export default function AdminLayout({
         <main
           className={`h-full overflow-y-auto transition-all duration-300 ${
             isSidebarOpen && !isMobile ? "ml-64" : "ml-0"
-          }`}
+          } bg-[var(--secondary-light)]`}
         >
           <AdminNavbar /> {/* 👈 Use navbar here */}
           <div className="">{children}</div>

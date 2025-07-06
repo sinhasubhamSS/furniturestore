@@ -1,17 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  FiHome,
-  FiUsers,
-  FiSettings,
-  FiFileText,
-  FiPieChart,
-  FiShoppingBag,
-  FiLogOut,
-  FiChevronRight,
-} from "react-icons/fi";
-import { MdChevronLeft, MdChevronRight } from "react-icons/md";
+import { usePathname, useRouter } from "next/navigation";
+import { FiChevronRight } from "react-icons/fi";
+import { MdChevronLeft, MdChevronRight as MdChevronOpen } from "react-icons/md";
+import { navItems } from "@/app/config/nav.config";
 
 type SidebarProps = {
   isOpen: boolean;
@@ -20,73 +13,47 @@ type SidebarProps = {
 };
 
 type ExpandedMenus = {
-  products: boolean;
-  users: boolean;
-  content: boolean;
   [key: string]: boolean;
 };
 
 export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
-  const [activeMenu, setActiveMenu] = useState("dashboard");
-  const [expandedMenus, setExpandedMenus] = useState<ExpandedMenus>({
-    products: false,
-    users: false,
-    content: false,
-  });
+  const pathname = usePathname();
+  const router = useRouter();
 
-  const toggleMenu = (menu: keyof ExpandedMenus) => {
+  const isActive = (href: string) => pathname === href;
+
+  const [expandedMenus, setExpandedMenus] = useState<ExpandedMenus>({});
+
+  // Set activeMenu & expand corresponding parent on mount
+  useEffect(() => {
+    let found = false;
+
+    for (const item of navItems) {
+      if (item.children) {
+        for (const child of item.children) {
+          if (pathname === child.href) {
+            setExpandedMenus((prev) => ({ ...prev, [item.name]: true }));
+            found = true;
+            break;
+          }
+        }
+      } else if (pathname === item.href) {
+        found = true;
+      }
+
+      if (found) break;
+    }
+  }, [pathname]);
+
+  const toggleMenu = (menu: string) => {
     setExpandedMenus((prev) => ({
       ...prev,
       [menu]: !prev[menu],
     }));
   };
 
-  const navItems = [
-    {
-      name: "dashboard",
-      icon: <FiHome size={20} />,
-      label: "Dashboard",
-      subItems: [],
-    },
-    {
-      name: "products",
-      icon: <FiShoppingBag size={20} />,
-      label: "Products",
-      subItems: [
-        { name: "all-products", label: "All Products" },
-        { name: "categories", label: "Categories" },
-        { name: "inventory", label: "Inventory" },
-      ],
-    },
-    {
-      name: "orders",
-      icon: <FiFileText size={20} />,
-      label: "Orders",
-      subItems: [
-        { name: "all-orders", label: "All Orders" },
-        { name: "returns", label: "Returns" },
-      ],
-    },
-    {
-      name: "users",
-      icon: <FiUsers size={20} />,
-      label: "Users",
-      subItems: [
-        { name: "all-users", label: "All Users" },
-        { name: "roles", label: "User Roles" },
-      ],
-    },
-    {
-      name: "settings",
-      icon: <FiSettings size={20} />,
-      label: "Settings",
-      subItems: [],
-    },
-  ];
-
   return (
     <>
-      {/* Mobile overlay */}
       {isOpen && isMobile && (
         <div
           className="fixed inset-0 bg-black bg-opacity-40 z-40 md:hidden"
@@ -94,13 +61,12 @@ export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
         />
       )}
 
-      {/* Collapsed toggle button */}
       {!isOpen && (
         <button
           onClick={toggle}
           className="fixed left-0 top-1/2 z-40 p-2 bg-[var(--color-accent)] text-white rounded-r-lg shadow-lg transform -translate-y-1/2 hover:scale-[1.05] transition-transform duration-200 ease-in-out"
         >
-          <MdChevronRight size={24} />
+          <MdChevronOpen size={24} />
         </button>
       )}
 
@@ -110,87 +76,93 @@ export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
         }`}
       >
         <div className="flex flex-col h-full p-4">
-          {/* Sidebar header */}
+          {/* Header */}
           <div className="flex justify-between items-center mb-8 p-2">
             <h2 className="text-xl font-bold text-[var(--color-accent)]">
               Admin Panel
             </h2>
             <button
               onClick={toggle}
-              className="text-2xl text-[var(--foreground)] hover:text-[var(--color-accent)] transition-colors"
+              className="text-[var(--foreground)] hover:text-[var(--color-accent)]"
             >
               <MdChevronLeft size={24} />
             </button>
           </div>
 
-          {/* Navigation items */}
-          <nav className="flex-1">
+          {/* Navigation */}
+          <nav className="flex-1 overflow-y-auto">
             <ul className="space-y-2">
-              {navItems.map((item) => (
-                <li key={item.name}>
-                  {item.subItems.length > 0 ? (
-                    <>
+              {navItems.map((item) => {
+                const isExpanded = expandedMenus[item.name];
+                const Icon = item.icon;
+
+                if (item.children) {
+                  return (
+                    <li key={item.name}>
                       <button
-                        onClick={() =>
-                          toggleMenu(item.name as keyof ExpandedMenus)
-                        }
+                        onClick={() => toggleMenu(item.name)}
                         className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
-                          activeMenu.startsWith(item.name)
-                            ? "bg-[var(--color-accent)] text-white"
+                          isExpanded
+                            ? "bg-[var(--color-accent-light)] text-[var(--color-accent)]"
                             : "hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)]"
                         }`}
                       >
                         <div className="flex items-center space-x-3">
-                          <span>{item.icon}</span>
+                          <Icon size={20} />
                           <span>{item.label}</span>
                         </div>
                         <FiChevronRight
                           className={`transition-transform ${
-                            expandedMenus[item.name as keyof ExpandedMenus]
-                              ? "rotate-90"
-                              : ""
+                            isExpanded ? "rotate-90" : ""
                           }`}
                         />
                       </button>
-                      {expandedMenus[item.name as keyof ExpandedMenus] && (
-                        <ul className="ml-8 mt-1 space-y-1">
-                          {item.subItems.map((subItem) => (
-                            <li key={subItem.name}>
-                              <button
-                                onClick={() => setActiveMenu(subItem.name)}
-                                className={`w-full text-left p-2 rounded transition-colors ${
-                                  activeMenu === subItem.name
-                                    ? "bg-[var(--color-accent)] text-white"
-                                    : "hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)]"
-                                }`}
-                              >
-                                {subItem.label}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </>
-                  ) : (
+
+                      <ul
+                        className={`ml-6 mt-1 space-y-1 transition-all duration-300 ease-in-out overflow-hidden ${
+                          isExpanded ? "max-h-96" : "max-h-0"
+                        }`}
+                      >
+                        {item.children.map((child) => (
+                          <li key={child.name}>
+                            <button
+                              onClick={() => router.push(child.href)}
+                              className={`w-full text-left p-2 rounded transition-colors ${
+                                pathname === child.href
+                                  ? "bg-[var(--color-accent)] text-white"
+                                  : "hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)]"
+                              }`}
+                            >
+                              {child.label}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  );
+                }
+
+                return (
+                  <li key={item.name}>
                     <button
-                      onClick={() => setActiveMenu(item.name)}
+                      onClick={() => router.push(item.href!)}
                       className={`w-full flex items-center space-x-3 p-3 rounded-lg transition-colors ${
-                        activeMenu === item.name
+                        pathname === item.href
                           ? "bg-[var(--color-accent)] text-white"
                           : "hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)]"
                       }`}
                     >
-                      <span>{item.icon}</span>
+                      <Icon size={20} />
                       <span>{item.label}</span>
                     </button>
-                  )}
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           </nav>
 
-          {/* User profile and logout */}
-          <div className="border-t border-[var(--color-accent)] pt-3">
+          {/* Footer */}
+          <div className="border-t border-[var(--color-accent)] pt-3 mt-4">
             <div className="flex items-center space-x-3 p-3">
               <div className="w-8 h-8 rounded-full bg-[var(--color-accent)] flex items-center justify-center text-white text-sm">
                 JD
@@ -198,7 +170,7 @@ export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
               <span className="font-medium">John Doe</span>
             </div>
             <button className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] transition-colors">
-              <FiLogOut size={20} />
+              <FiChevronRight size={20} />
               <span>Logout</span>
             </button>
           </div>

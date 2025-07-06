@@ -16,6 +16,7 @@ export interface IProduct extends Document {
   createdBy: Types.ObjectId; // userId of admin (ref to User model)
   createdAt: Date;
   isPublished: boolean; // Jab tak admin publish na kare
+
 }
 
 // Schema
@@ -81,6 +82,7 @@ const productSchema = new Schema<IProduct>(
       type: Boolean,
       default: false, // Jab tak admin publish na kare
     },
+   
   },
   { timestamps: true }
 );
