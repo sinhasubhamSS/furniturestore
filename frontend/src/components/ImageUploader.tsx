@@ -5,10 +5,15 @@ import { FiUpload, FiX } from "react-icons/fi";
 import toast from "react-hot-toast";
 import { uploadImageToCloudinary } from "../../utils/uploadToCloudinary";
 
+interface UploadedImage {
+  url: string;
+  public_id: string;
+}
+
 interface ImageUploaderProps {
   folder?: string;
   maxFiles?: number;
-  onUpload: (urls: string[]) => void;
+  onUpload: (images: UploadedImage[]) => void;
 }
 
 export default function ImageUploader({
@@ -26,6 +31,13 @@ export default function ImageUploader({
       previews.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [previews]);
+
+  const extractPublicId = (url: string, folder: string) => {
+    const parts = url.split("/");
+    const fileWithExt = parts[parts.length - 1]; // e.g. abc123.jpg
+    const fileName = fileWithExt.split(".")[0]; // abc123
+    return `${folder}/${fileName}`;
+  };
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -53,7 +65,7 @@ export default function ImageUploader({
     setPreviews(Array.from(files).map((file) => URL.createObjectURL(file)));
 
     setUploading(true);
-    const urls: string[] = [];
+    const uploadedImages: UploadedImage[] = [];
 
     for (let i = 0; i < files.length; i++) {
       try {
@@ -61,7 +73,8 @@ export default function ImageUploader({
           const current = (i / files.length) * 100;
           setProgress(current + p / files.length);
         });
-        urls.push(url);
+        const public_id = extractPublicId(url, folder);
+        uploadedImages.push({ url, public_id });
       } catch (err) {
         toast.error(`Failed to upload ${files[i].name}`);
       }
@@ -69,7 +82,7 @@ export default function ImageUploader({
 
     setUploading(false);
     setProgress(0);
-    onUpload(urls);
+    onUpload(uploadedImages);
   };
 
   const removeImage = (index: number) => {

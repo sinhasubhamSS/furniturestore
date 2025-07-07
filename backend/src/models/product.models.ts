@@ -10,13 +10,15 @@ export interface IProduct extends Document {
   gstRate: number;
   price: number;
   basePrice: number;
-  images: string[]; // Cloudinary URLs
+  images: {
+    url: string;
+    public_id: string;
+  }[];
   stock: number;
   category: Types.ObjectId;
-  createdBy: Types.ObjectId; // userId of admin (ref to User model)
+  createdBy: Types.ObjectId;
   createdAt: Date;
-  isPublished: boolean; // Jab tak admin publish na kare
-
+  isPublished: boolean;
 }
 
 // Schema
@@ -55,8 +57,14 @@ const productSchema = new Schema<IProduct>(
     },
     images: [
       {
-        type: String,
-        required: true,
+        url: {
+          type: String,
+          required: true,
+        },
+        public_id: {
+          type: String,
+          required: true,
+        },
       },
     ],
     stock: {
@@ -82,7 +90,6 @@ const productSchema = new Schema<IProduct>(
       type: Boolean,
       default: false, // Jab tak admin publish na kare
     },
-   
   },
   { timestamps: true }
 );

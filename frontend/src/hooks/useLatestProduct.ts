@@ -4,7 +4,7 @@ import axiosClient from "../../utils/axios";
 export interface Product {
   id: string;
   name: string;
-  images: string[]; // You may need to check this field based on backend
+  images: string[]; // just URLs
   price: number;
 }
 
@@ -16,10 +16,15 @@ const useLatestProducts = () => {
     const fetchProducts = async () => {
       try {
         const response = await axiosClient.get("/products/latest-products");
-        console.log("response received for checking", response.data);
 
-        // ✅ Validate structure: your API wraps data inside `data` field
-        setProduct(response.data.data); // ← make sure this matches API response
+        setProduct(
+          response.data.data.map((item: any) => ({
+            id: item._id,
+            name: item.name,
+            price: item.price,
+            images: item.images.map((img: any) => img.url), // ✅ Only URLs
+          }))
+        );
       } catch (error) {
         console.error("Error fetching latest products", error);
       } finally {

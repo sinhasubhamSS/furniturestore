@@ -1,25 +1,18 @@
-// export interface IProductInput {
-//   name: string;
-//   title: string;
-//   description: string;
-//   gstRate: number;
-//   price: number;
-//   stock: number;
-//   category: string;
-// }
-
 import { Types } from "mongoose";
 
 export interface IProductInput {
   name: string;
+  slug: string;
   title: string;
   description: string;
   gstRate: number;
   price: number;
+  basePrice: number;
+  images: {
+    url: string;
+    public_id: string;
+  }[];
   stock: number;
-
-  // ✅ category should be a MongoDB ObjectId type
   category: Types.ObjectId;
-  isPublished?: boolean;
-  images: string[];
+  isPublished: boolean;
 }

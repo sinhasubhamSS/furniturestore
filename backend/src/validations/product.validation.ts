@@ -24,7 +24,12 @@ export const createProductSchema = z.object({
   slug: z.string().optional(),
   isPublished: z.boolean().optional(),
   images: z
-    .array(z.string().url({ message: "Invalid image URL" }))
+    .array(
+      z.object({
+        url: z.string().url({ message: "Invalid image URL" }),
+        public_id: z.string().min(1, "public_id is required"),
+      })
+    )
     .min(1, "At least one image is required"),
 });
 

@@ -8,9 +8,13 @@ export const createProductSchema = z.object({
 
   basePrice: z.number().min(0),
   stock: z.number().min(0),
-  images: z
-    .array(z.string().url())
-    .min(1, "At least one image URL is required"),
+  images: z.array(
+    z.object({
+      url: z.string().url(),
+      public_id: z.string(),
+    })
+  ),
+
   category: z.string().min(1),
 });
 
