@@ -21,4 +21,5 @@ export interface IProductInput {
   // ✅ category should be a MongoDB ObjectId type
   category: Types.ObjectId;
   isPublished?: boolean;
+  images: string[];
 }

@@ -13,14 +13,22 @@ import {
 // ✅ Create Product
 export const createProduct = catchAsync(
   async (req: AuthRequest, res: Response) => {
+    console.log("reached here");
     const parsedData = createProductSchema.parse(req.body);
-    const files = req.files as Express.Multer.File[];
+    console.log("Parsed Data:", parsedData);
 
     if (!req.userId) throw new AppError("Unauthorized", 401);
-    if (!files || files.length === 0)
-      throw new AppError("No files uploaded", 400);
+    if (!parsedData.images || parsedData.images.length === 0)
+      throw new AppError("No images provided", 400);
 
-    let { basePrice, gstRate, name, isPublished = false, ...rest } = parsedData;
+    let {
+      basePrice,
+      gstRate,
+      name,
+      images,
+      isPublished = false,
+      ...rest
+    } = parsedData;
 
     gstRate = gstRate > 1 ? gstRate / 100 : gstRate;
     const finalPrice = basePrice + basePrice * gstRate;
@@ -34,12 +42,13 @@ export const createProduct = catchAsync(
       gstRate,
       price: finalPrice,
       isPublished,
+      images, // array of cloudinary URLs
+
       ...rest,
     };
 
     const product = await productService.createProduct(
       productInput,
-      files,
       req.userId
     );
 

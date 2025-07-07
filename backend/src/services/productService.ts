@@ -6,24 +6,13 @@ import { uploadToCloudinary } from "../utils/cloudinaryUpload";
 
 class ProductService {
   // ✅ Create Product
-  async createProduct(
-    parsedData: IProductInput,
-    files: Express.Multer.File[],
-    userId: string
-  ) {
-    if (!Array.isArray(files) || files.length === 0) {
-      throw new AppError("At least one product image is required", 400);
+  async createProduct(parsedData: IProductInput, userId: string) {
+    if (!Array.isArray(parsedData.images) || parsedData.images.length === 0) {
+      throw new AppError("Images array is required", 400);
     }
-
-    const uploadedResults = await Promise.all(
-      files.map((file) => uploadToCloudinary(file.buffer, "products"))
-    );
-
-    const imageUrls = uploadedResults.map((result) => result.secure_url);
 
     const newProduct = await Product.create({
       ...parsedData,
-      images: imageUrls,
       createdBy: userId,
       isPublished: parsedData.isPublished ?? false,
     });

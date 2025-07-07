@@ -11,10 +11,13 @@ import {
 } from "@/lib/validations/product.schema";
 import axiosClient from "../../../utils/axios";
 import toast from "react-hot-toast";
+import ImageUploader from "@/components/ImageUploader"; // 👈 your uploader
+
 const CreateProduct = () => {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
     reset,
   } = useForm<CreateProductInput>({
@@ -32,8 +35,9 @@ const CreateProduct = () => {
   });
 
   const onSubmit = async (data: CreateProductInput) => {
+    console.log("Submitting data:", data);
     try {
-      await axiosClient.post("/api/products/createproduct", data); // Adjust endpoint accordingly
+      await axiosClient.post("/products/createproduct", data);
       toast.success("Product created successfully");
       reset();
     } catch (err: any) {
@@ -71,7 +75,6 @@ const CreateProduct = () => {
         register={register("gstRate", { valueAsNumber: true })}
         error={errors.gstRate?.message}
       />
-
       <Input
         type="number"
         label="Price"
@@ -89,17 +92,25 @@ const CreateProduct = () => {
       <Input
         label="Category ID"
         name="category"
-        register={register("category")}
+        register={register("category", {
+          setValueAs: (value) => value.trim(), // Removes extra whitespace and quotes
+        })}
         error={errors.category?.message}
       />
-      <Input
-        label="Image URLs (comma separated)"
-        name="images"
-        register={register("images", {
-          setValueAs: (v) => v.split(",").map((s: string) => s.trim()),
-        })}
-        error={errors.images?.message as string}
+      {/* 👇 New ImageUploader integration */}
+      <ImageUploader
+        maxFiles={5}
+        folder="products"
+        onUpload={(urls) => {
+          setValue("images", urls, { shouldValidate: true });
+        }}
       />
+
+      {errors.images?.message && (
+        <p className="text-sm text-red-500">
+          {errors.images.message as string}
+        </p>
+      )}
 
       <Button type="submit">Create Product</Button>
     </form>

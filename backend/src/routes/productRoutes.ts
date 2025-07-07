@@ -22,7 +22,6 @@ router.post(
   "/createproduct",
   authVerify,
   isAdmin,
-  upload.array("images", 5),
   createProduct
 );
 router.put(
