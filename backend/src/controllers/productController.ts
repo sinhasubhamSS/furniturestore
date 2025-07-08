@@ -62,23 +62,11 @@ export const createProduct = catchAsync(
 export const updateProduct = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const parsedData = updateProductSchema.parse(req.body);
-    const files = req.files as Express.Multer.File[];
 
     if (!req.userId) throw new AppError("Unauthorized", 401);
 
-    let updatedData = { ...parsedData };
-
-    // ✅ If name is updated, regenerate slug
-    if (parsedData.name) {
-      updatedData.slug = slugify(parsedData.name, {
-        lower: true,
-        strict: true,
-      });
-    }
-
     const updated = await productService.updateProduct(
-      updatedData,
-      files,
+      parsedData,
       req.params.productId,
       req.userId
     );

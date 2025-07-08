@@ -5,42 +5,53 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+import ImageUploader from "@/components/ImageUploader";
+import toast from "react-hot-toast";
 import {
   createProductSchema,
   CreateProductInput,
 } from "@/lib/validations/product.schema";
-import axiosClient from "../../../utils/axios";
-import toast from "react-hot-toast";
-import ImageUploader from "@/components/ImageUploader";
 
-const CreateProduct = () => {
+interface ProductFormProps {
+  onSubmit: (data: CreateProductInput) => Promise<void>;
+  defaultValues?: Partial<CreateProductInput>;
+  isEdit?: boolean;
+}
+
+const ProductForm: React.FC<ProductFormProps> = ({
+  onSubmit,
+  defaultValues,
+  isEdit = false,
+}) => {
   const {
     register,
     handleSubmit,
     setValue,
-    formState: { errors },
     reset,
     watch,
+    formState: { errors },
   } = useForm<CreateProductInput>({
     resolver: zodResolver(createProductSchema),
     defaultValues: {
-      name: "",
-      title: "",
-      description: "",
-      gstRate: 0,
-      basePrice: 0,
-      stock: 1,
-      images: [],
-      category: "",
-      isPublished: true, // default is public
+      name: defaultValues?.name || "",
+      title: defaultValues?.title || "",
+      description: defaultValues?.description || "",
+      gstRate: defaultValues?.gstRate || 0,
+      basePrice: defaultValues?.basePrice || 0,
+      stock: defaultValues?.stock || 1,
+      images: defaultValues?.images || [],
+      category: defaultValues?.category || "",
+      isPublished: defaultValues?.isPublished ?? true,
     },
   });
 
-  const onSubmit = async (data: CreateProductInput) => {
+  const handleFormSubmit = async (data: CreateProductInput) => {
     try {
-      await axiosClient.post("/products/createproduct", data);
-      toast.success("Product created successfully");
-      reset();
+      await onSubmit(data);
+      toast.success(
+        isEdit ? "Product updated successfully" : "Product created successfully"
+      );
+      if (!isEdit) reset(); // Only reset if creating
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Something went wrong");
     }
@@ -49,9 +60,10 @@ const CreateProduct = () => {
   return (
     <div className="max-w-2xl mx-auto py-10">
       <h1 className="text-2xl font-semibold text-center mb-6">
-        Add New Product
+        {isEdit ? "Update Product" : "Add New Product"}
       </h1>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+
+      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
         <Input
           label="Name"
           placeholder="Product name"
@@ -107,20 +119,19 @@ const CreateProduct = () => {
           error={errors.category?.message}
         />
 
-        {/* Image Upload */}
         <ImageUploader
           maxFiles={5}
           folder="products"
           onUpload={(urls) => {
             setValue("images", urls, { shouldValidate: true });
           }}
+          defaultUrls={defaultValues?.images || []}
         />
         {errors.images?.message && (
           <p className="text-sm text-red-500">{errors.images.message}</p>
         )}
 
         {/* Visibility Toggle */}
-        {/* Visibility Toggle - Professional Boolean Handling */}
         <div className="space-y-2">
           <label className="block font-medium">Visibility</label>
           <div className="flex gap-4">
@@ -147,7 +158,7 @@ const CreateProduct = () => {
 
         <div className="pt-4">
           <Button type="submit" className="w-full">
-            Create Product
+            {isEdit ? "Update Product" : "Create Product"}
           </Button>
         </div>
       </form>
@@ -155,4 +166,4 @@ const CreateProduct = () => {
   );
 };
 
-export default CreateProduct;
+export default ProductForm;

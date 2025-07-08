@@ -2,7 +2,7 @@ export const uploadImageToCloudinary = async (
   file: File,
   folder: string = "default",
   onProgress?: (percent: number) => void
-): Promise<string> => {
+): Promise<{ url: string; public_id: string }> => {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const formData = new FormData();
@@ -28,7 +28,14 @@ export const uploadImageToCloudinary = async (
 
     xhr.onload = () => {
       const res = JSON.parse(xhr.responseText);
-      res.secure_url ? resolve(res.secure_url) : reject("Upload failed");
+      if (res.secure_url && res.public_id) {
+        resolve({
+          url: res.secure_url,
+          public_id: res.public_id,
+        });
+      } else {
+        reject("Upload failed");
+      }
     };
 
     xhr.onerror = () => reject("Upload error");

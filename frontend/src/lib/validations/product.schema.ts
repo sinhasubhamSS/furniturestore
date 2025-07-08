@@ -16,6 +16,8 @@ export const createProductSchema = z.object({
   ),
 
   category: z.string().min(1),
+  isPublished: z.boolean().optional(),
+
 });
 
 export type CreateProductInput = z.infer<typeof createProductSchema>;

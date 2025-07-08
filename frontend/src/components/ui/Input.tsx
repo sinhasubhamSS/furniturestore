@@ -21,6 +21,20 @@ const Input: React.FC<InputProps> = ({
   register,
   error,
 }) => {
+  const isNumber = type === "number";
+
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (isNumber && e.target.value === "0") {
+      e.target.value = "";
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (isNumber && e.target.value.trim() === "") {
+      e.target.value = "0";
+    }
+  };
+
   return (
     <div className="mb-4 w-full">
       {label && (
@@ -38,6 +52,8 @@ const Input: React.FC<InputProps> = ({
         placeholder={placeholder}
         required={required}
         {...register}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         className={`w-full px-2 py-2 rounded-md bg-[var(--color-secondary)] text-[var(--foreground)] border ${
           error
             ? "border-red-500 focus:ring-red-500"

@@ -14,30 +14,26 @@ interface ImageUploaderProps {
   folder?: string;
   maxFiles?: number;
   onUpload: (images: UploadedImage[]) => void;
+  defaultUrls?: UploadedImage[];
 }
 
 export default function ImageUploader({
   folder = "default",
   maxFiles = 1,
   onUpload,
+  defaultUrls = [],
 }: ImageUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [previews, setPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
 
+  // 🔁 Clean up previews on update/unmount
   useEffect(() => {
     return () => {
       previews.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [previews]);
-
-  const extractPublicId = (url: string, folder: string) => {
-    const parts = url.split("/");
-    const fileWithExt = parts[parts.length - 1]; // e.g. abc123.jpg
-    const fileName = fileWithExt.split(".")[0]; // abc123
-    return `${folder}/${fileName}`;
-  };
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -62,18 +58,30 @@ export default function ImageUploader({
       }
     }
 
+    // 🧹 Clear previous previews
+    previews.forEach((url) => URL.revokeObjectURL(url));
     setPreviews(Array.from(files).map((file) => URL.createObjectURL(file)));
 
+    await uploadImages(files);
+  };
+
+  const uploadImages = async (files: FileList | File[]) => {
     setUploading(true);
+    setProgress(0);
     const uploadedImages: UploadedImage[] = [];
 
     for (let i = 0; i < files.length; i++) {
       try {
-        const url = await uploadImageToCloudinary(files[i], folder, (p) => {
-          const current = (i / files.length) * 100;
-          setProgress(current + p / files.length);
-        });
-        const public_id = extractPublicId(url, folder);
+        const file = files[i];
+        const { url, public_id } = await uploadImageToCloudinary(
+          file,
+          folder,
+          (p) => {
+            const current = (i / files.length) * 100;
+            setProgress(current + p / files.length);
+          }
+        );
+
         uploadedImages.push({ url, public_id });
       } catch (err) {
         toast.error(`Failed to upload ${files[i].name}`);
@@ -82,14 +90,21 @@ export default function ImageUploader({
 
     setUploading(false);
     setProgress(0);
-    onUpload(uploadedImages);
+
+    if (uploadedImages.length === files.length) {
+      toast.success("All images uploaded!");
+      onUpload(uploadedImages);
+    } else if (uploadedImages.length > 0) {
+      toast.error("Some images failed to upload");
+      onUpload(uploadedImages); // Optional: You can skip this if partial uploads aren't allowed
+    }
   };
 
   const removeImage = (index: number) => {
     URL.revokeObjectURL(previews[index]);
-    const newPrev = [...previews];
-    newPrev.splice(index, 1);
-    setPreviews(newPrev);
+    const updated = [...previews];
+    updated.splice(index, 1);
+    setPreviews(updated);
   };
 
   return (
@@ -110,7 +125,7 @@ export default function ImageUploader({
       {uploading && (
         <div className="w-full bg-gray-200 h-2 rounded">
           <div
-            className="bg-blue-500 h-2 rounded"
+            className="bg-blue-500 h-2 rounded transition-all duration-200"
             style={{ width: `${progress}%` }}
           />
         </div>
