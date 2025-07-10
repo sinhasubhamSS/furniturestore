@@ -61,6 +61,7 @@ export const createProduct = catchAsync(
 // ✅ Update Product
 export const updateProduct = catchAsync(
   async (req: AuthRequest, res: Response) => {
+    console.log("reached update product");
     const parsedData = updateProductSchema.parse(req.body);
 
     if (!req.userId) throw new AppError("Unauthorized", 401);
@@ -107,6 +108,7 @@ export const getProductById = catchAsync(
 // ✅ Get All Products
 export const getAllProducts = catchAsync(
   async (_req: AuthRequest, res: Response) => {
+    console.log("reached get product list");
     const products = await productService.getAllProducts();
     res
       .status(200)

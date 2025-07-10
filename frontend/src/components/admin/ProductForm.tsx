@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Input from "@/components/ui/Input";
@@ -33,25 +33,36 @@ const ProductForm: React.FC<ProductFormProps> = ({
   } = useForm<CreateProductInput>({
     resolver: zodResolver(createProductSchema),
     defaultValues: {
-      name: defaultValues?.name || "",
-      title: defaultValues?.title || "",
-      description: defaultValues?.description || "",
-      gstRate: defaultValues?.gstRate || 0,
-      basePrice: defaultValues?.basePrice || 0,
-      stock: defaultValues?.stock || 1,
-      images: defaultValues?.images || [],
-      category: defaultValues?.category || "",
-      isPublished: defaultValues?.isPublished ?? true,
+      isPublished: true, // Only static fallback value
     },
   });
+
+  // 👇 Reset form whenever defaultValues change (especially useful for edit)
+  useEffect(() => {
+    if (defaultValues) {
+      reset({
+        name: defaultValues.name ?? "",
+        title: defaultValues.title ?? "",
+        description: defaultValues.description ?? "",
+        gstRate: defaultValues.gstRate ?? 0,
+        basePrice: defaultValues.basePrice ?? 0,
+        stock: defaultValues.stock ?? 1,
+        images: defaultValues.images ?? [],
+        category: defaultValues.category ?? "",
+        isPublished: defaultValues.isPublished ?? true,
+      });
+    }
+  }, [defaultValues, reset]);
 
   const handleFormSubmit = async (data: CreateProductInput) => {
     try {
       await onSubmit(data);
+      console.log("Submitted Data 👉", data);
+
       toast.success(
         isEdit ? "Product updated successfully" : "Product created successfully"
       );
-      if (!isEdit) reset(); // Only reset if creating
+      if (!isEdit) reset(); // Reset only for new product
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Something went wrong");
     }
@@ -138,18 +149,20 @@ const ProductForm: React.FC<ProductFormProps> = ({
             <label className="flex items-center gap-2">
               <input
                 type="radio"
-                {...register("isPublished")}
-                onChange={() => setValue("isPublished", true)}
-                checked={true === watch("isPublished")}
+                value="true"
+                {...register("isPublished", {
+                  setValueAs: (v) => v === "true",
+                })}
               />
               Public
             </label>
             <label className="flex items-center gap-2">
               <input
                 type="radio"
-                {...register("isPublished")}
-                onChange={() => setValue("isPublished", false)}
-                checked={false === watch("isPublished")}
+                value="false"
+                {...register("isPublished", {
+                  setValueAs: (v) => v === "true",
+                })}
               />
               Private
             </label>
