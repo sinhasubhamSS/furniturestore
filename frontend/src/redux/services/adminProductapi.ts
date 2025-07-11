@@ -1,16 +1,13 @@
 // src/redux/services/adminProductApi.ts
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import type { AdminProductResponse } from "@/types/Product";
 
+import { createApi } from "@reduxjs/toolkit/query/react";
+import type { AdminProductResponse } from "@/types/Product";
 import { CreateProductInput } from "@/lib/validations/product.schema";
-import type { Product } from "@/types/Product";
+import { axiosBaseQuery } from "../api/ustomBaseQuery";
 
 export const adminProductApi = createApi({
   reducerPath: "adminProductApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: "/api",
-    credentials: "include",
-  }),
+  baseQuery: axiosBaseQuery(),
   tagTypes: ["AdminProducts"],
   endpoints: (builder) => ({
     // 🔁 Get all products
@@ -18,8 +15,11 @@ export const adminProductApi = createApi({
       AdminProductResponse,
       { page?: number; limit?: number }
     >({
-      query: ({ page = 1, limit = 10 }) =>
-        `/products/admin/getallproducts?page=${page}&limit=${limit}`,
+      query: ({ page = 1, limit = 10 }) => ({
+        url: "/products/admin/getallproducts",
+        method: "GET",
+        params: { page, limit },
+      }),
       transformResponse: (response: { data: AdminProductResponse }) =>
         response.data,
       providesTags: ["AdminProducts"],
@@ -30,7 +30,7 @@ export const adminProductApi = createApi({
       query: (body) => ({
         url: "/products/createproduct",
         method: "POST",
-        body,
+        data: body,
       }),
       invalidatesTags: ["AdminProducts"],
     }),
@@ -43,12 +43,13 @@ export const adminProductApi = createApi({
       query: ({ id, data }) => ({
         url: `/products/editproduct/${id}`,
         method: "PUT",
-        body: data,
+        data,
       }),
       invalidatesTags: ["AdminProducts"],
     }),
   }),
 });
+
 export const {
   useGetAdminProductsQuery,
   useCreateProductMutation,

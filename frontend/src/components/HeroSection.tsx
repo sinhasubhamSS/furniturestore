@@ -8,8 +8,9 @@ const slideDuration = 6000;
 
 const HeroSection = () => {
   const router = useRouter();
-  const { product: products, loading: loading } = useLatestProducts();
-  const images = products?.map((product) => product.images?.[0]) || [];
+  const { product: products, loading } = useLatestProducts();
+  const images =
+    products?.map((product) => product.images?.[0]).filter(Boolean) || [];
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -79,10 +80,6 @@ const HeroSection = () => {
     startAnimation();
   };
 
-  if (loading || images.length === 0) {
-    return <div className="text-center py-10">Loading latest products...</div>;
-  }
-
   return (
     <section className="px-4 sm:px-8 py-6 md:py-12">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl mx-auto items-center">
@@ -104,53 +101,63 @@ const HeroSection = () => {
           </div>
         </div>
 
-        {/* Right - Image Slider */}
+        {/* Right - Image Slider or Message */}
         <div className="col-span-1 md:col-span-7 flex justify-center md:justify-end relative">
           <div
-            className="relative w-full max-w-xl h-72 sm:h-80 md:h-88 lg:h-96 xl:h-104 2xl:h-112 rounded-xl overflow-hidden bg-[var(--color-secondary)]"
+            className="relative w-full max-w-xl h-72 sm:h-80 md:h-88 lg:h-96 xl:h-104 2xl:h-112 rounded-xl overflow-hidden bg-[var(--color-secondary)] flex items-center justify-center"
             onMouseEnter={handlePause}
             onMouseLeave={handleResume}
             onTouchStart={handlePause}
             onTouchEnd={handleResume}
           >
-            {images.map((src, index) => (
-              <img
-                key={index}
-                src={src}
-                alt={`Slide ${index + 1}`}
-                className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-700 ease-in-out ${
-                  index === currentIndex ? "opacity-100" : "opacity-0"
-                }`}
-              />
-            ))}
+            {loading ? (
+              <span className="text-[var(--foreground)]">Loading latest products...</span>
+            ) : images.length === 0 ? (
+              <span className="text-[var(--foreground)] text-center px-4">
+                No product images available.
+              </span>
+            ) : (
+              images.map((src, index) => (
+                <img
+                  key={index}
+                  src={src}
+                  alt={`Slide ${index + 1}`}
+                  className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-700 ease-in-out ${
+                    index === currentIndex ? "opacity-100" : "opacity-0"
+                  }`}
+                />
+              ))
+            )}
           </div>
 
           {/* Progress Bars */}
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
-            {images.map((_, index) => (
-              <div
-                key={index}
-                className="h-1.5 w-10 bg-gray-300 rounded-full overflow-hidden"
-              >
-                {index === currentIndex && (
-                  <div
-                    className="h-full bg-[var(--color-accent)] rounded-full"
-                    style={{
-                      width: `${progress}%`,
-                      transform:
-                        progress > 0 && progress < 100
-                          ? "scaleY(1.5)"
-                          : "scaleY(1)",
-                      transition: isPaused
-                        ? "none"
-                        : "width 0.1s linear, transform 0.3s ease-in-out",
-                      transformOrigin: "center",
-                    }}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
+          {images.length > 0 && (
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
+              {images.map((_, index) => (
+                <div
+                  key={index}
+                  className="h-1.5 w-10 bg-gray-300 rounded-full overflow-hidden"
+                >
+                  {index === currentIndex && (
+                    <div
+                      className="h-full bg-[var(--color-accent)] rounded-full"
+                      style={{
+                        width: `${progress}%`,
+                        transform:
+                          progress > 0 && progress < 100
+                            ? "scaleY(1.5)"
+                            : "scaleY(1)",
+                        transition: isPaused
+                          ? "none"
+                          : "width 0.1s linear, transform 0.3s ease-in-out",
+                        transformOrigin: "center",
+                      }}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>

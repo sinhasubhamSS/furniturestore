@@ -7,6 +7,7 @@ import { clearAuthCookies } from "../utils/auth/cookieHelper";
 import { AppError } from "../utils/AppError";
 import { ApiResponse } from "../utils/ApiResponse";
 import { catchAsync } from "../utils/catchAsync";
+import jwt from "jsonwebtoken";
 
 export const registerUser = catchAsync(async (req: Request, res: Response) => {
   const { name, email, password } = req.body;
@@ -38,10 +39,12 @@ export const registerUser = catchAsync(async (req: Request, res: Response) => {
   });
 
   sendTokenResponse(res, newUser._id.toString(), "Registration successful", {
-    _id: newUser._id,
-    name: newUser.name,
-    email: newUser.email,
-    avatar: newUser.avatar,
+    userData: {
+      _id: newUser._id.toString(),
+      name: newUser.name,
+      email: newUser.email,
+      avatar: newUser.avatar,
+    },
   });
 });
 
@@ -59,11 +62,13 @@ export const loginUser = catchAsync(async (req: Request, res: Response) => {
   }
 
   sendTokenResponse(res, user._id.toString(), "Login successful", {
-    _id: user._id,
-    name: user.name,
-    email: user.email,
-    avatar: user.avatar,
-    role: user.role,
+    userData: {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      role: user.role,
+    },
   });
 });
 
@@ -71,3 +76,24 @@ export const logoutUser = catchAsync(async (req: Request, res: Response) => {
   clearAuthCookies(res);
   res.status(200).json(new ApiResponse(200, null, "Logout successful"));
 });
+
+export const refreshAccessToken = catchAsync(
+  async (req: Request, res: Response) => {
+    const refreshToken = req.cookies?.refreshToken;
+
+    if (!refreshToken) {
+      return res.status(401).json({ message: "Refresh token not found" });
+    }
+
+    const decoded = jwt.verify(
+      refreshToken,
+      process.env.REFRESH_TOKEN_SECRET!
+    ) as { userId: string };
+    const user = await User.findById(decoded.userId).select("+refreshToken");
+
+    if (!user || user.refreshToken !== refreshToken) {
+      return res.status(403).json({ message: "Invalid refresh token" });
+    }
+    return sendTokenResponse(res, decoded.userId, "Access token refreshed");
+  }
+);
