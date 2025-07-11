@@ -1,14 +1,33 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
+
 import ProductForm from "@/components/admin/ProductForm";
-import axiosClient from "../../../../../utils/axios";
+import { useCreateProductMutation } from "@/redux/services/adminProductapi";
 import { CreateProductInput } from "@/lib/validations/product.schema";
 
+const AddProductPage = () => {
+  const router = useRouter();
+  const [createProduct, { isLoading }] = useCreateProductMutation();
 
-const AddProduct = () => {
-  const handleCreate = async (data:CreateProductInput) => {
-    await axiosClient.post("/products/createproduct", data);
+  const handleCreate = async (data: CreateProductInput) => {
+    try {
+      await createProduct(data).unwrap();
+
+      router.push("/admin/products");
+    } catch (error: any) {
+      toast.error(error?.data?.message || "Failed to create product");
+    }
   };
 
-  return <ProductForm onSubmit={handleCreate} />;
+  return (
+    <ProductForm
+      onSubmit={handleCreate}
+      isEdit={false}
+      loading={isLoading}
+    />
+  );
 };
 
-export default AddProduct;
+export default AddProductPage;

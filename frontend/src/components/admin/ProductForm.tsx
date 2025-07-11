@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import ImageUploader from "@/components/ImageUploader";
 import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
+
 import {
   createProductSchema,
   CreateProductInput,
@@ -16,6 +18,7 @@ interface ProductFormProps {
   onSubmit: (data: CreateProductInput) => Promise<void>;
   defaultValues?: Partial<CreateProductInput>;
   isEdit?: boolean;
+  loading?: boolean;
 }
 
 const ProductForm: React.FC<ProductFormProps> = ({
@@ -23,6 +26,8 @@ const ProductForm: React.FC<ProductFormProps> = ({
   defaultValues,
   isEdit = false,
 }) => {
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const {
     register,
     handleSubmit,
@@ -33,11 +38,11 @@ const ProductForm: React.FC<ProductFormProps> = ({
   } = useForm<CreateProductInput>({
     resolver: zodResolver(createProductSchema),
     defaultValues: {
-      isPublished: true, // Only static fallback value
+      isPublished: true,
+      ...defaultValues,
     },
   });
 
-  // 👇 Reset form whenever defaultValues change (especially useful for edit)
   useEffect(() => {
     if (defaultValues) {
       reset({
@@ -55,16 +60,19 @@ const ProductForm: React.FC<ProductFormProps> = ({
   }, [defaultValues, reset]);
 
   const handleFormSubmit = async (data: CreateProductInput) => {
+    setIsSubmitting(true);
     try {
       await onSubmit(data);
-      console.log("Submitted Data 👉", data);
 
       toast.success(
         isEdit ? "Product updated successfully" : "Product created successfully"
       );
-      if (!isEdit) reset(); // Reset only for new product
+      if (!isEdit) reset();
+      router.push("/admin/products");
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Something went wrong");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -142,27 +150,22 @@ const ProductForm: React.FC<ProductFormProps> = ({
           <p className="text-sm text-red-500">{errors.images.message}</p>
         )}
 
-        {/* Visibility Toggle */}
         <div className="space-y-2">
           <label className="block font-medium">Visibility</label>
           <div className="flex gap-4">
             <label className="flex items-center gap-2">
               <input
                 type="radio"
-                value="true"
-                {...register("isPublished", {
-                  setValueAs: (v) => v === "true",
-                })}
+                checked={watch("isPublished") === true}
+                onChange={() => setValue("isPublished", true)}
               />
               Public
             </label>
             <label className="flex items-center gap-2">
               <input
                 type="radio"
-                value="false"
-                {...register("isPublished", {
-                  setValueAs: (v) => v === "true",
-                })}
+                checked={watch("isPublished") === false}
+                onChange={() => setValue("isPublished", false)}
               />
               Private
             </label>
@@ -170,8 +173,12 @@ const ProductForm: React.FC<ProductFormProps> = ({
         </div>
 
         <div className="pt-4">
-          <Button type="submit" className="w-full">
-            {isEdit ? "Update Product" : "Create Product"}
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting
+              ? "Processing..."
+              : isEdit
+              ? "Update Product"
+              : "Create Product"}
           </Button>
         </div>
       </form>

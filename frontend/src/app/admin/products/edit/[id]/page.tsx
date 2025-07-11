@@ -1,37 +1,38 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useGetAdminProductsQuery } from "@/redux/services/adminProductapi";
+
 import ProductForm from "@/components/admin/ProductForm";
 
 import type { CreateProductInput } from "@/lib/validations/product.schema";
-import axiosClient from "../../../../../../utils/axios";
 import { Product } from "@/types/Product";
+import toast from "react-hot-toast";
+import {
+  useEditProductMutation,
+  useGetAdminProductsQuery,
+} from "@/redux/services/adminProductapi";
 
 const EditProductPage = () => {
-  const { id } = useParams(); // id will be string
+  const { id } = useParams(); // id is a string
+  console.log(id);
+  if (!id) return <p className="p-4 text-red-500">Invalid product ID</p>;
 
-  // ✅ Get product list from cache
   const { data: productList, isLoading } = useGetAdminProductsQuery({
     page: 1,
     limit: 10,
   });
 
-  // ✅ Find the required product
+  const [editProduct, { isLoading: isUpdating }] = useEditProductMutation();
+
   const product = productList?.products?.find((p: Product) => p._id === id);
 
- const handleUpdate = async (data: CreateProductInput) => {
-  console.log("📦 handleUpdate triggered with:", data); // ✅ this should show up
-  try {
-    const res = await axiosClient.put(`/products/admin/update/${id}`, data);
-    console.log("✅ Update success:", res.data);
-  } catch (err: any) {
-    console.error("❌ Update failed:", err?.response?.data || err.message);
-    throw err;
-  }
-};
-
-
+  const handleUpdate = async (data: CreateProductInput) => {
+    try {
+      await editProduct({ id: id as string, data }).unwrap();
+    } catch (error: any) {
+      toast.error(error?.data?.message || "Failed to update product");
+    }
+  };
 
   if (isLoading) return <p className="p-4">Loading...</p>;
   if (!product) return <p className="p-4 text-red-500">Product not found</p>;
@@ -42,8 +43,9 @@ const EditProductPage = () => {
       isEdit
       defaultValues={{
         ...product,
-        category: product.category._id, // 👈 yahi expected hai form ke schema ke according
+        category: product.category._id, // Form schema expects category id
       }}
+      loading={isUpdating}
     />
   );
 };
