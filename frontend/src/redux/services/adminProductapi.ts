@@ -3,7 +3,7 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import type { AdminProductResponse } from "@/types/Product";
 import { CreateProductInput } from "@/lib/validations/product.schema";
-import { axiosBaseQuery } from "../api/ustomBaseQuery";
+import { axiosBaseQuery } from "../api/customBaseQuery";
 
 export const adminProductApi = createApi({
   reducerPath: "adminProductApi",
@@ -47,6 +47,13 @@ export const adminProductApi = createApi({
       }),
       invalidatesTags: ["AdminProducts"],
     }),
+    deleteProduct: builder.mutation<any, string>({
+      query: (id) => ({
+        url: `/products/deleteproduct/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["AdminProducts"],
+    }),
   }),
 });
 
@@ -54,4 +61,5 @@ export const {
   useGetAdminProductsQuery,
   useCreateProductMutation,
   useEditProductMutation,
+  useDeleteProductMutation,
 } = adminProductApi;

@@ -79,6 +79,7 @@ export const logoutUser = catchAsync(async (req: Request, res: Response) => {
 
 export const refreshAccessToken = catchAsync(
   async (req: Request, res: Response) => {
+    console.log("reached refreshAccessToken");
     const refreshToken = req.cookies?.refreshToken;
 
     if (!refreshToken) {

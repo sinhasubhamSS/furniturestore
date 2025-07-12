@@ -28,33 +28,32 @@ axiosClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Handle 401 errors (unauthorized)
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
       if (isRefreshing) {
-        // Queue the request while token is being refreshed
-        return new Promise(function (resolve, reject) {
+        return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
-          .then((token) => {
-            return axiosClient(originalRequest);
-          })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
+          .then(() => axiosClient(originalRequest))
+          .catch((err) => Promise.reject(err));
       }
 
       isRefreshing = true;
 
       try {
-        // 🔁 Call refresh token route
-        await axiosClient.post("/user/refresh-token");
-        processQueue(null); // all waiting requests can proceed
-        return axiosClient(originalRequest); // retry original request
+        // ✅ KEY FIX: use raw axios to ensure cookies are sent correctly
+        await axios.post(
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}/user/refresh-token`,
+          {},
+          { withCredentials: true }
+        );
+
+        processQueue(null);
+        return axiosClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        window.location.href = "/auth/login"; // logout on refresh fail
+        window.location.href = "/auth/login";
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
