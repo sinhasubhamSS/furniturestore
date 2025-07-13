@@ -3,7 +3,10 @@ import Category, { ICategory } from "../models/category.model";
 
 interface CreateCategoryInput {
   name: string;
-  image: string;
+  image: {
+    url: string;
+    public_id: string;
+  };
 }
 
 class CategoryService {
@@ -14,6 +17,8 @@ class CategoryService {
     const newCategory = new Category(data);
     return await newCategory.save();
   }
+
+
 
   async getAllCategories(): Promise<ICategory[]> {
     return await Category.find().sort({ createdAt: -1 });

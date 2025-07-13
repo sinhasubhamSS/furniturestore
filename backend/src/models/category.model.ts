@@ -1,4 +1,3 @@
-// models/Category.ts
 import { Schema, model, models, Document } from "mongoose";
 import slugify from "slugify";
 
@@ -6,7 +5,10 @@ import slugify from "slugify";
 export interface ICategory extends Document {
   name: string;
   slug: string;
-  image: string; // Cloudinary URL
+  image: {
+    url: string;
+    public_id: string;
+  };
   createdAt: Date;
 }
 
@@ -21,12 +23,17 @@ const categorySchema = new Schema<ICategory>(
     },
     slug: {
       type: String,
-      required: false,
       unique: true,
     },
     image: {
-      type: String,
-      required: true,
+      url: {
+        type: String,
+        required: true,
+      },
+      public_id: {
+        type: String,
+        required: true,
+      },
     },
     createdAt: {
       type: Date,

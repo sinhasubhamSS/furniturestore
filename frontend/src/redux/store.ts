@@ -1,6 +1,4 @@
-// src/redux/store.ts
 import { configureStore } from "@reduxjs/toolkit";
-
 import userReducer from "./slices/userSlice";
 import {
   persistStore,
@@ -14,11 +12,13 @@ import {
 } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 import { combineReducers } from "@reduxjs/toolkit";
-import {adminProductApi} from "@/redux/services/adminProductapi"
+import { adminProductApi } from "@/redux/services/adminProductapi";
+import { adminCategoryApi } from "./services/adminCategoryapi";
 
 const rootReducer = combineReducers({
   user: userReducer,
-  [adminProductApi.reducerPath]: adminProductApi.reducer, // ✅ add api reducer
+  [adminProductApi.reducerPath]: adminProductApi.reducer,
+  [adminCategoryApi.reducerPath]: adminCategoryApi.reducer,
 });
 
 const persistConfig = {
@@ -36,7 +36,7 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }).concat(adminProductApi.middleware), // ✅ add api middleware
+    }).concat(adminProductApi.middleware, adminCategoryApi.middleware), // ✅ both middleware
 });
 
 export const persistor = persistStore(store);

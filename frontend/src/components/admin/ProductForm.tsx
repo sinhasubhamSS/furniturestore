@@ -13,6 +13,7 @@ import {
   createProductSchema,
   CreateProductInput,
 } from "@/lib/validations/product.schema";
+import { useGetCategoriesQuery } from "@/redux/services/adminCategoryapi";
 
 interface ProductFormProps {
   onSubmit: (data: CreateProductInput) => Promise<void>;
@@ -28,6 +29,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
 }) => {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   const {
     register,
     handleSubmit,
@@ -42,6 +44,9 @@ const ProductForm: React.FC<ProductFormProps> = ({
       ...defaultValues,
     },
   });
+
+  const { data: categories = [], isLoading: loadingCategories } =
+    useGetCategoriesQuery();
 
   useEffect(() => {
     if (defaultValues) {
@@ -63,7 +68,6 @@ const ProductForm: React.FC<ProductFormProps> = ({
     setIsSubmitting(true);
     try {
       await onSubmit(data);
-
       toast.success(
         isEdit ? "Product updated successfully" : "Product created successfully"
       );
@@ -128,16 +132,28 @@ const ProductForm: React.FC<ProductFormProps> = ({
           register={register("stock", { valueAsNumber: true })}
           error={errors.stock?.message}
         />
-        <Input
-          label="Category ID"
-          placeholder="Paste category ID"
-          name="category"
-          register={register("category", {
-            setValueAs: (value) => value.trim(),
-          })}
-          error={errors.category?.message}
-        />
 
+        {/* Category Dropdown */}
+        <div className="space-y-2">
+          <label className="block font-medium">Category</label>
+          <select
+            {...register("category", { required: true })}
+            className="w-full border p-2 rounded-md"
+            disabled={loadingCategories}
+          >
+            <option value="">Select category</option>
+            {categories.map((cat) => (
+              <option key={cat._id} value={cat._id}>
+                {cat.name}
+              </option>
+            ))}
+          </select>
+          {errors.category && (
+            <p className="text-sm text-red-500">{errors.category.message}</p>
+          )}
+        </div>
+
+        {/* Image Upload */}
         <ImageUploader
           maxFiles={5}
           folder="products"
@@ -150,6 +166,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
           <p className="text-sm text-red-500">{errors.images.message}</p>
         )}
 
+        {/* Visibility */}
         <div className="space-y-2">
           <label className="block font-medium">Visibility</label>
           <div className="flex gap-4">
@@ -172,6 +189,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
           </div>
         </div>
 
+        {/* Submit Button */}
         <div className="pt-4">
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting
