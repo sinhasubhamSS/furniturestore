@@ -4,9 +4,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
-import ImageUploader from "@/components/ImageUploader";
+
 import toast from "react-hot-toast";
-import { useCreateCategoryMutation } from "@/redux/services/adminCategoryapi";
+import { useCreateCategoryMutation } from "@/redux/services/admin/adminCategoryapi";
+import ImageUploader from "@/components/helperComponents/ImageUploader";
 
 interface CreateCategoryInput {
   name: string;
@@ -18,7 +19,13 @@ interface CreateCategoryInput {
 
 export default function CategoryForm() {
   const [createCategory, { isLoading }] = useCreateCategoryMutation();
-  const { register, handleSubmit, setValue, formState: { errors }, reset } = useForm<CreateCategoryInput>();
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+    reset,
+  } = useForm<CreateCategoryInput>();
 
   const onSubmit = async (data: CreateCategoryInput) => {
     try {
@@ -31,7 +38,10 @@ export default function CategoryForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 max-w-md mx-auto mt-10">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="space-y-5 max-w-md mx-auto mt-10"
+    >
       <h2 className="text-xl font-semibold">Create Category</h2>
 
       <Input
@@ -50,7 +60,9 @@ export default function CategoryForm() {
           }
         }}
       />
-      {errors.image?.url && <p className="text-sm text-red-500">Image is required</p>}
+      {errors.image?.url && (
+        <p className="text-sm text-red-500">Image is required</p>
+      )}
 
       <Button type="submit" disabled={isLoading} className="w-full">
         {isLoading ? "Creating..." : "Create Category"}

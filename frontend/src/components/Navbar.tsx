@@ -11,7 +11,7 @@ import {
 } from "react-icons/fi";
 import { RiLoginCircleLine } from "react-icons/ri";
 import type { RootState } from "@/redux/store";
-import Toggle from "@/components/Toogle";
+import Toggle from "@/components/helperComponents/Toogle";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clearActiveUser } from "@/redux/slices/userSlice";

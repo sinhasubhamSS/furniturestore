@@ -1,5 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
-import { axiosBaseQuery } from "../api/customBaseQuery";
+import { axiosBaseQuery } from "../../api/customBaseQuery";
 import { Category } from "@/types/category";
 
 export const adminCategoryApi = createApi({

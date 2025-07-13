@@ -2,7 +2,7 @@
 "use client";
 import React, { useState } from "react";
 import Button from "@/components/ui/Button";
-import Toggle from "@/components/Toogle";
+import Toggle from "@/components/helperComponents/Toogle";
 import ProductCard from "@/components/ui/ProductCard";
 
 const TestInputPage = () => {

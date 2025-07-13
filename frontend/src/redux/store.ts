@@ -12,8 +12,8 @@ import {
 } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 import { combineReducers } from "@reduxjs/toolkit";
-import { adminProductApi } from "@/redux/services/adminProductapi";
-import { adminCategoryApi } from "./services/adminCategoryapi";
+import { adminProductApi } from "@/redux/services/admin/adminProductapi";
+import { adminCategoryApi } from "./services/admin/adminCategoryapi";
 
 const rootReducer = combineReducers({
   user: userReducer,

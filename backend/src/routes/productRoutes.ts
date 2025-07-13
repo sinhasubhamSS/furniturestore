@@ -12,6 +12,7 @@ import {
   searchProducts,
   getProductsByCategory,
   getLatestProducts,
+  getPublishedProducts,
 } from "../controllers/productController";
 
 import { authVerify } from "../middlewares/authVerify";
@@ -26,5 +27,6 @@ router.get("/getproductbyid/:productId", getProductById);
 router.get("/search", searchProducts);
 router.get("/category/:slug", getProductsByCategory);
 router.get("/latest-products", getLatestProducts);
-
+//user
+router.get("/published-products", getPublishedProducts);
 export default router;

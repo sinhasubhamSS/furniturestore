@@ -3,7 +3,7 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import type { AdminProductResponse } from "@/types/Product";
 import { CreateProductInput } from "@/lib/validations/product.schema";
-import { axiosBaseQuery } from "../api/customBaseQuery";
+import { axiosBaseQuery } from "@/redux/api/customBaseQuery";
 
 export const adminProductApi = createApi({
   reducerPath: "adminProductApi",

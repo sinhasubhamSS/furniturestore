@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
-import ImageUploader from "@/components/ImageUploader";
+ImageUploader;
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 
@@ -13,7 +13,8 @@ import {
   createProductSchema,
   CreateProductInput,
 } from "@/lib/validations/product.schema";
-import { useGetCategoriesQuery } from "@/redux/services/adminCategoryapi";
+import { useGetCategoriesQuery } from "@/redux/services/admin/adminCategoryapi";
+import ImageUploader from "../helperComponents/ImageUploader";
 
 interface ProductFormProps {
   onSubmit: (data: CreateProductInput) => Promise<void>;

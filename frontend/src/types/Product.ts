@@ -31,3 +31,10 @@ export type AdminProductResponse = {
   page: number;
   limit: number;
 };
+export type UserProductResponse = {
+  products: Product[];
+  totalItems: number;
+  totalPages: number;
+  page: number;
+  limit: number;
+};
