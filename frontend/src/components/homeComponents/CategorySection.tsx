@@ -1,7 +1,8 @@
 "use client";
 
 import { useGetCategoriesQuery } from "@/redux/services/admin/adminCategoryapi";
-import CategoryCard from "./helperComponents/CategoryCard";
+import CategoryCard from "../helperComponents/CategoryCard";
+
 
 type Props = {
   onSelect?: (categoryId: string) => void;
