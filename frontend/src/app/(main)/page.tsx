@@ -1,5 +1,6 @@
 import CategorySection from "@/components/homeComponents/CategorySection";
 import HeroSection from "@/components/homeComponents/HeroSection";
+import LatestProduct from "@/components/homeComponents/LatestProduct";
 
 // app/(main)/page.tsx
 export default function HomePage() {
@@ -7,6 +8,7 @@ export default function HomePage() {
     <div>
       <HeroSection />
       <CategorySection />
+      <LatestProduct/>
     </div>
   );
   

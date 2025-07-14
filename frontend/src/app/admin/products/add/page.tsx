@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 import ProductForm from "@/components/admin/ProductForm";
-import { useCreateProductMutation } from "@/redux/services/adminProductapi";
+import { useCreateProductMutation } from "@/redux/services/admin/adminProductapi";
 import { CreateProductInput } from "@/lib/validations/product.schema";
 
 const AddProductPage = () => {

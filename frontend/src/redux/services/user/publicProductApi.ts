@@ -1,6 +1,6 @@
 import { axiosBaseQuery } from "@/redux/api/customBaseQuery";
 import { createApi } from "@reduxjs/toolkit/query/react";
-import {UserProductResponse} from "@/types/Product"
+import { UserProductResponse } from "@/types/Product";
 export const userProductApi = createApi({
   reducerPath: "userProductApi",
   baseQuery: axiosBaseQuery(),
@@ -11,10 +11,10 @@ export const userProductApi = createApi({
       { page?: number; limit?: number }
     >({
       query: ({ page = 1, limit = 10 } = {}) => ({
-        url: `/product/published?page=${page}&limit=${limit}`,
+        url: `/products/published-products?page=${page}&limit=${limit}`,
         method: "GET",
       }),
-      transformResponse: (res: { data: UserProductResponse}) => res.data,
+      transformResponse: (res: { data: UserProductResponse }) => res.data,
       providesTags: ["UserProducts"],
     }),
   }),

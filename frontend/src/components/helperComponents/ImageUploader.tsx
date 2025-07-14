@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import { FiUpload, FiX } from "react-icons/fi";
 import toast from "react-hot-toast";
-import { uploadImageToCloudinary } from "../../utils/uploadToCloudinary";
+import { uploadImageToCloudinary } from "../../../utils/uploadToCloudinary";
 
 interface UploadedImage {
   url: string;

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   useGetAdminProductsQuery,
   useDeleteProductMutation,
-} from "@/redux/services/adminProductapi";
+} from "@/redux/services/admin/adminProductapi";
 const ProductTable = () => {
   const { data, isLoading, error } = useGetAdminProductsQuery({
     page: 1,
