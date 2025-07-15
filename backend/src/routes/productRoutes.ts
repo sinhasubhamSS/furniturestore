@@ -22,11 +22,12 @@ const router = Router();
 router.post("/createproduct", authVerify, isAdmin, createProduct);
 router.put("/editproduct/:productId", authVerify, isAdmin, updateProduct);
 router.delete("/deleteproduct/:productId", authVerify, isAdmin, deleteProduct);
-router.get("/admin/getallproducts",authVerify,isAdmin, getAllProducts);
-router.get("/getproductbyid/:productId", getProductById);
+router.get("/admin/getallproducts", authVerify, isAdmin, getAllProducts);
+
 router.get("/search", searchProducts);
 router.get("/category/:slug", getProductsByCategory);
 router.get("/latest-products", getLatestProducts);
+router.get("/getproductbyid/:productId", getProductById);
 //user
 router.get("/published-products", getPublishedProducts);
 export default router;

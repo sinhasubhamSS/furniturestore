@@ -84,9 +84,16 @@ class ProductService {
   }
 
   // ✅ Get Single Product
-  async getProductById(productId: string) {
-    const product = await Product.findById(productId).lean();
+  async getProductById(productId: string, isAdmin = false) {
+    const product = await Product.findById(productId).lean<IProductInput>();
+
     if (!product) throw new AppError("Product not found", 404);
+
+    // 👇 Agar admin nahi hai aur product published nahi hai to error do
+    if (!isAdmin && !product.isPublished) {
+      throw new AppError("Product is not available", 403);
+    }
+
     return product;
   }
 
