@@ -8,7 +8,7 @@ import {
   updateProduct,
   deleteProduct,
   getAllProducts,
-  getProductById,
+  getProductBySlug,
   searchProducts,
   getProductsByCategory,
   getLatestProducts,
@@ -27,7 +27,8 @@ router.get("/admin/getallproducts", authVerify, isAdmin, getAllProducts);
 router.get("/search", searchProducts);
 router.get("/category/:slug", getProductsByCategory);
 router.get("/latest-products", getLatestProducts);
-router.get("/getproductbyid/:productId", getProductById);
+router.get("/getproductbyslug/:slug", getProductBySlug);
+
 //user
 router.get("/published-products", getPublishedProducts);
 export default router;

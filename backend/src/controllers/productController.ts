@@ -95,12 +95,12 @@ export const deleteProduct = catchAsync(
 );
 
 // ✅ Get Single Product by ID
-export const getProductById = catchAsync(
+export const getProductBySlug = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const isAdmin = req.user?.role === "admin"; // User ya Admin yahan check ho raha hai
 
-    const product = await productService.getProductById(
-      req.params.productId,
+    const product = await productService.getProductBySlug(
+      req.params.slug,
       isAdmin // ← Ye flag service ko batata hai ki kaun request kar raha hai
     );
 

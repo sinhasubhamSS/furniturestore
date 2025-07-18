@@ -84,8 +84,8 @@ class ProductService {
   }
 
   // ✅ Get Single Product
-  async getProductById(productId: string, isAdmin = false) {
-    const product = await Product.findById(productId).lean<IProductInput>();
+  async getProductBySlug(slug: string, isAdmin = false) {
+    const product = await Product.findOne({ slug }).lean<IProductInput>();
 
     if (!product) throw new AppError("Product not found", 404);
 

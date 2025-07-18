@@ -13,7 +13,7 @@ const ProductCard = ({ product }: Props) => {
 
   return (
     <div
-      onClick={() => router.push(`/products/${_id}`)}
+      onClick={() => router.push(`/products/${product.slug}`)}
       className="cursor-pointer bg-white dark:bg-[var(--color-secondary)] p-4 rounded-xl shadow-md hover:shadow-lg transition-transform duration-300 hover:-translate-y-1"
     >
       <div className="w-full aspect-square mb-3 rounded-md overflow-hidden bg-white">
