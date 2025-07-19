@@ -81,7 +81,7 @@ const HeroSection = () => {
   };
 
   return (
-    <section className="px-4 sm:px-8 py-6 md:py-12">
+    <section className="px-4 sm:px-8 py-6 md:py-12 bg-[var(--background)] text-[var(--foreground)]">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl mx-auto items-center">
         {/* Left - Text */}
         <div className="col-span-1 md:col-span-5 text-center md:text-left space-y-4">
@@ -94,24 +94,26 @@ const HeroSection = () => {
           <div className="flex justify-center md:justify-start">
             <button
               onClick={() => router.push("/products")}
-              className="bg-[var(--color-accent)] text-[var(--text-light)] px-10 py-4 rounded-xl text-lg sm:text-xl font-semibold shadow-md hover:scale-105 hover:shadow-lg transition-all duration-300 ease-in-out"
+              className="bg-[var(--color-accent)] text-[var(--text-light)] px-10 py-4 rounded-xl text-lg sm:text-xl font-semibold shadow-lg hover:scale-105 transition-transform duration-300"
             >
               🛒 SHOP NOW
             </button>
           </div>
         </div>
 
-        {/* Right - Image Slider or Message */}
+        {/* Right - Image Slider */}
         <div className="col-span-1 md:col-span-7 flex justify-center md:justify-end relative">
           <div
-            className="relative w-full max-w-xl h-72 sm:h-80 md:h-88 lg:h-96 xl:h-104 2xl:h-112 rounded-xl overflow-hidden bg-[var(--color-secondary)] flex items-center justify-center"
+            className="relative w-full max-w-xl h-72 sm:h-80 md:h-88 lg:h-96 xl:h-104 2xl:h-112 rounded-xl overflow-hidden bg-[var(--card-bg)] flex items-center justify-center"
             onMouseEnter={handlePause}
             onMouseLeave={handleResume}
             onTouchStart={handlePause}
             onTouchEnd={handleResume}
           >
             {loading ? (
-              <span className="text-[var(--foreground)]">Loading latest products...</span>
+              <span className="text-[var(--foreground)]">
+                Loading latest products...
+              </span>
             ) : images.length === 0 ? (
               <span className="text-[var(--foreground)] text-center px-4">
                 No product images available.
@@ -136,7 +138,7 @@ const HeroSection = () => {
               {images.map((_, index) => (
                 <div
                   key={index}
-                  className="h-1.5 w-10 bg-gray-300 rounded-full overflow-hidden"
+                  className="h-1.5 w-10 bg-[color:var(--border)] rounded-full overflow-hidden"
                 >
                   {index === currentIndex && (
                     <div

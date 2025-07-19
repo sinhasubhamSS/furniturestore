@@ -1,6 +1,6 @@
 import { axiosBaseQuery } from "@/redux/api/customBaseQuery";
 import { createApi } from "@reduxjs/toolkit/query/react";
-import { UserProductResponse } from "@/types/Product";
+import { Product, UserProductResponse } from "@/types/Product";
 
 export const userProductApi = createApi({
   reducerPath: "userProductApi",
@@ -21,12 +21,13 @@ export const userProductApi = createApi({
     }),
 
     // ✅ Get single product by slug
-    getProductBySlug: builder.query<UserProductResponse, string>({
+    // ✅ Correct
+    getProductBySlug: builder.query<Product, string>({
       query: (slug) => ({
-        url: `/products/${slug}`, // ← update endpoint to use slug
+        url: `/products/getproductbyslug/${slug}`,
         method: "GET",
       }),
-      transformResponse: (res: { data: UserProductResponse }) => res.data,
+      transformResponse: (res: { data: Product }) => res.data,
       providesTags: (_result, _error, slug) => [
         { type: "UserProducts", id: slug },
       ],
@@ -34,7 +35,5 @@ export const userProductApi = createApi({
   }),
 });
 
-export const {
-  useGetPublishedProductsQuery,
-  useGetProductBySlugQuery, 
-} = userProductApi;
+export const { useGetPublishedProductsQuery, useGetProductBySlugQuery } =
+  userProductApi;
