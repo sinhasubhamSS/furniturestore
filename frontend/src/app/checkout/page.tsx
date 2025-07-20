@@ -1,9 +1,12 @@
-import React from 'react'
+import AddressSection from "@/components/checkout/AddressSection";
 
-function page() {
+function Page() {
   return (
-    <div>page</div>
-  )
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">Your Addresses</h1>
+      <AddressSection />
+    </div>
+  );
 }
 
-export default page
+export default Page;

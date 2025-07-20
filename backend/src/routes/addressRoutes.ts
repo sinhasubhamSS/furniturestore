@@ -5,10 +5,12 @@ import {
   getAddresses,
   updateAddress,
 } from "../controllers/addressController";
+import { authVerify } from "../middlewares/authVerify";
 
 const router = Router();
+router.use(authVerify);
 router.get("/", getAddresses);
-router.post("/", createAddress);
-router.patch("/:id", updateAddress);
-router.delete("/:id", deleteAddress);
+router.post("/create", createAddress);
+router.patch("/update/:id", updateAddress);
+router.delete("/delete/:id", deleteAddress);
 export default router;

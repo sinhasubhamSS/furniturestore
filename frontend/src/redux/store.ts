@@ -15,12 +15,14 @@ import storage from "redux-persist/lib/storage";
 import { adminProductApi } from "@/redux/services/admin/adminProductapi";
 import { adminCategoryApi } from "./services/admin/adminCategoryapi";
 import { userProductApi } from "@/redux/services/user/publicProductApi"; // ✅ IMPORT
+import { addressApi } from "./services/user/addressApi";
 
 const rootReducer = combineReducers({
   user: userReducer,
   [adminProductApi.reducerPath]: adminProductApi.reducer,
   [adminCategoryApi.reducerPath]: adminCategoryApi.reducer,
   [userProductApi.reducerPath]: userProductApi.reducer, // ✅ ADD HERE
+  [addressApi.reducerPath]: addressApi.reducer,
 });
 
 const persistConfig = {
@@ -41,7 +43,8 @@ export const store = configureStore({
     }).concat(
       adminProductApi.middleware,
       adminCategoryApi.middleware,
-      userProductApi.middleware // ✅ ADD HERE
+      userProductApi.middleware, // ✅ ADD HERE
+      addressApi.middleware
     ),
 });
 
