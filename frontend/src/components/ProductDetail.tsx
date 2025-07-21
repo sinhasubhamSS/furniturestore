@@ -3,6 +3,7 @@
 import { useGetProductBySlugQuery } from "@/redux/services/user/publicProductApi";
 import { useState } from "react";
 import Button from "@/components/ui/Button";
+import { useRouter } from "next/navigation";
 
 interface Props {
   slug: string;
@@ -11,6 +12,10 @@ interface Props {
 const ProductDetail = ({ slug }: Props) => {
   const { data: product, isLoading, error } = useGetProductBySlugQuery(slug);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const router = useRouter();
+  const handleBuyNow = () => {
+    router.push(`/checkout`);
+  };
 
   if (isLoading) {
     return (
@@ -100,7 +105,13 @@ const ProductDetail = ({ slug }: Props) => {
             <Button className="bg-[--color-secondary] text-[--text-accent] hover:opacity-90 transition">
               Add to Cart
             </Button>
-            <Button className="bg-[--color-accent] text-white hover:brightness-110 transition">
+            <Button
+              disabled={product.stock <= 0}
+              onClick={handleBuyNow}
+              className={`bg-[--color-accent] text-white hover:brightness-110 transition ${
+                product.stock <= 0 ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
               Buy Now
             </Button>
           </div>
