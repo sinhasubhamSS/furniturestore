@@ -109,6 +109,21 @@ export const getProductBySlug = catchAsync(
       .json(new ApiResponse(200, product, "Product fetched successfully"));
   }
 );
+// ✅ Get Single Product by ID (used in checkout, etc.)
+export const getProductById = catchAsync(
+  async (req: AuthRequest, res: Response) => {
+    const isAdmin = req.user?.role === "admin";
+    const productId = req.params.productId;
+
+    if (!productId) throw new AppError("Product ID is required", 400);
+
+    const product = await productService.getProductById(productId, isAdmin);
+
+    res.status(200).json(
+      new ApiResponse(200, product, "Product fetched by ID successfully")
+    );
+  }
+);
 
 // ✅ Get All Products
 export const getAllProducts = catchAsync(

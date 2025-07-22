@@ -4,23 +4,35 @@ import {
   useGetAddressesQuery,
   useCreateAddressMutation,
 } from "@/redux/services/user/addressApi";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Address } from "@/types/address";
 import Input from "@/components/ui/Input";
 import { useForm } from "react-hook-form";
+import { useDispatch, useSelector } from "react-redux";
+import { setSelectedAddressId } from "@/redux/slices/checkoutSlice";
+import { RootState } from "@/redux/store"; // adjust if needed
 
-const AddressSection = () => {
+const AddressSection = ({
+  onSelectionChange,
+}: {
+  onSelectionChange: (val: boolean) => void;
+}) => {
   const { data: addresses = [], isLoading } = useGetAddressesQuery();
   const [createAddress] = useCreateAddressMutation();
 
+  const selectedFromRedux = useSelector(
+    (state: RootState) => state.checkout.selectedAddressId
+  );
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newAddress, setNewAddress] = useState(false);
+  const dispatch = useDispatch();
 
   const {
     register,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<Partial<Address>>({
     defaultValues: {
       fullName: "",
@@ -36,43 +48,68 @@ const AddressSection = () => {
     },
   });
 
+  useEffect(() => {
+    if (selectedFromRedux) {
+      setSelectedId(selectedFromRedux);
+    }
+  }, [selectedFromRedux]);
+
   const onSubmit = async (data: Partial<Address>) => {
     try {
-      await createAddress(data).unwrap();
+      const res = await createAddress(data).unwrap();
       reset();
       setNewAddress(false);
+
+      if (res._id) {
+        setSelectedId(res._id);
+        dispatch(setSelectedAddressId(res._id));
+        onSelectionChange(true);
+      }
     } catch (err) {
       console.error("Failed to create address", err);
     }
   };
 
   return (
-    <div className="p-4 border rounded-lg">
+    <div className="p-4 border border-[--color-border] rounded-lg bg-[--color-card] text-[--text-dark] dark:text-[--text-light]">
       <h2 className="text-lg font-bold mb-2">Delivery Address</h2>
 
       {isLoading ? (
-        <p>Loading addresses...</p>
+        <p className="text-[--color-muted-foreground]">Loading addresses...</p>
       ) : addresses.length > 0 ? (
         addresses.map((addr) => (
-          <label key={addr._id} className="block mb-2 cursor-pointer">
+          <label
+            key={addr._id}
+            className="block mb-2 cursor-pointer hover:bg-[--secondary-light] dark:hover:bg-[--secondary-light]/10 p-2 rounded"
+          >
             <input
               type="radio"
               name="address"
               checked={selectedId === addr._id}
-              onChange={() => setSelectedId(addr._id)}
+              onChange={() => {
+                setSelectedId(addr._id);
+                dispatch(setSelectedAddressId(addr._id));
+                onSelectionChange(true);
+              }}
+              className="accent-[--color-accent]"
             />
             <span className="ml-2">
               {addr.fullName}, {addr.addressLine1}, {addr.city}
+              {selectedId === addr._id && (
+                <span className="ml-2 text-green-500 font-semibold">✔</span>
+              )}
             </span>
           </label>
         ))
       ) : (
-        <p>No addresses found. Please add one.</p>
+        <p className="text-[--text-error]">
+          No addresses found. Please add one.
+        </p>
       )}
 
       <button
         onClick={() => setNewAddress(!newAddress)}
-        className="mt-4 text-blue-600 underline"
+        className="mt-4 text-[--color-accent] underline"
       >
         {newAddress ? "Cancel" : "+ Add new address"}
       </button>
@@ -141,15 +178,21 @@ const AddressSection = () => {
           />
 
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="isDefault" {...register("isDefault")} />
+            <input
+              type="checkbox"
+              id="isDefault"
+              {...register("isDefault")}
+              className="accent-[--color-accent]"
+            />
             <label htmlFor="isDefault">Make this my default address</label>
           </div>
 
           <button
             type="submit"
-            className="bg-blue-600 text-white px-4 py-2 rounded"
+            disabled={isSubmitting}
+            className="bg-[--color-accent] text-[--text-light] px-4 py-2 rounded disabled:opacity-50"
           >
-            Save Address
+            {isSubmitting ? "Saving..." : "Save Address"}
           </button>
         </form>
       )}

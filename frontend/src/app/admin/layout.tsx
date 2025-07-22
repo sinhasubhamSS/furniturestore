@@ -34,7 +34,7 @@ export default function AdminLayout({
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-[var(--background)]">
+    <div className="flex min-h-screen ">
       <Sidebar
         isOpen={isSidebarOpen}
         toggle={() => setIsSidebarOpen(!isSidebarOpen)}

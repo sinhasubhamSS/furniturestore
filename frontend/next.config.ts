@@ -1,4 +1,9 @@
+/** @type {import('next').NextConfig} */
 const nextConfig = {
+  images: {
+    domains: ["res.cloudinary.com"], // 👈 Required for Cloudinary images
+  },
+
   async rewrites() {
     return [
       {

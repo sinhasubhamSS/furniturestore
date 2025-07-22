@@ -14,7 +14,7 @@ const ProductDetail = ({ slug }: Props) => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const router = useRouter();
   const handleBuyNow = () => {
-    router.push(`/checkout`);
+    router.push(`/checkout?product=${product!._id}`);
   };
 
   if (isLoading) {

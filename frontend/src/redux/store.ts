@@ -16,9 +16,10 @@ import { adminProductApi } from "@/redux/services/admin/adminProductapi";
 import { adminCategoryApi } from "./services/admin/adminCategoryapi";
 import { userProductApi } from "@/redux/services/user/publicProductApi"; // ✅ IMPORT
 import { addressApi } from "./services/user/addressApi";
-
+import checkoutReducer from "./slices/checkoutSlice";
 const rootReducer = combineReducers({
   user: userReducer,
+   checkout: checkoutReducer,
   [adminProductApi.reducerPath]: adminProductApi.reducer,
   [adminCategoryApi.reducerPath]: adminCategoryApi.reducer,
   [userProductApi.reducerPath]: userProductApi.reducer, // ✅ ADD HERE

@@ -32,8 +32,18 @@ export const userProductApi = createApi({
         { type: "UserProducts", id: slug },
       ],
     }),
+    getProductByID: builder.query<Product, string>({
+      query: (id) => ({
+        url: `/products/getproductbyid/${id}`,
+        method: "GET",
+      }),
+      transformResponse: (res: { data: Product }) => res.data,
+      providesTags: (_result, _error, id) => [
+        { type: "UserProducts", id },
+      ],
+    }),
   }),
 });
 
-export const { useGetPublishedProductsQuery, useGetProductBySlugQuery } =
+export const { useGetPublishedProductsQuery, useGetProductBySlugQuery,useGetProductByIDQuery } =
   userProductApi;

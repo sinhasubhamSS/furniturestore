@@ -1,3 +1,4 @@
+import { FilterQuery } from "mongoose";
 import cloudinary from "../config/cloudinary";
 import Category from "../models/category.model";
 import Product from "../models/product.models";
@@ -84,17 +85,27 @@ class ProductService {
   }
 
   // ✅ Get Single Product
-  async getProductBySlug(slug: string, isAdmin = false) {
-    const product = await Product.findOne({ slug }).lean<IProductInput>();
+  private async getProduct(
+    query: FilterQuery<IProductInput>,
+    isAdmin: boolean
+  ) {
+    const product = await Product.findOne(query).lean<IProductInput>();
 
     if (!product) throw new AppError("Product not found", 404);
 
-    // 👇 Agar admin nahi hai aur product published nahi hai to error do
     if (!isAdmin && !product.isPublished) {
       throw new AppError("Product is not available", 403);
     }
 
     return product;
+  }
+
+  async getProductBySlug(slug: string, isAdmin = false) {
+    return this.getProduct({ slug }, isAdmin);
+  }
+
+  async getProductById(productId: string, isAdmin = false) {
+    return this.getProduct({ _id: productId }, isAdmin);
   }
 
   // ✅ Get All Products with Pagination
