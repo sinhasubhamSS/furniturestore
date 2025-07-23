@@ -8,7 +8,6 @@ import { useGetProductByIDQuery } from "@/redux/services/user/publicProductApi";
 import {
   setProduct,
   setQuantity as setReduxQuantity,
-  setOrderSummary,
 } from "@/redux/slices/checkoutSlice";
 
 const CheckoutSummary = () => {
@@ -26,9 +25,9 @@ const CheckoutSummary = () => {
   });
 
   useEffect(() => {
-    if (product) {
-      dispatch(setProduct(product));
-      updateReduxSummary(quantity, product);
+    if (product?._id) {
+      dispatch(setProduct(product)); // Only ID stored in Redux
+      dispatch(setReduxQuantity(quantity));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product]);
@@ -68,24 +67,10 @@ const CheckoutSummary = () => {
   const priceWithGst = product.price + gstAmount;
   const total = priceWithGst * quantity;
 
-  const updateReduxSummary = (qty: number, prod = product) => {
-    const gst = (prod.price * prod.gstRate) / 100;
-    const priceWithGst = prod.price + gst;
-    const total = priceWithGst * qty;
-
-    dispatch(setReduxQuantity(qty));
-    dispatch(
-      setOrderSummary({
-        totalItems: qty,
-        totalPrice: total,
-      })
-    );
-  };
-
   const updateQuantity = (newQty: number) => {
     const validQty = Math.max(1, Math.min(newQty, product.stock));
     setQuantity(validQty);
-    updateReduxSummary(validQty);
+    dispatch(setReduxQuantity(validQty));
   };
 
   return (

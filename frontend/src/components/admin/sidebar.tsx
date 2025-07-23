@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { FiChevronRight } from "react-icons/fi";
 import { MdChevronLeft, MdChevronRight as MdChevronOpen } from "react-icons/md";
 import { navItems } from "@/app/config/nav.config";
+import Link from "next/link";
 
 type SidebarProps = {
   isOpen: boolean;
@@ -78,9 +79,11 @@ export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
         <div className="flex flex-col h-full p-4">
           {/* Header */}
           <div className="flex justify-between items-center mb-8 p-2">
-            <h2 className="text-xl font-bold text-[var(--color-accent)]">
-              Admin Panel
-            </h2>
+            <Link href="/">
+              <h2 className="text-xl font-bold text-[var(--color-accent)] cursor-pointer">
+                Suvidha
+              </h2>
+            </Link>
             <button
               onClick={toggle}
               className="text-[var(--foreground)] hover:text-[var(--color-accent)]"

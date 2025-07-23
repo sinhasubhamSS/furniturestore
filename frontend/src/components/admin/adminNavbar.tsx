@@ -7,7 +7,7 @@ export default function AdminNavbar() {
   return (
     <header className="w-full h-16 px-4 flex items-center justify-between bg-[var(--color-secondary)] text-[var(--foreground)] rounded-none">
       {/* Left: Page title or breadcrumb */}
-      <h1 className="text-xl font-semibold">Dashboard</h1>
+      <h1 className="text-xl font-semibold">Admin Dashboard</h1>
 
       {/* Right: Notification + Admin Profile */}
       <div className="flex items-center space-x-6">

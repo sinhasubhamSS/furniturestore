@@ -27,7 +27,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300">
+      <body className="min-h-screen bg-[var(--color-primary)] text-[var(--color-foreground)] transition-colors duration-300">
         <ReduxProviders>
           <div className="">{children}</div>
         </ReduxProviders>

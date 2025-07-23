@@ -7,38 +7,29 @@
   --radius: 0.625rem;
 
   /* Light Theme Colors */
-  --color-background: oklch(1 0 0);
-  --color-foreground: oklch(0.141 0.005 285.823);
-  --color-border: oklch(0.92 0.004 286.32);
 
-  --color-primary: #fdf6f0;
-  --color-secondary: #e4d1bb;
+  --color-primary: #eddcca;
+  --color-secondary: #d8bfa6;
   --color-accent: #6b3c1a;
-
-  --color-card: #fff8f2;
-  --color-card-foreground: var(--color-foreground);
-
+  --color-foreground: var(--text-dark);
+  --color-card:  #d8bfa6;
   --text-dark: #1a1a1a;
   --text-light: #ffffff;
   --text-accent: #4e2a13;
   --text-error: #d32f2f;
 
-  --secondary-light: #f2e8d9;
+  --secondary-light: #eddcca;
 }
 
 /* Dark Theme Overrides */
 .dark {
-  --color-background: oklch(0.141 0.005 285.823);
-  --color-foreground: oklch(0.985 0 0);
   --color-border: oklch(1 0 0 / 10%);
 
-  --color-primary: #121212;
+  --color-primary: #212121;
   --color-secondary: #1e1e1e;
   --color-accent: #2196f3;
-
-  --color-card: #292929;
-  --color-card-foreground: var(--color-foreground);
-
+  --color-foreground: var(--text-dark);
+  --color-card: #2a2a2a;
   --text-dark: #ffffff;
   --text-accent: #bbdefb;
   --text-error: #f87171;
@@ -71,6 +62,6 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-[--color-background] text-[--color-foreground] transition-colors duration-300 ease-in-out;
+    @apply bg-[--color-primary] text-[--color-foreground] transition-colors duration-300 ease-in-out;
   }
 }

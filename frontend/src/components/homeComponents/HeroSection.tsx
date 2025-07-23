@@ -81,43 +81,47 @@ const HeroSection = () => {
   };
 
   return (
-    <section className="px-4 sm:px-8 py-6 md:py-12 bg-[var(--background)] text-[var(--foreground)]">
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl mx-auto items-center">
+    <section className="px-6 sm:px-10 py-16 md:py-20 bg-[var(--color-primary)] text-[var(--color-foreground)] transition-colors duration-300">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-10 max-w-7xl mx-auto items-center">
         {/* Left - Text */}
-        <div className="col-span-1 md:col-span-5 text-center md:text-left space-y-4">
-          <h1 className="text-4xl sm:text-5xl lg:text-[2.75rem] xl:text-[3.25rem] font-extrabold text-[var(--text-accent)] leading-tight">
+        <div className="col-span-1 md:col-span-5 text-center md:text-left space-y-6">
+          <h1 className="text-4xl sm:text-5xl xl:text-6xl font-bold text-[var(--text-accent)] leading-tight tracking-tight">
             Suvidha <br className="md:hidden" /> Furniture Store
           </h1>
-          <p className="text-base sm:text-lg xl:text-xl font-medium text-[var(--foreground)]">
-            Quality Furniture For Every Home
+          <p className="text-lg sm:text-xl font-medium max-w-md mx-auto md:mx-0 text-[var(--color-foreground)]">
+            Quality Furniture For Every Home – Durable. Stylish. Affordable.
           </p>
           <div className="flex justify-center md:justify-start">
             <button
               onClick={() => router.push("/products")}
-              className="bg-[var(--color-accent)] text-[var(--text-light)] px-10 py-4 rounded-xl text-lg sm:text-xl font-semibold shadow-lg hover:scale-105 transition-transform duration-300"
+              className="bg-[var(--color-accent)] text-[var(--text-light)] px-8 py-3 rounded-2xl text-lg font-semibold shadow-xl hover:scale-105 transition-transform"
             >
               🛒 SHOP NOW
             </button>
           </div>
         </div>
 
-        {/* Right - Image Slider */}
-        <div className="col-span-1 md:col-span-7 flex justify-center md:justify-end relative">
+        {/* Right - Enhanced Image Slider */}
+        <div className="col-span-1 md:col-span-7 relative flex justify-center md:justify-end">
           <div
-            className="relative w-full max-w-xl h-72 sm:h-80 md:h-88 lg:h-96 xl:h-104 2xl:h-112 rounded-xl overflow-hidden bg-[var(--card-bg)] flex items-center justify-center"
+            className="relative w-full max-w-2xl aspect-[4/3] rounded-3xl overflow-hidden bg-[var(--color-card)] shadow-2xl border border-[var(--color-border)]"
             onMouseEnter={handlePause}
             onMouseLeave={handleResume}
             onTouchStart={handlePause}
             onTouchEnd={handleResume}
           >
             {loading ? (
-              <span className="text-[var(--foreground)]">
-                Loading latest products...
-              </span>
+              <div className="flex items-center justify-center h-full">
+                <span className="text-[var(--color-foreground)]">
+                  Loading latest products...
+                </span>
+              </div>
             ) : images.length === 0 ? (
-              <span className="text-[var(--foreground)] text-center px-4">
-                No product images available.
-              </span>
+              <div className="flex items-center justify-center h-full px-4 text-center">
+                <span className="text-[var(--color-foreground)]">
+                  No product images available.
+                </span>
+              </div>
             ) : (
               images.map((src, index) => (
                 <img
@@ -134,24 +138,24 @@ const HeroSection = () => {
 
           {/* Progress Bars */}
           {images.length > 0 && (
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 w-full justify-center px-4">
               {images.map((_, index) => (
                 <div
                   key={index}
-                  className="h-1.5 w-10 bg-[color:var(--border)] rounded-full overflow-hidden"
+                  className="h-1.5 flex-1 max-w-[80px] bg-[var(--color-secondary)] rounded-full overflow-hidden"
                 >
                   {index === currentIndex && (
                     <div
                       className="h-full bg-[var(--color-accent)] rounded-full"
                       style={{
                         width: `${progress}%`,
-                        transform:
-                          progress > 0 && progress < 100
-                            ? "scaleY(1.5)"
-                            : "scaleY(1)",
                         transition: isPaused
                           ? "none"
-                          : "width 0.1s linear, transform 0.3s ease-in-out",
+                          : "width 0.1s linear, transform 0.2s ease",
+                        transform:
+                          progress > 0 && progress < 100
+                            ? "scaleY(1.4)"
+                            : "scaleY(1)",
                         transformOrigin: "center",
                       }}
                     />

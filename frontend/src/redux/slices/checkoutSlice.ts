@@ -1,26 +1,20 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { Product } from "@/types/Product";
-// Global Redux Checkout Slice (example):
+
 interface CheckoutState {
   selectedAddressId: string | null;
-  paymentMethod: string;
-  product: Product | null; // Optionally store product too if already fetched
+  product: Product | null;
   quantity: number;
-  orderSummary: {
-    totalItems: number;
-    totalPrice: number;
-  };
+  paymentMethod: "COD" | "RAZORPAY" | "";
 }
+
 const initialState: CheckoutState = {
   selectedAddressId: null,
-  paymentMethod: "",
   product: null,
   quantity: 1,
-  orderSummary: {
-    totalItems: 0,
-    totalPrice: 0,
-  },
+  paymentMethod: "",
 };
+
 const checkoutSlice = createSlice({
   name: "checkout",
   initialState,
@@ -28,20 +22,14 @@ const checkoutSlice = createSlice({
     setSelectedAddressId(state, action: PayloadAction<string>) {
       state.selectedAddressId = action.payload;
     },
-    setPaymentMethod(state, action: PayloadAction<string>) {
-      state.paymentMethod = action.payload;
-    },
     setProduct(state, action: PayloadAction<Product>) {
       state.product = action.payload;
     },
     setQuantity(state, action: PayloadAction<number>) {
       state.quantity = action.payload;
     },
-    setOrderSummary(
-      state,
-      action: PayloadAction<{ totalItems: number; totalPrice: number }>
-    ) {
-      state.orderSummary = action.payload;
+    setPaymentMethod(state, action: PayloadAction<"COD" | "RAZORPAY">) {
+      state.paymentMethod = action.payload;
     },
     resetCheckout(state) {
       Object.assign(state, initialState);
@@ -51,10 +39,9 @@ const checkoutSlice = createSlice({
 
 export const {
   setSelectedAddressId,
-  setPaymentMethod,
   setProduct,
   setQuantity,
-  setOrderSummary,
+  setPaymentMethod,
   resetCheckout,
 } = checkoutSlice.actions;
 
