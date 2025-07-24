@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useDispatch } from "react-redux";
 import { useGetProductByIDQuery } from "@/redux/services/user/publicProductApi";
 import {
-  setProduct,
+  setProductId,
   setQuantity as setReduxQuantity,
 } from "@/redux/slices/checkoutSlice";
 
@@ -26,7 +26,7 @@ const CheckoutSummary = () => {
 
   useEffect(() => {
     if (product?._id) {
-      dispatch(setProduct(product)); // Only ID stored in Redux
+      dispatch(setProductId(product._id)); // ✅ Only productId in Redux
       dispatch(setReduxQuantity(quantity));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -63,9 +63,7 @@ const CheckoutSummary = () => {
     );
   }
 
-  const gstAmount = (product.price * product.gstRate) / 100;
-  const priceWithGst = product.price + gstAmount;
-  const total = priceWithGst * quantity;
+  const total = product.price * quantity;
 
   const updateQuantity = (newQty: number) => {
     const validQty = Math.max(1, Math.min(newQty, product.stock));
@@ -83,6 +81,8 @@ const CheckoutSummary = () => {
           alt={product.name}
           width={100}
           height={100}
+          priority
+          
           className="rounded-md object-cover border"
         />
 
@@ -92,7 +92,7 @@ const CheckoutSummary = () => {
             {product.description}
           </p>
           <p className="mt-1 font-medium text-[--text-accent]">
-            ₹ {priceWithGst.toFixed(2)} (incl. GST)
+            ₹ {product.price.toFixed(2)} {/* No GST addition */}
           </p>
 
           <div className="flex items-center gap-2 mt-3">

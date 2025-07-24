@@ -1,16 +1,16 @@
+import { Address } from "@/types/address";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { Product } from "@/types/Product";
 
 interface CheckoutState {
-  selectedAddressId: string | null;
-  product: Product | null;
+  selectedAddress: Address | null;
+  productId: string | null;
   quantity: number;
   paymentMethod: "COD" | "RAZORPAY" | "";
 }
 
 const initialState: CheckoutState = {
-  selectedAddressId: null,
-  product: null,
+  selectedAddress: null,
+  productId: null,
   quantity: 1,
   paymentMethod: "",
 };
@@ -19,11 +19,11 @@ const checkoutSlice = createSlice({
   name: "checkout",
   initialState,
   reducers: {
-    setSelectedAddressId(state, action: PayloadAction<string>) {
-      state.selectedAddressId = action.payload;
+    setSelectedAddress(state, action: PayloadAction<Address>) {
+      state.selectedAddress = action.payload;
     },
-    setProduct(state, action: PayloadAction<Product>) {
-      state.product = action.payload;
+    setProductId(state, action: PayloadAction<string>) {
+      state.productId = action.payload;
     },
     setQuantity(state, action: PayloadAction<number>) {
       state.quantity = action.payload;
@@ -38,8 +38,8 @@ const checkoutSlice = createSlice({
 });
 
 export const {
-  setSelectedAddressId,
-  setProduct,
+  setSelectedAddress,
+  setProductId,
   setQuantity,
   setPaymentMethod,
   resetCheckout,

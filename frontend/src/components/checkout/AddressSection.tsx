@@ -9,7 +9,7 @@ import { Address } from "@/types/address";
 import Input from "@/components/ui/Input";
 import { useForm } from "react-hook-form";
 import { useDispatch, useSelector } from "react-redux";
-import { setSelectedAddressId } from "@/redux/slices/checkoutSlice";
+import { setSelectedAddress } from "@/redux/slices/checkoutSlice";
 import { RootState } from "@/redux/store";
 
 const AddressSection = ({
@@ -21,7 +21,7 @@ const AddressSection = ({
   const [createAddress] = useCreateAddressMutation();
 
   const selectedFromRedux = useSelector(
-    (state: RootState) => state.checkout.selectedAddressId
+    (state: RootState) => state.checkout.selectedAddress
   );
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -49,8 +49,8 @@ const AddressSection = ({
   });
 
   useEffect(() => {
-    if (selectedFromRedux) {
-      setSelectedId(selectedFromRedux);
+    if (selectedFromRedux?._id) {
+      setSelectedId(selectedFromRedux._id);
     }
   }, [selectedFromRedux]);
 
@@ -62,7 +62,7 @@ const AddressSection = ({
 
       if (res._id) {
         setSelectedId(res._id);
-        dispatch(setSelectedAddressId(res._id));
+        dispatch(setSelectedAddress(res));
         onSelectionChange(true);
       }
     } catch (err) {
@@ -72,10 +72,14 @@ const AddressSection = ({
 
   return (
     <div className="p-6 border border-[--color-border] rounded-xl bg-[--color-card] text-[--text-dark] dark:text-[--text-light]">
-      <h2 className="text-2xl font-bold mb-4 text-[--text-accent]">Delivery Address</h2>
+      <h2 className="text-2xl font-bold mb-4 text-[--text-accent]">
+        Delivery Address
+      </h2>
 
       {isLoading ? (
-        <p className="text-[--color-muted-foreground] text-sm">Loading addresses...</p>
+        <p className="text-[--color-muted-foreground] text-sm">
+          Loading addresses...
+        </p>
       ) : addresses.length > 0 ? (
         <div className="space-y-3">
           {addresses.map((addr) => (
@@ -93,7 +97,7 @@ const AddressSection = ({
                 checked={selectedId === addr._id}
                 onChange={() => {
                   setSelectedId(addr._id);
-                  dispatch(setSelectedAddressId(addr._id));
+                  dispatch(setSelectedAddress(addr));
                   onSelectionChange(true);
                 }}
                 className="mt-1 accent-[--color-accent] scale-125"
@@ -101,11 +105,14 @@ const AddressSection = ({
               <div>
                 <p className="text-base font-medium">{addr.fullName}</p>
                 <p className="text-sm text-[--color-muted-foreground] leading-snug">
-                  {addr.addressLine1}, {addr.addressLine2 && `${addr.addressLine2}, `}
+                  {addr.addressLine1},{" "}
+                  {addr.addressLine2 && `${addr.addressLine2}, `}
                   {addr.city}, {addr.state}, {addr.pincode}
                 </p>
                 {selectedId === addr._id && (
-                  <span className="text-sm font-semibold text-green-600">✔ Selected</span>
+                  <span className="text-sm font-semibold text-green-600">
+                    ✔ Selected
+                  </span>
                 )}
               </div>
             </label>
@@ -131,7 +138,9 @@ const AddressSection = ({
               label="Full Name"
               name="fullName"
               placeholder="Full Name"
-              register={register("fullName", { required: "Full name is required" })}
+              register={register("fullName", {
+                required: "Full name is required",
+              })}
               error={errors.fullName?.message}
             />
             <Input
@@ -145,7 +154,9 @@ const AddressSection = ({
               label="Address Line 1"
               name="addressLine1"
               placeholder="Address Line 1"
-              register={register("addressLine1", { required: "Address is required" })}
+              register={register("addressLine1", {
+                required: "Address is required",
+              })}
               error={errors.addressLine1?.message}
             />
             <Input
@@ -173,7 +184,9 @@ const AddressSection = ({
               label="Pincode"
               name="pincode"
               placeholder="Pincode"
-              register={register("pincode", { required: "Pincode is required" })}
+              register={register("pincode", {
+                required: "Pincode is required",
+              })}
               error={errors.pincode?.message}
             />
             <Input
