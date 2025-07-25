@@ -1,24 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/redux/store";
 import { useGetProductByIDQuery } from "@/redux/services/user/publicProductApi";
-import { useCreateOrderMutation } from "@/redux/services/user/orderApi";
-import { useState } from "react";
-import { setPaymentMethod, resetCheckout } from "@/redux/slices/checkoutSlice";
+import {
+  useCreateOrderMutation,
+  useCreateRazorpayOrderMutation,
+} from "@/redux/services/user/orderApi";
+import { resetCheckout, setPaymentMethod } from "@/redux/slices/checkoutSlice";
 import { useRouter } from "next/navigation";
 
 const PaymentPage = () => {
-  const loadRazorpayScript = () => {
-    return new Promise((resolve) => {
-      const script = document.createElement("script");
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
-  };
-
   const dispatch = useDispatch();
   const router = useRouter();
 
@@ -29,21 +22,27 @@ const PaymentPage = () => {
     paymentMethod,
   } = useSelector((state: RootState) => state.checkout);
 
-  const {
-    data: product,
-    isLoading: productLoading,
-    error: productError,
-  } = useGetProductByIDQuery(productId!, {
+  const { data: product, isLoading } = useGetProductByIDQuery(productId!, {
     skip: !productId,
   });
 
   const [selectedMethod, setSelectedMethod] = useState<
     "card" | "upi" | "netbanking" | "cod" | null
   >(null);
-
-  const [createOrder, { isLoading: orderLoading }] = useCreateOrderMutation();
+  const [createOrder, { isLoading: placingOrder }] = useCreateOrderMutation();
+  const [createRazorpayOrder] = useCreateRazorpayOrderMutation();
 
   const total = product ? product.price * quantity : 0;
+  console.log("🧮 TOTAL amount before Razorpay:", total);
+
+  const loadRazorpayScript = () =>
+    new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
 
   const handleSelectMethod = (
     method: "card" | "upi" | "netbanking" | "cod"
@@ -53,59 +52,109 @@ const PaymentPage = () => {
   };
 
   const handlePayment = async () => {
-    if (!selectedMethod || !shippingAddress || !paymentMethod) {
-      alert("Missing payment method or shipping address.");
+    if (
+      !selectedMethod ||
+      !shippingAddress ||
+      !paymentMethod ||
+      !productId ||
+      !product
+    ) {
+      alert("Please fill all required fields.");
       return;
     }
 
-    const payload = {
-      items: [
-        {
-          productId: productId!,
-          quantity,
-        },
-      ],
-      shippingAddress,
-      payment: {
-        method: paymentMethod,
-        razorpayOrderId: undefined,
-        // Add real ID when Razorpay is integrated
-      },
-    };
+    // ===================== COD =====================
+    if (selectedMethod === "cod") {
+      try {
+        await createOrder({
+          data: {
+            items: [{ productId, quantity }],
+            shippingAddress,
+            payment: { method: "COD" },
+          },
+        }).unwrap();
+
+        alert("Order placed successfully!");
+        dispatch(resetCheckout());
+        router.push("/order-success");
+      } catch (err: any) {
+        alert(err?.data?.message || "COD Order failed");
+      }
+      return;
+    }
+
+    // ================== Razorpay ===================
+    const razorpayLoaded = await loadRazorpayScript();
+    if (!razorpayLoaded) {
+      alert("Failed to load Razorpay SDK");
+      return;
+    }
 
     try {
-      const res = await createOrder({ userId: "", data: payload }).unwrap();
-      alert("Order placed successfully!");
-      dispatch(resetCheckout());
-      // router.push(`/order-success/${res.orderId}`);
-    } catch (err: any) {
-      console.error("Order failed", err);
-      alert(err?.data?.message || "Failed to place order.");
+      console.log("📤 Sending total amount to backend:", total);
+      const razorpayOrder = await createRazorpayOrder(total).unwrap();
+      console.log("📦 Razorpay Order from backend:", razorpayOrder);
+
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
+        amount: razorpayOrder.amount, // ✅ correct
+        currency: razorpayOrder.currency, // ✅ correct
+        name: "Your Store",
+        description: product.name,
+        order_id: razorpayOrder.orderId, // ✅ FIXED from .order_id to .orderId
+        handler: async (response: any) => {
+          console.log("✅ Razorpay handler response:", response);
+          try {
+            await createOrder({
+              data: {
+                items: [{ productId, quantity }],
+                shippingAddress,
+                payment: {
+                  method: "RAZORPAY",
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                },
+              },
+            }).unwrap();
+
+            alert("Payment successful & order placed!");
+            dispatch(resetCheckout());
+            router.push("/order-success");
+          } catch (err: any) {
+            alert(err?.data?.message || "Order saving failed");
+          }
+        },
+        prefill: {
+          name: shippingAddress.fullName,
+          contact: shippingAddress.mobile,
+        },
+        theme: { color: "#6366f1" },
+      };
+
+      console.log("🧾 Razorpay Checkout Options:", options);
+      console.log("✅ Razorpay KEY:", process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID);
+
+
+      const razorpay = new (window as any).Razorpay(options);
+      razorpay.open();
+    } catch (error) {
+      console.error("❌ Failed to create Razorpay order", error);
+      alert("Failed to create Razorpay order");
     }
   };
 
-  if (!productId || !quantity) {
-    return <p className="text-center text-red-500">Invalid payment session.</p>;
-  }
-
-  if (productLoading) return <p className="text-center">Loading product...</p>;
-  if (productError || !product)
-    return <p className="text-center text-red-500">Failed to load product.</p>;
+  if (!product || isLoading) return <p>Loading product...</p>;
 
   return (
-    <div className="max-w-xl mx-auto p-6 text-center">
-      <h1 className="text-2xl font-bold mb-4">Payment Page</h1>
-      <p className="text-lg font-medium">{product.name}</p>
-      <p className="mb-2">Quantity: {quantity}</p>
-      <p className="text-xl font-semibold mb-6">Total: ₹ {total.toFixed(2)}</p>
+    <div className="max-w-lg mx-auto p-6 text-center">
+      <h1 className="text-xl font-bold mb-2">Payment for {product.name}</h1>
+      <p>Total Amount: ₹{total.toFixed(2)}</p>
 
-      <div className="flex flex-col gap-3 items-start mb-6">
-        <p className="font-semibold">Choose Payment Method:</p>
+      <div className="text-left mt-4">
+        <p className="font-semibold mb-1">Select Payment Method:</p>
         {["card", "upi", "netbanking", "cod"].map((method) => (
-          <label
-            key={method}
-            className="flex items-center gap-2 cursor-pointer"
-          >
+          <label key={method} className="block mb-1 cursor-pointer">
             <input
               type="radio"
               name="payment"
@@ -113,24 +162,23 @@ const PaymentPage = () => {
               checked={selectedMethod === method}
               onChange={() => handleSelectMethod(method as any)}
             />
-            {method === "card" && "Credit / Debit Card"}
-            {method === "upi" && "UPI"}
-            {method === "netbanking" && "Net Banking"}
-            {method === "cod" && "Cash on Delivery"}
+            <span className="ml-2 capitalize">
+              {method === "cod" ? "Cash on Delivery" : method}
+            </span>
           </label>
         ))}
       </div>
 
       <button
         onClick={handlePayment}
-        disabled={!selectedMethod || orderLoading}
-        className="bg-green-600 text-white py-2 px-6 rounded disabled:opacity-50"
+        disabled={!selectedMethod || placingOrder}
+        className="mt-4 bg-indigo-600 text-white py-2 px-6 rounded"
       >
-        {orderLoading
-          ? "Placing Order..."
+        {placingOrder
+          ? "Processing..."
           : selectedMethod === "cod"
-          ? "Place Order"
-          : "Pay Now"}
+          ? "Place COD Order"
+          : "Pay with Razorpay"}
       </button>
     </div>
   );

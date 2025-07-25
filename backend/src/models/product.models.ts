@@ -98,6 +98,9 @@ const productSchema = new Schema<IProduct>(
 productSchema.pre("save", function (next) {
   if (!this.isModified("name")) return next();
   this.slug = slugify(this.name, { lower: true, strict: true });
+  if (this.isModified("basePrice") || this.isModified("gstRate")) {
+    this.price = this.basePrice + (this.basePrice * this.gstRate) / 100;
+  }
   next();
 });
 

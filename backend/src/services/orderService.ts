@@ -3,6 +3,7 @@ import { Order } from "../models/order.models";
 import { PlaceOrderRequest } from "../types/orderservicetypes";
 import { Cart } from "../models/cart.model";
 import { CartItem } from "../models/cartItems.model";
+import { paymentService } from "./paymentService";
 
 class OrderService {
   async placeOrderFromProductPage(

@@ -3,17 +3,17 @@ import crypto from "crypto";
 import { AppError } from "../utils/AppError";
 
 class PaymentService {
-  async createOrder(amount: number) {
-    if (!amount || amount <= 0) {
+  async createOrder(amountInRupees: number) {
+    if (!amountInRupees || amountInRupees <= 0) {
       throw new AppError("Amount must be greater than 0", 400);
     }
 
     const options = {
-      amount: amount * 100,
+      amount: amountInRupees * 100, // 💰 convert to paise
       currency: "INR",
-      receipt: `receipt_order_${Math.floor(Math.random() * 1000000)}`,
+      receipt: `receipt_order_${Date.now()}`,
     };
-
+    console.log("📦 Razorpay create order options:", options);
     const order = await razorpay.orders.create(options);
 
     return {

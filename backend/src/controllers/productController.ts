@@ -61,13 +61,39 @@ export const createProduct = catchAsync(
 // ✅ Update Product
 export const updateProduct = catchAsync(
   async (req: AuthRequest, res: Response) => {
-    console.log("reached update product");
-    const parsedData = updateProductSchema.parse(req.body);
+    console.log("📩 Reached update product");
 
+    const parsedData = updateProductSchema.parse(req.body);
     if (!req.userId) throw new AppError("Unauthorized", 401);
 
+    let { name, basePrice, gstRate, ...rest } = parsedData;
+
+    // Normalize gstRate (if provided)
+    if (typeof gstRate !== "undefined") {
+      gstRate = gstRate > 1 ? gstRate / 100 : gstRate;
+    }
+
+    // Recalculate price (if both basePrice and gstRate are provided)
+    let price: number | undefined = undefined;
+    if (typeof basePrice !== "undefined" && typeof gstRate !== "undefined") {
+      price = basePrice + basePrice * gstRate;
+    }
+
+    // Generate slug if name is updated
+    const slug = name
+      ? slugify(name, { lower: true, strict: true })
+      : undefined;
+
+    // Final payload
+    const updatedProductInput = {
+      ...parsedData,
+      ...(slug && { slug }),
+      ...(typeof gstRate !== "undefined" && { gstRate }),
+      ...(typeof price !== "undefined" && { price }),
+    };
+
     const updated = await productService.updateProduct(
-      parsedData,
+      updatedProductInput,
       req.params.productId,
       req.userId
     );
@@ -119,9 +145,11 @@ export const getProductById = catchAsync(
 
     const product = await productService.getProductById(productId, isAdmin);
 
-    res.status(200).json(
-      new ApiResponse(200, product, "Product fetched by ID successfully")
-    );
+    res
+      .status(200)
+      .json(
+        new ApiResponse(200, product, "Product fetched by ID successfully")
+      );
   }
 );
 
