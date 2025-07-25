@@ -12,7 +12,7 @@ export enum OrderStatus {
 
 // Enum for payment method (optional but good practice)
 export enum PaymentMethod {
-  COD = "Cash on Delivery",
+  COD = "COD",
   UPI = "UPI",
   Card = "Card",
   NetBanking = "Net Banking",
@@ -47,6 +47,7 @@ export interface PaymentSnapshot {
   transactionId?: string;
   provider?: string;
   paidAt?: Date;
+   razorpayOrderId?: string; 
 }
 
 // Final Order Document interface

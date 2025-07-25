@@ -35,6 +35,7 @@ class OrderService {
 
       product.stock -= item.quantity;
       await product.save();
+      console.log("stock updated");
     }
 
     const newOrder = await Order.create({
@@ -50,6 +51,7 @@ class OrderService {
       totalAmount,
       status: "pending",
     });
+    console.log("New Order Created:");
 
     return newOrder;
   }

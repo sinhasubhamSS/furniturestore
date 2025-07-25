@@ -3,21 +3,36 @@
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/redux/store";
 import { useGetProductByIDQuery } from "@/redux/services/user/publicProductApi";
+import { useCreateOrderMutation } from "@/redux/services/user/orderApi";
 import { useState } from "react";
-import axiosClient from "../../../../utils/axios";
-import { setPaymentMethod } from "@/redux/slices/checkoutSlice";
+import { setPaymentMethod, resetCheckout } from "@/redux/slices/checkoutSlice";
+import { useRouter } from "next/navigation";
 
 const PaymentPage = () => {
-  const dispatch = useDispatch();
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
 
-  const { productId, quantity } = useSelector(
-    (state: RootState) => state.checkout
-  );
+  const dispatch = useDispatch();
+  const router = useRouter();
+
+  const {
+    productId,
+    quantity,
+    selectedAddress: shippingAddress,
+    paymentMethod,
+  } = useSelector((state: RootState) => state.checkout);
 
   const {
     data: product,
-    isLoading,
-    error,
+    isLoading: productLoading,
+    error: productError,
   } = useGetProductByIDQuery(productId!, {
     skip: !productId,
   });
@@ -26,30 +41,9 @@ const PaymentPage = () => {
     "card" | "upi" | "netbanking" | "cod" | null
   >(null);
 
-  if (!productId || !quantity) {
-    return <p className="text-center text-red-500">Invalid payment session.</p>;
-  }
+  const [createOrder, { isLoading: orderLoading }] = useCreateOrderMutation();
 
-  if (isLoading) {
-    return <p className="text-center">Loading...</p>;
-  }
-
-  if (error || !product) {
-    return <p className="text-center text-red-500">Failed to load product.</p>;
-  }
-
-  const total = product.price * quantity;
-
-  const handlePayment = () => {
-    if (!selectedMethod) return;
-
-    // Example alerts — you’ll replace this later with actual order placing logic
-    if (selectedMethod === "cod") {
-      alert("Order placed with Cash on Delivery");
-    } else {
-      alert(`Razorpay will open for ${selectedMethod}`);
-    }
-  };
+  const total = product ? product.price * quantity : 0;
 
   const handleSelectMethod = (
     method: "card" | "upi" | "netbanking" | "cod"
@@ -57,6 +51,46 @@ const PaymentPage = () => {
     setSelectedMethod(method);
     dispatch(setPaymentMethod(method === "cod" ? "COD" : "RAZORPAY"));
   };
+
+  const handlePayment = async () => {
+    if (!selectedMethod || !shippingAddress || !paymentMethod) {
+      alert("Missing payment method or shipping address.");
+      return;
+    }
+
+    const payload = {
+      items: [
+        {
+          productId: productId!,
+          quantity,
+        },
+      ],
+      shippingAddress,
+      payment: {
+        method: paymentMethod,
+        razorpayOrderId: undefined,
+        // Add real ID when Razorpay is integrated
+      },
+    };
+
+    try {
+      const res = await createOrder({ userId: "", data: payload }).unwrap();
+      alert("Order placed successfully!");
+      dispatch(resetCheckout());
+      // router.push(`/order-success/${res.orderId}`);
+    } catch (err: any) {
+      console.error("Order failed", err);
+      alert(err?.data?.message || "Failed to place order.");
+    }
+  };
+
+  if (!productId || !quantity) {
+    return <p className="text-center text-red-500">Invalid payment session.</p>;
+  }
+
+  if (productLoading) return <p className="text-center">Loading product...</p>;
+  if (productError || !product)
+    return <p className="text-center text-red-500">Failed to load product.</p>;
 
   return (
     <div className="max-w-xl mx-auto p-6 text-center">
@@ -89,10 +123,14 @@ const PaymentPage = () => {
 
       <button
         onClick={handlePayment}
-        disabled={!selectedMethod}
+        disabled={!selectedMethod || orderLoading}
         className="bg-green-600 text-white py-2 px-6 rounded disabled:opacity-50"
       >
-        {selectedMethod === "cod" ? "Place Order" : "Pay Now"}
+        {orderLoading
+          ? "Placing Order..."
+          : selectedMethod === "cod"
+          ? "Place Order"
+          : "Pay Now"}
       </button>
     </div>
   );

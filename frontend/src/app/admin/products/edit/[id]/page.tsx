@@ -10,7 +10,7 @@ import toast from "react-hot-toast";
 import {
   useEditProductMutation,
   useGetAdminProductsQuery,
-} from "@/redux/services/adminProductapi";
+} from "@/redux/services/admin/adminProductapi";
 
 const EditProductPage = () => {
   const { id } = useParams(); // id is a string
