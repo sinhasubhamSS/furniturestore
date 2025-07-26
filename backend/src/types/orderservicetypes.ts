@@ -17,12 +17,14 @@ export interface PlaceOrderAddress {
 }
 
 export interface PlaceOrderPayment {
-  method: string;
+  method: "COD" | "RAZORPAY";
   status?: string;
   transactionId?: string;
   provider?: string;
   paidAt?: Date;
   razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  razorpaySignature?: string;
 }
 
 export interface PlaceOrderRequest {
