@@ -18,6 +18,7 @@ import { userProductApi } from "@/redux/services/user/publicProductApi"; // ✅ 
 import { addressApi } from "./services/user/addressApi";
 import checkoutReducer from "./slices/checkoutSlice";
 import { orderApi } from "./services/user/orderApi"; 
+import { cartApi } from "./services/user/cartApi";
 const rootReducer = combineReducers({
   user: userReducer,
    checkout: checkoutReducer,
@@ -25,7 +26,8 @@ const rootReducer = combineReducers({
   [adminCategoryApi.reducerPath]: adminCategoryApi.reducer,
   [userProductApi.reducerPath]: userProductApi.reducer, // ✅ ADD HERE
   [addressApi.reducerPath]: addressApi.reducer,
-  [orderApi.reducerPath]: orderApi.reducer, // Add orderApi reducer
+  [orderApi.reducerPath]: orderApi.reducer, 
+  [cartApi.reducerPath]: cartApi.reducer,
 });
 
 const persistConfig = {
@@ -48,7 +50,8 @@ export const store = configureStore({
       adminCategoryApi.middleware,
       userProductApi.middleware, // ✅ ADD HERE
       addressApi.middleware,
-      orderApi.middleware 
+      orderApi.middleware,
+      cartApi.middleware
     ),
 });
 

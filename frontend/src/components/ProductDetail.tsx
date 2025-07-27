@@ -4,7 +4,7 @@ import { useGetProductBySlugQuery } from "@/redux/services/user/publicProductApi
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import { useRouter } from "next/navigation";
-
+import { useAddToCartMutation } from "@/redux/services/user/cartApi";
 interface Props {
   slug: string;
 }
@@ -13,8 +13,19 @@ const ProductDetail = ({ slug }: Props) => {
   const { data: product, isLoading, error } = useGetProductBySlugQuery(slug);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const router = useRouter();
+  const [addToCart, { isLoading: isAdding }] = useAddToCartMutation();
+
   const handleBuyNow = () => {
     router.push(`/checkout?product=${product!._id}`);
+  };
+  const handleAddToCart = async () => {
+    try {
+      await addToCart({ productId: product!._id, quantity: 1 }).unwrap();
+      // optional toast/alert
+    } catch (error: any) {
+      console.error("Error adding to cart:", error);
+      // show toast or error UI
+    }
   };
 
   if (isLoading) {
@@ -102,9 +113,14 @@ const ProductDetail = ({ slug }: Props) => {
 
           {/* Buttons */}
           <div className="mt-4 flex gap-4">
-            <Button className="bg-[--color-secondary] text-[--text-accent] hover:opacity-90 transition">
-              Add to Cart
+            <Button
+              onClick={handleAddToCart}
+              disabled={isAdding || product.stock <= 0}
+              className="bg-[--color-secondary] text-[--text-accent] hover:opacity-90 transition"
+            >
+              {isAdding ? "Adding..." : "Add to Cart"}
             </Button>
+
             <Button
               disabled={product.stock <= 0}
               onClick={handleBuyNow}
