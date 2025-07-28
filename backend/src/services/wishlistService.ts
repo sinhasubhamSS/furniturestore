@@ -39,11 +39,12 @@ class WishlistService {
   async getWishlist(userId: string) {
     const wishlist = await Wishlist.findOne({ user: userId });
 
+    // ✅ If wishlist doesn't exist yet, return empty array instead of error
     if (!wishlist) {
-      throw new AppError("Wishlist not found", 404);
+      return [];
     }
 
-    // return just an array of product IDs
+    // ✅ Return product IDs as strings
     return wishlist.products.map((pid) => pid.toString());
   }
 
@@ -61,7 +62,7 @@ class WishlistService {
   async getWishlistWithProducts(userId: string) {
     const wishlist = await Wishlist.findOne({ user: userId }).populate({
       path: "products",
-      select: "name price image",
+      select: "name price images slug title",
     });
 
     if (!wishlist) {

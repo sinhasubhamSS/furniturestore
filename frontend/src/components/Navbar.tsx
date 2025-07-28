@@ -15,6 +15,7 @@ import Toggle from "@/components/helperComponents/Toogle";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clearActiveUser } from "@/redux/slices/userSlice";
+import { useGetCartCountQuery } from "@/redux/services/user/cartApi";
 
 const Navbar = () => {
   const activeUser = useSelector((state: RootState) => state.user.activeUser);
@@ -23,6 +24,8 @@ const Navbar = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch();
   const router = useRouter();
+  const { data: cartCount, isLoading: cartCountLoading } =
+    useGetCartCountQuery();
 
   const handleSignOut = () => {
     dispatch(clearActiveUser());
@@ -43,7 +46,7 @@ const Navbar = () => {
   }, []);
 
   return (
-<nav className="sticky top-0 z-[1000] w-full bg-[var(--color-secondary)] backdrop-blur border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
+    <nav className="sticky top-0 z-[1000] w-full bg-[var(--color-secondary)] backdrop-blur border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between py-3 gap-4">
           {/* Left */}
@@ -88,12 +91,17 @@ const Navbar = () => {
 
           {/* Right: Cart + User */}
           <div className="flex items-center gap-4">
-            <button className="relative p-2 group">
-              <FiShoppingCart className="h-6 w-6 text-[var(--foreground)] group-hover:text-[var(--color-accent)]" />
-              <span className="absolute -top-1 -right-1 bg-[var(--color-accent)] text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                3
-              </span>
-            </button>
+            <Link href="/cart">
+              <button className="relative p-2 group">
+                <FiShoppingCart className="h-6 w-6 text-[var(--foreground)] group-hover:text-[var(--color-accent)]" />
+
+                {!cartCountLoading && (cartCount ?? 0) > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-[var(--color-accent)] text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-bounce">
+                    {cartCount ?? 0}
+                  </span>
+                )}
+              </button>
+            </Link>
 
             <div ref={dropdownRef} className="relative">
               {activeUser ? (

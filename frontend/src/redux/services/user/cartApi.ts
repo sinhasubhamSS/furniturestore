@@ -8,7 +8,10 @@ export const cartApi = createApi({
   tagTypes: ["Cart"],
   endpoints: (builder) => ({
     // ✅ Add item to cart
-    addToCart: builder.mutation<CartResponse, { productId: string; quantity: number }>({
+    addToCart: builder.mutation<
+      CartResponse,
+      { productId: string; quantity: number }
+    >({
       query: ({ productId, quantity }) => ({
         url: `/cart/add`,
         method: "POST",
@@ -23,11 +26,15 @@ export const cartApi = createApi({
         url: `/cart/`,
         method: "GET",
       }),
+      transformResponse: (response: any) => response.data, // ✅ Only extract `.data`
       providesTags: ["Cart"],
     }),
 
     // ✅ Update quantity
-    updateQuantity: builder.mutation<CartResponse, { productId: string; quantity: number }>({
+    updateQuantity: builder.mutation<
+      CartResponse,
+      { productId: string; quantity: number }
+    >({
       query: ({ productId, quantity }) => ({
         url: `/cart/update`,
         method: "PATCH",
@@ -61,6 +68,7 @@ export const cartApi = createApi({
         url: `/cart/count`,
         method: "GET",
       }),
+      transformResponse: (response: any) => response.data,
       providesTags: ["Cart"],
     }),
   }),

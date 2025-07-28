@@ -32,6 +32,7 @@ export const removeFromWishlist = catchAsync(
 
 export const getWishlist = catchAsync(
   async (req: AuthRequest, res: Response) => {
+    console.log("reaced getWishlist");
     const userId = req.userId;
     if (!userId) throw new AppError("User not authenticated", 403);
 
