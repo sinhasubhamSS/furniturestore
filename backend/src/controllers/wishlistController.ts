@@ -70,8 +70,6 @@ export const isInWishlist = catchAsync(
       throw new AppError("Invalid productId", 400);
 
     const result = await wishlistService.isInWishlist(userId, productId);
-    res
-      .status(200)
-      .json(new ApiResponse(200, { isWishlisted: result }, "Check successful"));
+    res.status(200).json(new ApiResponse(200, result, "Check successful"));
   }
 );

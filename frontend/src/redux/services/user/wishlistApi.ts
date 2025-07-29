@@ -14,21 +14,21 @@ export const wishlistApi = createApi({
         method: "GET",
       }),
       transformResponse: (response: any) => {
-        console.log("📦 Wishlist Products Response:", response);
         return response.data;
       },
       providesTags: ["Wishlist"],
     }),
 
-    isInWishlist: builder.query<{ isWishlisted: boolean }, string>({
-      query: (productId) => ({
-        url: `/wishlist/check?productId=${productId}`,
+    Wishlistids: builder.query<string[], void>({
+      query: () => ({
+        url: `/wishlist`,
         method: "GET",
       }),
       transformResponse: (response: any) => {
-        console.log("📦 Wishlist Products Response:", response);
+        console.log(response.data);
         return response.data;
       },
+      providesTags: ["Wishlist"],
     }),
 
     addToWishlist: builder.mutation<void, { productId: string }>({
@@ -53,7 +53,7 @@ export const wishlistApi = createApi({
 
 export const {
   useGetWishlistWithProductsQuery,
-  useIsInWishlistQuery,
+  useWishlistidsQuery,
   useAddToWishlistMutation,
   useRemoveFromWishlistMutation,
 } = wishlistApi;
