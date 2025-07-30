@@ -1,5 +1,4 @@
 import { Response } from "express";
-
 import OrderService from "../services/orderService";
 import { AuthRequest } from "../types/app-request";
 import { catchAsync } from "../utils/catchAsync";
@@ -12,46 +11,19 @@ export const placeOrder = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const userId = req.userId;
     if (!userId) {
-      return res.status(401).json({ success: false, message: "Unauthorized" });
+      // Throwing AppError lets your error middleware format the error
+      throw new AppError("Unauthorized", 401);
     }
 
-    const order = await orderService.placeOrderFromProductPage(
-      userId,
-      req.body
+    const order = await orderService.placeOrder(userId, req.body);
+
+    // Use ApiResponse for consistent, structured success output
+    return res.status(201).json(
+      new ApiResponse(
+        201,
+        { orderId: order._id },
+        "Order placed successfully"
+      )
     );
-
-    res.status(201).json({
-      success: true,
-      message: "Order placed successfully",
-      orderId: order._id,
-    });
-  }
-);
-export const placeOrderFromCart = catchAsync(
-  async (req: AuthRequest, res: Response) => {
-    const userId = req.userId;
-
-    if (!userId) {
-      throw new AppError("Unauthorized access", 401);
-    }
-
-    const { shippingAddress, payment } = req.body;
-
-    if (!shippingAddress || !payment) {
-      throw new AppError(
-        "Shipping address and payment details are required",
-        400
-      );
-    }
-
-    const orderData = { items: [], shippingAddress, payment };
-    const order = await orderService.placeOrderFromCart(userId, orderData);
-
-    const apiResponse = new ApiResponse(
-      201,
-      order,
-      "Order placed successfully"
-    );
-    res.status(201).json(apiResponse);
   }
 );

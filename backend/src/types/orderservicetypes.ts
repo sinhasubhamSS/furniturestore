@@ -1,4 +1,3 @@
-// types/order.types.ts
 export interface PlaceOrderItem {
   productId: string;
   quantity: number;
@@ -18,7 +17,7 @@ export interface PlaceOrderAddress {
 
 export interface PlaceOrderPayment {
   method: "COD" | "RAZORPAY";
-  status?: string;
+  status?: "pending" | "paid" | string;
   transactionId?: string;
   provider?: string;
   paidAt?: Date;
@@ -31,4 +30,10 @@ export interface PlaceOrderRequest {
   items: PlaceOrderItem[];
   shippingAddress: PlaceOrderAddress;
   payment: PlaceOrderPayment;
+
+  /**
+   * Optional flag to indicate order is placed from cart context.
+   * Useful for backend logic to trigger cart cleanup or other actions.
+   */
+  fromCart?: boolean;
 }

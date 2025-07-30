@@ -1,129 +1,93 @@
-"use client";
-
+// components/CheckoutSummary.tsx
 import Image from "next/image";
-import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
-import { useDispatch } from "react-redux";
-import { useGetProductByIDQuery } from "@/redux/services/user/publicProductApi";
-import {
-  setProductId,
-  setQuantity as setReduxQuantity,
-} from "@/redux/slices/checkoutSlice";
 
-const CheckoutSummary = () => {
-  const searchParams = useSearchParams();
-  const productId = searchParams.get("product");
-  const [quantity, setQuantity] = useState(1);
-  const dispatch = useDispatch();
+export type Product = {
+  _id: string;
+  name: string;
+  description?: string;
+  price: number;
+  stock: number;
+  images: { url: string }[];
+};
 
-  const {
-    data: product,
-    isLoading,
-    error,
-  } = useGetProductByIDQuery(productId!, {
-    skip: !productId,
-  });
+export type CheckoutItem = {
+  product: Product;
+  quantity: number;
+};
 
-  useEffect(() => {
-    if (product?._id) {
-      dispatch(setProductId(product._id)); // ✅ Only productId in Redux
-      dispatch(setReduxQuantity(quantity));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product]);
+interface CheckoutSummaryProps {
+  items: CheckoutItem[];
+  total: number;
+  allowQuantityEdit?: boolean;
+  onQuantityChange?: (index: number, quantity: number) => void;
+}
 
-  if (!productId) {
-    return (
-      <p className="text-[--text-error] text-center">No product selected.</p>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <p className="text-center text-[--color-muted-foreground] animate-pulse">
-        Loading product...
-      </p>
-    );
-  }
-
-  if (error || !product) {
-    return (
-      <p className="text-[--text-error] text-center">
-        Failed to fetch product details.
-      </p>
-    );
-  }
-
-  if (product.stock === 0) {
-    return (
-      <div className="text-center p-6 text-[--text-error]">
-        <h2 className="text-2xl font-bold mb-2">{product.name}</h2>
-        <p>Out of Stock</p>
-      </div>
-    );
-  }
-
-  const total = product.price * quantity;
-
-  const updateQuantity = (newQty: number) => {
-    const validQty = Math.max(1, Math.min(newQty, product.stock));
-    setQuantity(validQty);
-    dispatch(setReduxQuantity(validQty));
-  };
+const CheckoutSummary = ({
+  items,
+  total,
+  allowQuantityEdit = false,
+  onQuantityChange,
+}: CheckoutSummaryProps) => {
+  if (!items.length)
+    return <p className="text-center text-gray-500">Your cart is empty.</p>;
 
   return (
-    <div className="max-w-xl mx-auto bg-[--color-card] text-[--text-dark] dark:text-[--text-light] p-6 rounded-xl shadow-lg border border-[--color-border]">
+    <div className="max-w-xl mx-auto bg-[--color-card] text-[--text] p-6 rounded-xl shadow-lg border border-[--color-border]">
       <h2 className="text-2xl font-bold mb-6">Checkout Summary</h2>
-
-      <div className="flex items-center gap-4">
-        <Image
-          src={product.images[0].url}
-          alt={product.name}
-          width={100}
-          height={100}
-          priority
-          
-          className="rounded-md object-cover border"
-        />
-
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold">{product.name}</h3>
-          <p className="text-sm text-[--color-muted-foreground]">
-            {product.description}
-          </p>
-          <p className="mt-1 font-medium text-[--text-accent]">
-            ₹ {product.price.toFixed(2)} {/* No GST addition */}
-          </p>
-
-          <div className="flex items-center gap-2 mt-3">
-            <button
-              className="w-8 h-8 text-lg border border-[--color-border] rounded text-[--text-dark] dark:text-[--text-light]"
-              onClick={() => updateQuantity(quantity - 1)}
-              disabled={quantity <= 1}
-            >
-              −
-            </button>
-            <span className="w-6 text-center">{quantity}</span>
-            <button
-              className="w-8 h-8 text-lg border border-[--color-border] rounded text-[--text-dark] dark:text-[--text-light] disabled:opacity-50"
-              onClick={() => updateQuantity(quantity + 1)}
-              disabled={quantity >= product.stock}
-            >
-              +
-            </button>
-          </div>
-
-          <p className="text-xs mt-1 text-[--color-muted-foreground]">
-            Available stock: {product.stock}
-          </p>
-        </div>
+      <div className="space-y-4 max-h-96 overflow-y-auto">
+        {items.map(({ product, quantity }, idx) => {
+          const itemTotal = product.price * quantity;
+          return (
+            <div key={product._id} className="flex gap-4 items-center">
+              <Image
+                src={product.images?.[0]?.url || "/placeholder.jpg"}
+                alt={product.name}
+                width={100}
+                height={100}
+                className="rounded-md object-cover border"
+              />
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold">{product.name}</h3>
+                {product.description && (
+                  <p className="text-sm text-muted line-clamp-2">
+                    {product.description}
+                  </p>
+                )}
+                <p className="mt-1 font-medium text-accent">
+                  ₹{product.price.toFixed(2)}
+                  {quantity > 1 && ` × ${quantity} = ₹${itemTotal.toFixed(2)}`}
+                </p>
+                <p className="text-xs text-muted">
+                  Available Stock: {product.stock}
+                </p>
+                {allowQuantityEdit && onQuantityChange && (
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      disabled={quantity <= 1}
+                      onClick={() => onQuantityChange(idx, quantity - 1)}
+                      className="btn-xs"
+                    >
+                      −
+                    </button>
+                    <span className="w-6 text-center">{quantity}</span>
+                    <button
+                      disabled={quantity >= product.stock}
+                      onClick={() => onQuantityChange(idx, quantity + 1)}
+                      className="btn-xs"
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
-
-      <hr className="my-4 border-[--color-border]" />
-
-      <div className="flex justify-between font-bold text-lg">
-        <span>Total:</span>
-        <span>₹ {total.toFixed(2)}</span>
+      <hr className="my-5 border-border" />
+      <div className="flex justify-between text-xl font-bold">
+        <span>Total</span>
+        <span>₹{total.toFixed(2)}</span>
       </div>
     </div>
   );
