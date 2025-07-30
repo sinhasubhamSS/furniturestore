@@ -18,12 +18,14 @@ export const placeOrder = catchAsync(
     const order = await orderService.placeOrder(userId, req.body);
 
     // Use ApiResponse for consistent, structured success output
-    return res.status(201).json(
-      new ApiResponse(
-        201,
-        { orderId: order._id },
-        "Order placed successfully"
-      )
-    );
+    return res
+      .status(201)
+      .json(
+        new ApiResponse(
+          201,
+          { orderId: order._id },
+          "Order placed successfully"
+        )
+      );
   }
 );

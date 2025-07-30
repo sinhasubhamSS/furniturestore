@@ -37,6 +37,7 @@ const PaymentPage = () => {
       skip: !productId,
     }
   );
+  const cartBased = !productId && cartData && cartData.items.length > 0;
 
   // Local state
   const [selectedMethod, setSelectedMethod] = useState<
@@ -162,6 +163,7 @@ const PaymentPage = () => {
                   razorpayPaymentId: response.razorpay_payment_id,
                   razorpaySignature: response.razorpay_signature,
                 },
+                fromCart: cartBased ? true : undefined,
               },
             }).unwrap();
 

@@ -18,6 +18,7 @@ type PlaceOrderRequest = {
     razorpayPaymentId?: string;
     razorpaySignature?: string;
   };
+  fromCart?: boolean;
 };
 
 // Razorpay order response structure
@@ -54,4 +55,5 @@ export const orderApi = createApi({
   }),
 });
 
-export const { useCreateOrderMutation, useCreateRazorpayOrderMutation } = orderApi;
+export const { useCreateOrderMutation, useCreateRazorpayOrderMutation } =
+  orderApi;

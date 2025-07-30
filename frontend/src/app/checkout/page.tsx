@@ -1,10 +1,13 @@
-// pages/checkout.tsx or components/CheckoutPage.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useGetCartQuery } from "@/redux/services/user/cartApi";
+import {
+  useGetCartQuery,
+  useUpdateQuantityMutation,
+} from "@/redux/services/user/cartApi";
+
 import { useGetProductByIDQuery } from "@/redux/services/user/publicProductApi";
 import CheckoutSummary, {
   CheckoutItem,
@@ -19,11 +22,10 @@ export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const productId = searchParams.get("product") || null;
-
+  const productId = searchParams.get("product");
   const { data: cartData, isLoading: cartLoading } = useGetCartQuery();
   const { data: product, isLoading: productLoading } = useGetProductByIDQuery(
-    productId ?? "",
+    productId || "",
     {
       skip: !productId,
     }
@@ -32,8 +34,12 @@ export default function CheckoutPage() {
   const { quantity, selectedAddress } = useSelector(
     (state: RootState) => state.checkout
   );
+  const [addressSelected, setAddressSelected] = useState(!!selectedAddress);
 
-  // Prepare checkout items & total
+  // Hook for cart quantity update mutation
+  const [updateQty] = useUpdateQuantityMutation();
+
+  // Prepare items and total
   let items: CheckoutItem[] = [];
   let total = 0;
 
@@ -41,34 +47,52 @@ export default function CheckoutPage() {
     items = [{ product, quantity }];
     total = product.price * quantity;
   } else if (cartData?.items?.length) {
-    items = cartData.items.map(
-      ({ product, quantity }: { product: Product; quantity: number }) => ({
-        product,
-        quantity,
-      })
-    );
+    items = cartData.items.map(({ product, quantity }) => ({
+      product,
+      quantity,
+    }));
     total = cartData.cartTotal ?? 0;
   }
 
-  const [addressSelected, setAddressSelected] = useState(!!selectedAddress);
-
-  const handleQuantityChange = (index: number, newQty: number) => {
+  // Handle Quantity Change
+  const handleQuantityChange = async (index: number, newQuantity: number) => {
     if (productId) {
-      const clampedQty = Math.max(
+      // Single product quantity managed in Redux.
+      const clamped = Math.max(
         1,
-        Math.min(newQty, items[index].product.stock)
+        Math.min(newQuantity, items[index].product.stock)
       );
-      dispatch(setQuantity(clampedQty));
+      dispatch(setQuantity(clamped));
+    } else {
+      // Cart quantity update via backend API call.
+      const item = items[index];
+      if (!item) return;
+
+      const clamped = Math.max(1, Math.min(newQuantity, item.product.stock));
+      try {
+        await updateQty({
+          productId: item.product._id,
+          quantity: clamped,
+        }).unwrap();
+        // On success, RTK query will refetch cart data automatically.
+      } catch (err) {
+        alert("Failed to update cart quantity. Please try again.");
+        console.error(err);
+      }
     }
-    // For cart quantity edit: implement update cart API call & Redux update accordingly
   };
+
+  // Sync addressSelected with Redux address
+  useEffect(() => {
+    setAddressSelected(!!selectedAddress);
+  }, [selectedAddress]);
 
   if (cartLoading || productLoading) {
     return <p className="text-center mt-10">Loading...</p>;
   }
 
-  if (!items.length) {
-    return <p className="text-center mt-10">Your cart is empty.</p>;
+  if (items.length === 0) {
+    return <p className="text-center mt-10">Your cart is empty</p>;
   }
 
   return (
@@ -76,17 +100,19 @@ export default function CheckoutPage() {
       <div className="max-w-7xl mx-auto">
         <h1 className="text-center text-3xl font-bold mb-10">Checkout</h1>
         <div className="grid lg:grid-cols-[2fr_1fr] gap-8">
-          {/* Left: Address Section */}
+          {/* Address Selection */}
           <div>
             <AddressSection onSelectionChange={setAddressSelected} />
           </div>
 
-          {/* Right: Summary and Proceed Button */}
+          {/* Summary and Proceed Button */}
           <div className="sticky top-10 self-start bg-white p-6 rounded-xl shadow-md border border-gray-300">
             <CheckoutSummary
               items={items}
               total={total}
-              allowQuantityEdit={!!productId}
+              allowQuantityEdit={
+                !!productId || (cartData?.items?.length ?? 0) > 0
+              }
               onQuantityChange={handleQuantityChange}
             />
             <button

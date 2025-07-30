@@ -23,7 +23,7 @@ const initialState: CheckoutState = {
   paymentMethod: null,
 };
 
-export const checkoutSlice = createSlice({
+const checkoutSlice = createSlice({
   name: "checkout",
   initialState,
   reducers: {
@@ -33,7 +33,8 @@ export const checkoutSlice = createSlice({
     setProductId(state, action: PayloadAction<string | null>) {
       state.productId = action.payload;
       if (action.payload) {
-        state.cartItems = []; // clear cartItems if single product selected
+        // Reset cartItems if single product selected
+        state.cartItems = [];
       }
     },
     setQuantity(state, action: PayloadAction<number>) {
@@ -42,11 +43,15 @@ export const checkoutSlice = createSlice({
     setCartItems(state, action: PayloadAction<CartItem[]>) {
       state.cartItems = action.payload;
       if (action.payload.length) {
-        state.productId = null; // clear single product selection if cart used
+        // Reset single product selection if cart is active
+        state.productId = null;
         state.quantity = 1;
       }
     },
-    setPaymentMethod(state, action: PayloadAction<"COD" | "RAZORPAY" | null>) {
+    setPaymentMethod(
+      state,
+      action: PayloadAction<"COD" | "RAZORPAY" | "" | null>
+    ) {
       state.paymentMethod = action.payload;
     },
     resetCheckout(state) {
