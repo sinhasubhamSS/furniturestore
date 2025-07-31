@@ -18,14 +18,31 @@ export const placeOrder = catchAsync(
     const order = await orderService.placeOrder(userId, req.body);
 
     // Use ApiResponse for consistent, structured success output
-    return res
-      .status(201)
-      .json(
-        new ApiResponse(
-          201,
-          { orderId: order._id },
-          "Order placed successfully"
-        )
-      );
+    return res.status(201).json(
+      new ApiResponse(
+        201,
+        {
+          orderId: order._id,
+          payment: order.paymentSnapshot,
+          items: order.orderItemsSnapshot,
+          totalAmount: order.totalAmount,
+        },
+        "Order placed successfully"
+      )
+    );
+  }
+);
+export const getMyOrders = catchAsync(
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.userId;
+    if (!userId) {
+      throw new AppError("Unauthorized", 401);
+    }
+
+    const orders = await orderService.getMyOrders(userId);
+
+    return res.status(200).json(
+      new ApiResponse(200, orders, "Fetched user orders successfully")
+    );
   }
 );

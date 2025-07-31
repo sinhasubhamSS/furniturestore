@@ -35,90 +35,90 @@ class CartService {
     return this.getCart(userId);
   }
 
- async getCart(userId: string) {
-  const cart = await Cart.aggregate([
-    { $match: { user: new Types.ObjectId(userId) } },
-    
-    // Lookup and process items in a single stage
-    {
-      $lookup: {
-        from: "cartitems",
-        localField: "items",
-        foreignField: "_id",
-        as: "items",
-        pipeline: [
-          // Lookup product details
-          {
-            $lookup: {
-              from: "products",
-              localField: "product",
-              foreignField: "_id",
-              as: "product",
-            }
-          },
-          // Unwind product while preserving items
-          { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
-          
-          // Add calculated fields
-          {
-            $addFields: {
-              subtotal: {
-                $cond: [
-                  { $ifNull: ["$product", false] },
-                  { $multiply: ["$quantity", "$product.basePrice"] },
-                  0
-                ]
-              },
-              gstAmount: {
-                $cond: [
-                  { $ifNull: ["$product", false] },
-                  {
-                    $multiply: [
-                      { $multiply: ["$quantity", "$product.basePrice"] },
-                      "$product.gstRate"
-                    ]
-                  },
-                  0
-                ]
-              },
-              totalWithGST: {
-                $cond: [
-                  { $ifNull: ["$product", false] },
-                  { $multiply: ["$quantity", "$product.price"] },
-                  0
-                ]
-              }
-            }
-          }
-        ]
-      }
-    },
-    
-    // Calculate cart totals
-    {
-      $addFields: {
-        cartSubtotal: { $sum: "$items.subtotal" },
-        cartGST: { $sum: "$items.gstAmount" },
-        cartTotal: { $sum: "$items.totalWithGST" }
-      }
-    },
-    
-    // Add verification field
-    {
-      $addFields: {
-        totalVerification: {
-          $eq: [
-            { $round: ["$cartTotal", 2] },
-            { $round: [{ $add: ["$cartSubtotal", "$cartGST"] }, 2] }
-          ]
-        }
-      }
-    }
-  ]);
+  async getCart(userId: string) {
+    const cart = await Cart.aggregate([
+      { $match: { user: new Types.ObjectId(userId) } },
 
-  if (!cart.length) throw new AppError("Cart not found", 404);
-  return cart[0];
-}
+      // Lookup and process items in a single stage
+      {
+        $lookup: {
+          from: "cartitems",
+          localField: "items",
+          foreignField: "_id",
+          as: "items",
+          pipeline: [
+            // Lookup product details
+            {
+              $lookup: {
+                from: "products",
+                localField: "product",
+                foreignField: "_id",
+                as: "product",
+              },
+            },
+            // Unwind product while preserving items
+            { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
+
+            // Add calculated fields
+            {
+              $addFields: {
+                subtotal: {
+                  $cond: [
+                    { $ifNull: ["$product", false] },
+                    { $multiply: ["$quantity", "$product.basePrice"] },
+                    0,
+                  ],
+                },
+                gstAmount: {
+                  $cond: [
+                    { $ifNull: ["$product", false] },
+                    {
+                      $multiply: [
+                        { $multiply: ["$quantity", "$product.basePrice"] },
+                        "$product.gstRate",
+                      ],
+                    },
+                    0,
+                  ],
+                },
+                totalWithGST: {
+                  $cond: [
+                    { $ifNull: ["$product", false] },
+                    { $multiply: ["$quantity", "$product.price"] },
+                    0,
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      },
+
+      // Calculate cart totals
+      {
+        $addFields: {
+          cartSubtotal: { $sum: "$items.subtotal" },
+          cartGST: { $sum: "$items.gstAmount" },
+          cartTotal: { $sum: "$items.totalWithGST" },
+        },
+      },
+
+      // Add verification field
+      {
+        $addFields: {
+          totalVerification: {
+            $eq: [
+              { $round: ["$cartTotal", 2] },
+              { $round: [{ $add: ["$cartSubtotal", "$cartGST"] }, 2] },
+            ],
+          },
+        },
+      },
+    ]);
+
+    if (!cart.length) throw new AppError("Cart not found", 404);
+    return cart[0];
+  }
   async updateQuantity(userId: string, productId: string, quantity: number) {
     if (quantity <= 0) {
       return this.removeItem(userId, productId);
@@ -156,9 +156,13 @@ class CartService {
     return this.getCart(userId);
   }
 
+  // async getCartCount(userId: string) {
+  //   const items = await CartItem.find({ user: userId });
+  //   return items.reduce((acc, item) => acc + item.quantity, 0);
+  // }
   async getCartCount(userId: string) {
     const items = await CartItem.find({ user: userId });
-    return items.reduce((acc, item) => acc + item.quantity, 0);
+    return items.length; // number of unique cart items
   }
 }
 

@@ -15,7 +15,7 @@ import CheckoutSummary, {
 } from "@/components/checkout/CheckoutSummary";
 import AddressSection from "@/components/checkout/AddressSection";
 import { RootState } from "@/redux/store";
-import { setQuantity } from "@/redux/slices/checkoutSlice";
+import { setQuantity, setProductId } from "@/redux/slices/checkoutSlice";
 
 export default function CheckoutPage() {
   const dispatch = useDispatch();
@@ -23,6 +23,11 @@ export default function CheckoutPage() {
   const searchParams = useSearchParams();
 
   const productId = searchParams.get("product");
+  useEffect(() => {
+    if (productId) {
+      dispatch(setProductId(productId)); // redux slice me productId set karo
+    }
+  }, [productId, dispatch]);
   const { data: cartData, isLoading: cartLoading } = useGetCartQuery();
   const { data: product, isLoading: productLoading } = useGetProductByIDQuery(
     productId || "",

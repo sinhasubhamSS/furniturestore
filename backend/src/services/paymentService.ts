@@ -8,8 +8,10 @@ class PaymentService {
       throw new AppError("Amount must be greater than 0", 400);
     }
 
+    const amountInPaise = Math.round(amountInRupees * 100); // round to nearest integer paise
+
     const options = {
-      amount: amountInRupees * 100, // 💰 convert to paise
+      amount: amountInPaise, // integer paise me
       currency: "INR",
       receipt: `receipt_order_${Date.now()}`,
     };

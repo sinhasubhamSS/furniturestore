@@ -4,13 +4,33 @@ import { Address } from "@/types/address";
 
 // Order item structure
 type OrderItem = {
-  productId: string;
+  productId: {
+    _id: string;
+    name: string;
+    price: number;
+    images: { url: string }[]; // ✅ Product ke image ke liye
+  };
   quantity: number;
 };
 
-// Order placement request structure
-type PlaceOrderRequest = {
+// Full order structure returned by backend
+type Order = {
+  _id: string;
   items: OrderItem[];
+  shippingAddress: Address;
+  payment: {
+    method: "COD" | "RAZORPAY";
+  };
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type PlaceOrderRequest = {
+  items: {
+    productId: string;
+    quantity: number;
+  }[];
   shippingAddress: Address;
   payment: {
     method: "COD" | "RAZORPAY";
@@ -21,7 +41,6 @@ type PlaceOrderRequest = {
   fromCart?: boolean;
 };
 
-// Razorpay order response structure
 type RazorpayOrderResponse = {
   orderId: string;
   amount: number;
@@ -33,7 +52,7 @@ export const orderApi = createApi({
   baseQuery: axiosBaseQuery(),
   tagTypes: ["Orders"],
   endpoints: (builder) => ({
-    // Place order (COD or after Razorpay payment success)
+    // Place order (COD or Razorpay)
     createOrder: builder.mutation<any, { data: PlaceOrderRequest }>({
       query: ({ data }) => ({
         url: `/order/placeorder/`,
@@ -43,17 +62,29 @@ export const orderApi = createApi({
       invalidatesTags: ["Orders"],
     }),
 
-    // Create Razorpay order (gets amount, currency, orderId)
+    // Razorpay order creation
     createRazorpayOrder: builder.mutation<RazorpayOrderResponse, number>({
       query: (amount) => ({
         url: `/payment/create-order`,
         method: "POST",
         data: { amount },
       }),
-      transformResponse: (response: any) => response.data, // ✅ only extract `data`
+      transformResponse: (response: any) => response.data,
+    }),
+
+    // ✅ Get user's own orders
+    getMyOrders: builder.query<Order[], void>({
+      query: () => ({
+        url: `/order/myorders`,
+        method: "GET",
+      }),
+      providesTags: ["Orders"],
     }),
   }),
 });
 
-export const { useCreateOrderMutation, useCreateRazorpayOrderMutation } =
-  orderApi;
+export const {
+  useCreateOrderMutation,
+  useCreateRazorpayOrderMutation,
+  useGetMyOrdersQuery,
+} = orderApi;

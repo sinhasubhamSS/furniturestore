@@ -5,7 +5,6 @@ import { Cart } from "../models/cart.model";
 import { CartItem } from "../models/cartItems.model";
 import { paymentService } from "./paymentService";
 import { AppError } from "../utils/AppError";
-// Optional: Error helper
 
 class OrderService {
   // Helper to process product items
@@ -44,11 +43,10 @@ class OrderService {
     return { orderItemsSnapshot, totalAmount };
   }
 
-  // Unified order placement method
+  // Place a new order
   async placeOrder(userId: string, orderData: PlaceOrderRequest) {
     let { items, shippingAddress, payment, fromCart } = orderData;
 
-    // If items not provided (optional fallback), get from cart
     if ((!items || items.length === 0) && fromCart) {
       const cart = await Cart.findOne({ user: userId });
       if (!cart || cart.items.length === 0)
@@ -65,12 +63,10 @@ class OrderService {
     if (!items || items.length === 0)
       throw new AppError("No order items provided.", 400);
 
-    // Snapshot, total calculation, stock check
     const { orderItemsSnapshot, totalAmount } = await this.buildOrderItems(
       items
     );
 
-    // Payment verification (Razorpay / COD)
     let paymentStatus: "pending" | "paid" = "pending";
     let paymentMethod: "COD" | "RAZORPAY" = payment.method as
       | "COD"
@@ -99,7 +95,6 @@ class OrderService {
       paymentMethod = "RAZORPAY";
     }
 
-    // Create the order
     const newOrder = await Order.create({
       user: userId,
       orderItemsSnapshot,
@@ -115,7 +110,6 @@ class OrderService {
       status: "pending",
     });
 
-    // (Optional) If the order was from cart, cleanup cart
     if (fromCart) {
       const cart = await Cart.findOne({ user: userId });
       if (cart && cart.items.length > 0) {
@@ -126,6 +120,27 @@ class OrderService {
     }
 
     return newOrder;
+  }
+
+  // ✅ Get all orders for user with simplified structure
+  async getMyOrders(userId: string) {
+    const orders = await Order.find({ user: userId })
+      .sort({ createdAt: -1 })
+      .select("-__v");
+
+    return orders.map((order) => ({
+      _id: order._id,
+      status: order.status,
+      placedAt: order.placedAt,
+      totalAmount: order.totalAmount,
+      items: order.orderItemsSnapshot.map((item) => ({
+        productId: item.productId,
+        name: item.name,
+        image: item.image,
+        price: item.price,
+        quantity: item.quantity,
+      })),
+    }));
   }
 }
 

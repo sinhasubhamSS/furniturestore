@@ -28,6 +28,12 @@ const PaymentPage = () => {
     selectedAddress: shippingAddress,
     paymentMethod,
   } = useSelector((state: RootState) => state.checkout);
+  console.log("Redux state at PaymentPage:", {
+    productId,
+    quantity,
+    shippingAddress,
+    paymentMethod,
+  });
 
   // Fetch data
   const { data: cartData } = useGetCartQuery();
@@ -153,7 +159,7 @@ const PaymentPage = () => {
         order_id: razorpayOrder.orderId,
         handler: async (response: any) => {
           try {
-            await createOrder({
+            const orderData = await createOrder({
               data: {
                 items,
                 shippingAddress,
@@ -169,7 +175,10 @@ const PaymentPage = () => {
 
             alert("Payment successful and order placed!");
             dispatch(resetCheckout());
-            router.push("/order-success");
+            console.log(orderData);
+            console.log(`Order ID: ${orderData.data.orderId}`);
+
+            router.push(`/order-success?orderId=${orderData.data.orderId}`);
           } catch (e: any) {
             alert(e?.data?.message || "Failed to record order after payment.");
           }
@@ -239,3 +248,5 @@ const PaymentPage = () => {
 };
 
 export default PaymentPage;
+
+//6076 4510 0000 0001 test card
