@@ -1,5 +1,5 @@
 import Product from "../models/product.models";
-import { Order } from "../models/order.models";
+import { Order, OrderStatus } from "../models/order.models";
 import { PlaceOrderRequest } from "../types/orderservicetypes";
 import { Cart } from "../models/cart.model";
 import { CartItem } from "../models/cartItems.model";
@@ -154,6 +154,47 @@ class OrderService {
 
       paymentStatus: order.paymentSnapshot?.status || "unpaid",
     }));
+  }
+  async cancelOrder(userId: string, orderId: string) {
+    // 1. Find order with userId and orderId
+    const order = await Order.findOne({ user: userId, _id: orderId });
+    if (!order) throw new AppError("Order not found", 404);
+
+    // 2. Check if order is already cancelled
+    if (order.status === "cancelled") {
+      throw new AppError("Order is already cancelled", 400);
+    }
+
+    // 3. Check if cancellation is within allowed time window (12 hours)
+    const now = new Date();
+    const orderCreatedAt = order.placedAt;
+    const hoursSinceOrder =
+      (now.getTime() - orderCreatedAt.getTime()) / (1000 * 60 * 60);
+
+    if (hoursSinceOrder > 12) {
+      throw new AppError("Order cannot be cancelled after 12 hours", 400);
+    }
+
+    // 4. Update order status to 'cancelled'
+    order.status = OrderStatus.Cancelled;
+
+    await order.save();
+
+    // 5. Update stock for each product in the order
+    for (const item of order.orderItemsSnapshot) {
+      const product = await Product.findById(item.productId);
+      if (product) {
+        product.stock += item.quantity; // wapas add karo stock
+        await product.save();
+      }
+    }
+
+    // 6. Return success response or updated order data as per your design
+    return {
+      success: true,
+      message: "Order cancelled successfully",
+      orderId: order._id,
+    };
   }
 }
 

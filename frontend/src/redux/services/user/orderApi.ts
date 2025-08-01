@@ -36,6 +36,15 @@ export const orderApi = createApi({
       transformResponse: (response: any) => response.data,
       providesTags: ["Orders"],
     }),
+    cancelOrder: builder.mutation<void, { orderId: string }>({
+      query: ({ orderId }) => ({
+        url: `/order/cancel-order`,
+        method: "POST",
+        data: { orderId },
+      }),
+      transformResponse: (response: any) => response.data,
+      invalidatesTags: ["Orders"],
+    }),
   }),
 });
 
@@ -43,4 +52,5 @@ export const {
   useCreateOrderMutation,
   useCreateRazorpayOrderMutation,
   useGetMyOrdersQuery,
+  useCancelOrderMutation,
 } = orderApi;

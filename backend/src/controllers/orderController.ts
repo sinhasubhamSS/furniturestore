@@ -41,8 +41,30 @@ export const getMyOrders = catchAsync(
 
     const orders = await orderService.getMyOrders(userId);
 
-    return res.status(200).json(
-      new ApiResponse(200, orders, "Fetched user orders successfully")
-    );
+    return res
+      .status(200)
+      .json(new ApiResponse(200, orders, "Fetched user orders successfully"));
+  }
+);
+// Controller handler
+export const cancelOrderController = catchAsync(
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.userId; // assume authentication middleware sets this
+    const { orderId } = req.body;
+
+    if (!userId) {
+      throw new AppError("Unauthorized", 401);
+    }
+
+    if (!orderId) {
+      throw new AppError("Order ID is required", 400);
+    }
+
+    // Call service method
+    const result = await orderService.cancelOrder(userId, orderId);
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, result, "Order cancelled successfully"));
   }
 );
