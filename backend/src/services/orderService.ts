@@ -31,7 +31,7 @@ class OrderService {
       orderItemsSnapshot.push({
         productId: product._id,
         name: product.name,
-        image: product.images?.[0] || "",
+        image: product.images?.[0]?.url || "",
         quantity: item.quantity,
         price: product.price,
       });
@@ -129,17 +129,30 @@ class OrderService {
       .select("-__v");
 
     return orders.map((order) => ({
-      _id: order._id,
-      status: order.status,
-      placedAt: order.placedAt,
-      totalAmount: order.totalAmount,
-      items: order.orderItemsSnapshot.map((item) => ({
-        productId: item.productId,
-        name: item.name,
-        image: item.image,
-        price: item.price,
-        quantity: item.quantity,
-      })),
+      _id: order._id, // Order ID
+      placedAt: order.placedAt, // Date of placing
+      totalAmount: order.totalAmount, // Final amount
+      status: order.status, // Order status like 'shipped', 'delivered'
+
+      // Thumbnail details: show only 1st product
+      productPreview: {
+        images: order.orderItemsSnapshot?.[0]?.image || null,
+
+        name: order.orderItemsSnapshot[0]?.name || "Product",
+        quantity: order.orderItemsSnapshot.reduce(
+          (acc, item) => acc + item.quantity,
+          0
+        ), // total qty
+      },
+
+      shippingSummary: {
+        name: order.shippingAddressSnapshot.fullName,
+        city: order.shippingAddressSnapshot.city,
+        state: order.shippingAddressSnapshot.state,
+        pincode: order.shippingAddressSnapshot.pincode,
+      },
+
+      paymentStatus: order.paymentSnapshot?.status || "unpaid",
     }));
   }
 }
