@@ -4,6 +4,8 @@ import { AuthRequest } from "../types/app-request";
 import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 import { ApiResponse } from "../utils/ApiResponse";
+import { paymentService } from "../services/paymentService";
+import { OrderStatus } from "../models/order.models";
 
 const orderService = new OrderService();
 
@@ -32,6 +34,7 @@ export const placeOrder = catchAsync(
     );
   }
 );
+
 export const getMyOrders = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const userId = req.userId;
@@ -46,10 +49,10 @@ export const getMyOrders = catchAsync(
       .json(new ApiResponse(200, orders, "Fetched user orders successfully"));
   }
 );
-// Controller handler
+
 export const cancelOrderController = catchAsync(
   async (req: AuthRequest, res: Response) => {
-    const userId = req.userId; // assume authentication middleware sets this
+    const userId = req.userId;
     const { orderId } = req.body;
 
     if (!userId) {
@@ -60,11 +63,42 @@ export const cancelOrderController = catchAsync(
       throw new AppError("Order ID is required", 400);
     }
 
-    // Call service method
     const result = await orderService.cancelOrder(userId, orderId);
 
     return res
       .status(200)
       .json(new ApiResponse(200, result, "Order cancelled successfully"));
+  }
+);
+
+// New: Update Order Status Controller
+export const updateOrderStatusController = catchAsync(
+  async (req: AuthRequest, res: Response) => {
+    const { orderId } = req.params;
+    const { status } = req.body;
+
+    if (!orderId || !status) {
+      throw new AppError("Order ID and status are required", 400);
+    }
+
+    if (!Object.values(OrderStatus).includes(status)) {
+      throw new AppError("Invalid order status", 400);
+    }
+
+    const updatedOrder = await orderService.updateOrderStatus(
+      orderId,
+      status as OrderStatus
+    );
+
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          orderId: updatedOrder._id,
+          status: updatedOrder.status,
+        },
+        `Order status updated to ${updatedOrder.status}`
+      )
+    );
   }
 );

@@ -5,10 +5,13 @@ export enum OrderStatus {
   Pending = "pending",
   Confirmed = "confirmed",
   Shipped = "shipped",
+  OutForDelivery = "out_for_delivery", // optional
   Delivered = "delivered",
   Cancelled = "cancelled",
   Refunded = "refunded",
+  Failed = "failed",             // delivery failed add kar sakte hain
 }
+
 
 // Enum for payment method (optional but good practice)
 export enum PaymentMethod {
@@ -49,6 +52,7 @@ export interface PaymentSnapshot {
   provider?: string;
   paidAt?: Date;
   razorpayOrderId?: string;
+  razorpayPaymentId?: string;
 }
 
 // Final Order Document interface

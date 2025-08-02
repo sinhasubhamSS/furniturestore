@@ -158,7 +158,7 @@ const Navbar = () => {
                           Your Profile
                         </Link>
                         <Link
-                          href="/orders"
+                          href="/my-orders"
                           className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-secondary)]"
                         >
                           My Orders

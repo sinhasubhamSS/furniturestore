@@ -54,6 +54,26 @@ class PaymentService {
       verified: true,
       method: paymentDetails.method?.toUpperCase(), // e.g. "UPI"
     };
+  }//remove it when webhook is implemented
+
+  // verifySignatureAndGetDetails	Payment signature verification & payment info fetch	Payment verify karte waqt (e.g., order place time)
+  // verifyWebhookSignature	Webhook payload signature verification	Webhook endpoint par webhook verify karte waqt
+  // src/services/paymentService.ts
+  async verifyWebhookSignature(
+    payloadBody: string,
+    signature: string,
+    secret: string
+  ): Promise<boolean> {
+    if (!signature || !secret) {
+      throw new AppError("Missing webhook signature or secret", 400);
+    }
+
+    const generatedSignature = crypto
+      .createHmac("sha256", secret)
+      .update(payloadBody)
+      .digest("hex");
+
+    return generatedSignature === signature;
   }
 }
 
