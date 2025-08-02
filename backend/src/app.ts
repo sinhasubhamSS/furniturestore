@@ -19,6 +19,8 @@ import addressRoute from "./routes/addressRoutes";
 import orderRoute from "./routes/orderRoutes";
 import paymentRoute from "./routes/paymentRoutes";
 import categoryRoute from "./routes/categoryRoutes";
+
+import dashboardRoutes from "./routes/adminRoutes";
 import { errorMiddleware } from "./middlewares/errorMiddleware";
 app.use("/api/user", userRoutes);
 app.use("/api/products", productRoutes);
@@ -27,7 +29,8 @@ app.use("/api/wishlist", wishlistRoute);
 app.use("/api/address", addressRoute);
 app.use("/api/order", orderRoute);
 app.use("/api/payment", paymentRoute);
-app.use("/api/category", categoryRoute);
 
+app.use("/api/category", categoryRoute);
+app.use("/api/admin", dashboardRoutes);
 app.use(errorMiddleware);
 export default app;

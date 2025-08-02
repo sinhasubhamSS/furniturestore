@@ -1,66 +1,70 @@
 "use client";
 import { useState } from "react";
+import { useGetDashboardStatsQuery } from "../../../redux/services/admin/adminDashboard";
+
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
+  
+  // ✅ Real API data fetch karna
+  const { data: dashboardData, error, isLoading } = useGetDashboardStatsQuery();
 
-  // Sample data - replace with real API data
-  //sample admin dashboar aur jab user ka sara feature complete ho jaiga tab then jake isko sahi sa update karunga aur admin ka kuch kuch jasie total revenue and all nikalunga
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="p-4 md:p-6 space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg">Loading dashboard data...</div>
+        </div>
+      </div>
+    );
+  }
 
+  // Error state
+  if (error) {
+    return (
+      <div className="p-4 md:p-6 space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg text-red-500">Error loading dashboard data</div>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ Real stats data - API se aaya hua data use kar rahe hain
   const stats = [
     {
-      title: "Total Revenue",
-      value: "$24,567",
-      change: "+18%",
-      trend: "up",
-      icon: "💰",
-    },
-    { title: "Orders", value: "342", change: "+12%", trend: "up", icon: "📦" },
-    {
-      title: "Customers",
-      value: "1,289",
-      change: "+8%",
+      title: "Total Users",
+      value: dashboardData?.totalUsers || 0,
+      change: "+8%", // Ye calculation backend se bhi aa sakti hai
       trend: "up",
       icon: "👥",
     },
     {
-      title: "Return Rate",
-      value: "4.2%",
-      change: "-1%",
+      title: "Total Products", 
+      value: dashboardData?.totalProducts || 0,
+      change: "+12%",
+      trend: "up", 
+      icon: "📦"
+    },
+    {
+      title: "Pending Orders",
+      value: dashboardData?.pendingOrdersCount || 0,
+      change: "-2%",
       trend: "down",
-      icon: "🔄",
+      icon: "⏳",
+    },
+    {
+      title: "Total Orders",
+      value: dashboardData?.recentOrders?.length || 0,
+      change: "+15%",
+      trend: "up",
+      icon: "🛒",
     },
   ];
 
-  const popularProducts = [
-    { name: "Nordic Oak Chair", sales: 142, revenue: "$8,520" },
-    { name: "Minimalist Coffee Table", sales: 98, revenue: "$6,860" },
-    { name: "Scandinavian Sofa", sales: 76, revenue: "$15,200" },
-  ];
-
-  const recentOrders = [
-    {
-      id: "#FUR-1001",
-      customer: "Alex Johnson",
-      amount: "$450",
-      status: "shipped",
-      items: 2,
-    },
-    {
-      id: "#FUR-1002",
-      customer: "Sarah Miller",
-      amount: "$1,200",
-      status: "processing",
-      items: 3,
-    },
-    {
-      id: "#FUR-1003",
-      customer: "David Wilson",
-      amount: "$780",
-      status: "delivered",
-      items: 1,
-    },
-  ];
+  // ✅ Recent orders - Real data use kar rahe hain
+  const recentOrders = dashboardData?.recentOrders?.slice(0, 5) || [];
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -68,7 +72,7 @@ export default function AdminDashboard() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-[var(--foreground)]">
-            Furniture Dashboard
+            Admin Dashboard
           </h1>
           <p className="text-sm text-[var(--text-accent)]">
             Welcome back! Here's what's happening with your store.
@@ -82,7 +86,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid - Real API data */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
           <div
@@ -131,35 +135,27 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Top Products */}
+        {/* Quick Stats */}
         <div className="bg-[var(--card-bg)] p-5 rounded-xl shadow-sm border border-[var(--color-secondary)]">
-          <h2 className="text-lg font-semibold mb-4">Popular Products</h2>
+          <h2 className="text-lg font-semibold mb-4">Quick Stats</h2>
           <div className="space-y-4">
-            {popularProducts.map((product, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-3 p-2 hover:bg-[var(--background)] rounded-lg transition-colors"
-              >
-                <div className="w-10 h-10 rounded-md bg-[var(--color-secondary)] flex items-center justify-center">
-                  <span className="text-lg">🪑</span>
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium">{product.name}</p>
-                  <p className="text-sm text-[var(--text-accent)]">
-                    {product.sales} sold
-                  </p>
-                </div>
-                <p className="font-medium">{product.revenue}</p>
-              </div>
-            ))}
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-[var(--text-accent)]">Total Users</span>
+              <span className="font-semibold">{dashboardData?.totalUsers || 0}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-[var(--text-accent)]">Total Products</span>
+              <span className="font-semibold">{dashboardData?.totalProducts || 0}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-[var(--text-accent)]">Pending Orders</span>
+              <span className="font-semibold">{dashboardData?.pendingOrdersCount || 0}</span>
+            </div>
           </div>
-          <button className="w-full mt-4 py-2 text-sm text-[var(--color-accent)] hover:underline">
-            View all products →
-          </button>
         </div>
       </div>
 
-      {/* Recent Orders */}
+      {/* Recent Orders - Real API data */}
       <div className="bg-[var(--card-bg)] p-5 rounded-xl shadow-sm border border-[var(--color-secondary)]">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">Recent Orders</h2>
@@ -167,77 +163,83 @@ export default function AdminDashboard() {
             View all orders →
           </button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[var(--color-secondary)]">
-                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--text-accent)]">
-                  Order ID
-                </th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--text-accent)]">
-                  Customer
-                </th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--text-accent)]">
-                  Amount
-                </th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-[var(--text-accent)]">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentOrders.map((order, index) => (
-                <tr
-                  key={index}
-                  className="border-b border-[var(--color-secondary)] hover:bg-[var(--background)] transition-colors cursor-pointer"
-                >
-                  <td className="py-3 px-4 font-medium">{order.id}</td>
-                  <td className="py-3 px-4">{order.customer}</td>
-                  <td className="py-3 px-4">{order.amount}</td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        order.status === "delivered"
-                          ? "bg-green-100 text-green-800"
-                          : order.status === "shipped"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-yellow-100 text-yellow-800"
-                      }`}
-                    >
-                      {order.status.charAt(0).toUpperCase() +
-                        order.status.slice(1)}
-                    </span>
-                  </td>
+        
+        {recentOrders.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[var(--color-secondary)]">
+                  <th className="text-left py-3 px-4 text-sm font-medium text-[var(--text-accent)]">
+                    Order ID
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-[var(--text-accent)]">
+                    Status
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-[var(--text-accent)]">
+                    Date
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {recentOrders.map((order, index) => (
+                  <tr
+                    key={index}
+                    className="border-b border-[var(--color-secondary)] hover:bg-[var(--background)] transition-colors cursor-pointer"
+                  >
+                    <td className="py-3 px-4 font-medium">{order._id?.slice(-8) || 'N/A'}</td>
+                    <td className="py-3 px-4">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          order.status === "delivered"
+                            ? "bg-green-100 text-green-800"
+                            : order.status === "shipped"
+                            ? "bg-blue-100 text-blue-800"
+                            : order.status === "pending"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {order.status?.charAt(0).toUpperCase() + order.status?.slice(1)}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      {new Date(order.placedAt).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-[var(--text-accent)]">
+            No recent orders found
+          </div>
+        )}
       </div>
 
-      {/* Quick Stats */}
+      {/* Additional Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-[var(--card-bg)] p-4 rounded-xl border border-[var(--color-secondary)]">
           <h3 className="text-sm font-medium text-[var(--text-accent)] mb-2">
-            Average Order Value
+            Total Users
           </h3>
-          <p className="text-2xl font-bold">$189.42</p>
-          <p className="text-sm text-green-500 mt-1">↑ 12% from last month</p>
+          <p className="text-2xl font-bold">{dashboardData?.totalUsers || 0}</p>
+          <p className="text-sm text-green-500 mt-1">↑ Registered users</p>
         </div>
         <div className="bg-[var(--card-bg)] p-4 rounded-xl border border-[var(--color-secondary)]">
           <h3 className="text-sm font-medium text-[var(--text-accent)] mb-2">
-            Conversion Rate
+            Products Available
           </h3>
-          <p className="text-2xl font-bold">3.2%</p>
-          <p className="text-sm text-green-500 mt-1">↑ 0.4% from last month</p>
+          <p className="text-2xl font-bold">{dashboardData?.totalProducts || 0}</p>
+          <p className="text-sm text-blue-500 mt-1">↑ In inventory</p>
         </div>
         <div className="bg-[var(--card-bg)] p-4 rounded-xl border border-[var(--color-secondary)]">
           <h3 className="text-sm font-medium text-[var(--text-accent)] mb-2">
-            Inventory Alert
+            Pending Orders
           </h3>
-          <p className="text-2xl font-bold">8 Items</p>
+          <p className="text-2xl font-bold">{dashboardData?.pendingOrdersCount || 0}</p>
           <p className="text-sm text-[var(--text-accent)] mt-1">
-            Low stock products
+            Need attention
           </p>
         </div>
       </div>
