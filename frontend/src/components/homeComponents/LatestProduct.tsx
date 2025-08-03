@@ -1,37 +1,64 @@
+// components/homeComponents/TrendingSection.tsx
 "use client";
 
 import React from "react";
 import { useGetPublishedProductsQuery } from "@/redux/services/user/publicProductApi";
 import ProductCard from "../ui/HomeCardComponent";
 
-const LatestProduct = () => {
+const TrendingSection = () => {
   const { data, isLoading, error } = useGetPublishedProductsQuery({
     page: 1,
-    limit: 12,
+    limit: 8,
   });
 
   if (isLoading) {
-    return <p className="text-center py-8">Loading products...</p>;
+    return (
+      <section className="w-full py-16 px-4 md:px-8 lg:px-16">
+        <div className="max-w-[1440px] mx-auto">
+          <h2 className="text-2xl font-bold mb-8 text-[var(--color-foreground)]">
+            Trending Products
+          </h2>
+          <p className="text-center py-8 text-[var(--color-foreground)]">
+            Loading trending products...
+          </p>
+        </div>
+      </section>
+    );
   }
 
   if (error) {
     return (
-      <p className="text-center py-8 text-red-500">Failed to load products</p>
+      <section className="w-full py-16 px-4 md:px-8 lg:px-16">
+        <div className="max-w-[1440px] mx-auto">
+          <h2 className="text-2xl font-bold mb-8 text-[var(--color-foreground)]">
+            Trending Products
+          </h2>
+          <p className="text-center py-8 text-red-500">
+            Failed to load trending products
+          </p>
+        </div>
+      </section>
     );
   }
 
   return (
-    <section className="py-12 px-4 md:px-8 lg:px-16">
-      <h2 className="text-2xl font-bold mb-6 text-[var(--foreground)]">
-        Latest Products
-      </h2>
-      <div className="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-        {data?.products?.map((product) => (
-          <ProductCard key={product._id} product={product} />
-        ))}
+    <section className="w-full py-16 px-4 md:px-8 lg:px-16">
+      <div className="max-w-[1440px] mx-auto">
+        <h2 className="text-2xl font-bold mb-8 text-[var(--color-foreground)]">
+          Trending Products
+        </h2>
+
+        {/* Flipkart Style Horizontal Row */}
+        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+          {data?.products?.map((product) => (
+            <div key={product._id} className="flex-none w-48 flex flex-col">
+              <ProductCard product={product} variant="trending" />
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
 };
 
-export default LatestProduct;
+export default TrendingSection;

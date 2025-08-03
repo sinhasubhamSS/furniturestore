@@ -81,7 +81,7 @@ const HeroSection = () => {
   };
 
   return (
-    <section className="px-6 sm:px-10 py-16 md:py-20 bg-[var(--color-primary)] text-[var(--color-foreground)] transition-colors duration-300">
+    <section className="px-6 sm:px-10 py-8  bg-[var(--color-primary)] text-[var(--color-foreground)] transition-colors duration-300">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-10 max-w-7xl mx-auto items-center">
         {/* Left - Text */}
         <div className="col-span-1 md:col-span-5 text-center md:text-left space-y-6">

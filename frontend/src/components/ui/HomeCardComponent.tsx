@@ -13,17 +13,18 @@ import {
 
 type Props = {
   product: Product;
+  variant?: "default" | "trending";
 };
 
-const ProductCard = ({ product }: Props) => {
+const ProductCard = ({ product, variant = "default" }: Props) => {
   const router = useRouter();
-  const { _id, title, price, images, slug } = product;
+  const { _id, title, name, price, images, slug, category } = product;
 
-  // Fetch wishlist product IDs (cached)
+  const productName = title || name;
+
   const { data: wishlistIds = [], isLoading: isLoadingWishlist } =
     useWishlistidsQuery();
 
-  // Local state for optimistic toggle (null = no override, true/false = optimistically set)
   const [localWishlisted, setLocalWishlisted] = useState<boolean | null>(null);
 
   const [addToWishlist, { isLoading: isAdding }] = useAddToWishlistMutation();
@@ -32,11 +33,9 @@ const ProductCard = ({ product }: Props) => {
 
   const isMutating = isAdding || isRemoving;
 
-  // Determine wishlist state for this product allowing optimistic override
   const isWishlisted =
     localWishlisted !== null ? localWishlisted : wishlistIds.includes(_id);
 
-  // Reset optimistic state if global wishlist changes or product changes
   useEffect(() => {
     setLocalWishlisted(null);
   }, [wishlistIds, _id]);
@@ -44,66 +43,93 @@ const ProductCard = ({ product }: Props) => {
   const handleWishlistClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    if (isLoadingWishlist || isMutating) return; // prevent clicks while loading/mutating
+    if (isLoadingWishlist || isMutating) return;
 
     const newState = !isWishlisted;
-    setLocalWishlisted(newState); // optimistic update
+    setLocalWishlisted(newState);
 
     try {
       if (newState) {
-        console.log(`Adding product  to wishlist`);
         await addToWishlist({ productId: _id });
       } else {
-        console.log(`Removing product  from wishlist`);
         await removeFromWishlist({ productId: _id });
       }
-      setLocalWishlisted(null); // reset and rely on cache to update state
+      setLocalWishlisted(null);
     } catch (error) {
-      setLocalWishlisted(isWishlisted); // revert optimistic update on error
+      setLocalWishlisted(isWishlisted);
       console.error("❌ Wishlist toggle failed:", error);
     }
   };
 
+  const handleProductClick = () => {
+    router.push(`/products/${slug}`);
+  };
+
+  const getImageUrl = (): string => {
+    if (images && images.length > 0) {
+      return images[0].url;
+    }
+    return "/images/placeholder.jpg";
+  };
+
   return (
     <div
-      onClick={() => router.push(`/products/${slug}`)}
-      className="relative cursor-pointer bg-white dark:bg-[var(--color-secondary)] p-4 rounded-xl shadow-md hover:shadow-lg transition-transform duration-300 hover:-translate-y-1"
+      onClick={handleProductClick}
+      className="relative cursor-pointer  p-3 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 h-full flex flex-col"
     >
       {/* Wishlist Button */}
       <button
         onClick={handleWishlistClick}
         disabled={isLoadingWishlist || isMutating}
-        className={`absolute top-2 right-2 z-10 bg-white/90 p-1 rounded-full shadow-sm transition-transform hover:scale-105 ${
-          isWishlisted ? "text-red-500" : "text-gray-400"
-        }`}
+        className={`absolute top-2 right-2 z-10  p-1 rounded-full shadow-sm ${
+          isWishlisted ? "text-red-500" : "text-gray-500"
+        } ${isMutating ? "opacity-50" : ""}`}
         aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
       >
         {isMutating ? (
-          <div className="w-5 h-5 rounded-full bg-red-400 animate-pulse" />
+          <div className="w-3 h-3 rounded-full bg-red-400 " />
         ) : isWishlisted ? (
-          <AiFillHeart className="w-5 h-5 fill-current" />
+          <AiFillHeart className="w-3 h-3" />
         ) : (
-          <FiHeart className="w-5 h-5 stroke-current" />
+          <FiHeart className="w-3 h-3" />
         )}
       </button>
 
       {/* Product Image */}
-      <div className="w-full aspect-square mb-3 rounded-md overflow-hidden bg-white">
+      <div
+        className={`
+      w-full mb-3 rounded overflow-hidden
+      ${variant === "trending" ? "h-48" : "aspect-square"}
+    `}
+      >
         <img
-          src={images?.[0]?.url}
-          alt={title}
+          src={getImageUrl()}
+          alt={productName}
           loading="lazy"
-          className="w-full h-full object-contain"
+          className={`w-full h-full object-contain ${
+            variant === "trending" ? "object-scale-down" : ""
+          }`}
+          onError={(e) => {
+            e.currentTarget.src = "/images/placeholder.jpg";
+          }}
         />
       </div>
 
       {/* Product Info */}
-      <h3 className="text-sm font-medium text-[var(--foreground)] line-clamp-2">
-        {title}
-      </h3>
-      <p className="text-sm font-semibold text-[var(--foreground)] mt-1">
-        ₹{price}
-      </p>
+      <div className="space-y-1">
+        {/* Product Name */}
+        <h3 className="text-sm font-medium text-gray-900 line-clamp-2 leading-4">
+          {productName}
+        </h3>
+
+        {/* Price */}
+        <p className="text-base font-bold text-[var(--color-accent)]">
+          ₹{price.toLocaleString()}
+        </p>
+
+        {/* Category */}
+        <p className="text-xs text-gray-600">{category.name}</p>
+      </div>
     </div>
   );
 };
