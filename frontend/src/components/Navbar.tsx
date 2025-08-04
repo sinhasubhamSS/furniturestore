@@ -46,7 +46,7 @@ const Navbar = () => {
   }, []);
 
   return (
-    <nav className="sticky top-0 z-[1000] w-full bg-[var(--color-secondary)] backdrop-blur border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
+    <nav className="fixed top-0 left-0 w-full z-[1000] bg-[var(--color-secondary)] backdrop-blur border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between py-3 gap-4">
           {/* Left */}

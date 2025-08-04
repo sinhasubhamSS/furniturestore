@@ -12,12 +12,17 @@
   --color-secondary: #d8bfa6;
   --color-accent: #6b3c1a;
   --color-foreground: var(--text-dark);
-  --color-card:  #d8bfa6;
+  --color-card: #d8bfa6;
   /* --color-card: #f5f0ea; */
   --text-dark: #1a1a1a;
   --text-light: #ffffff;
   --text-accent: #4e2a13;
   --text-error: #d32f2f;
+  --color-border-custom: #a89c8b;
+  /* //enhacning the u */
+  --color-scroll-track: #cbbba2;
+  --color-scroll-thumb: #a58b6f;
+  --color-hover-card: #c7b294;
 
   --secondary-light: #eddcca;
 }
@@ -64,5 +69,29 @@
   }
   body {
     @apply bg-[--color-primary] text-[--color-foreground] transition-colors duration-300 ease-in-out;
+  }
+}
+@layer utilities {
+  .border-custom {
+    border-color: var(--color-border-custom);
+  }
+
+  .scrollbar-custom {
+    scrollbar-color: var(--color-scroll-thumb) var(--color-scroll-track);
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-track {
+    background: var(--color-scroll-track);
+    border-radius: 10px;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-thumb {
+    background: var(--color-scroll-thumb);
+    border-radius: 10px;
   }
 }

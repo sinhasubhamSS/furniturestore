@@ -81,8 +81,8 @@ const HeroSection = () => {
   };
 
   return (
-    <section className="px-6 sm:px-10 py-8  bg-[var(--color-primary)] text-[var(--color-foreground)] transition-colors duration-300">
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-10 max-w-7xl mx-auto items-center">
+    <section className="  bg-[var(--color-primary)] text-[var(--color-foreground)] transition-colors duration-300">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-10 w-full mx-auto items-center">
         {/* Left - Text */}
         <div className="col-span-1 md:col-span-5 text-center md:text-left space-y-6">
           <h1 className="text-4xl sm:text-5xl xl:text-6xl font-bold text-[var(--text-accent)] leading-tight tracking-tight">
@@ -102,9 +102,9 @@ const HeroSection = () => {
         </div>
 
         {/* Right - Enhanced Image Slider */}
-        <div className="col-span-1 md:col-span-7 relative flex justify-center md:justify-end">
+        <div className="col-span-1 md:col-span-7 relative flex justify-center md:justify-end my-8">
           <div
-            className="relative w-full max-w-2xl aspect-[4/3] rounded-3xl overflow-hidden bg-[var(--color-card)] shadow-2xl border border-[var(--color-border)]"
+            className="relative w-full max-w-2xl aspect-[3/2] rounded-3xl overflow-hidden bg-[var(--color-card)] shadow-2xl border border-[var(--color-border)]"
             onMouseEnter={handlePause}
             onMouseLeave={handleResume}
             onTouchStart={handlePause}
