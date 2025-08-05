@@ -74,12 +74,12 @@ const Navbar = () => {
           <div className="hidden sm:flex flex-1 max-w-xl mx-4">
             <div className="relative group w-full">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FiSearch className="h-5 w-5 text-[var(--foreground)] opacity-70" />
+                <FiSearch className="h-5 w-5 text-[var(--foreground)] opacity-90" />
               </div>
               <input
                 type="text"
                 placeholder="Search furniture, decor..."
-                className="block w-full pl-10 pr-3 py-2.5 rounded-full bg-[var(--color-secondary)] focus:ring-2 focus:ring-[var(--color-accent)] text-sm text-[var(--foreground)] placeholder-gray-500 transition-all"
+                className="block w-full pl-10 pr-3 py-2.5 rounded-full bg-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-accent)] text-sm text-[var(--foreground)] placeholder-gray-500 transition-all"
               />
               <div className="absolute inset-y-0 right-0 flex items-center pr-3">
                 <kbd className="px-2 py-1 text-xs rounded bg-[var(--card-bg)] text-[var(--foreground)] opacity-70">
@@ -129,7 +129,7 @@ const Navbar = () => {
                   </button>
 
                   {isDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-56 rounded-lg bg-[var(--card-bg)] shadow-lg ring-1 ring-black ring-opacity-5 border border-white/10">
+                    <div className="absolute right-0 mt-4 w-56 rounded-md bg-[var(--color-secondary)] backdrop-blur-lg shadow-lg ring-1 ring-black ring-opacity-10 border border-white/20">
                       <div className="px-4 py-3">
                         <p className="text-sm text-[var(--foreground)]">
                           Signed in as
@@ -143,7 +143,7 @@ const Navbar = () => {
                         <div className="py-1">
                           <Link
                             href="/admin/dashboard"
-                            className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-secondary)]"
+                            className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-accent)]/30 transition-colors duration-200 rounded"
                           >
                             Admin Dashboard
                           </Link>
@@ -153,13 +153,13 @@ const Navbar = () => {
                       <div className="py-1">
                         <Link
                           href="/profile"
-                          className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-secondary)]"
+                          className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-accent)]/30 transition-colors duration-200 rounded"
                         >
                           Your Profile
                         </Link>
                         <Link
                           href="/my-orders"
-                          className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-secondary)]"
+                          className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-accent)]/30 transition-colors duration-200 rounded"
                         >
                           My Orders
                         </Link>
@@ -177,7 +177,7 @@ const Navbar = () => {
                       <div className="py-1">
                         <button
                           onClick={handleSignOut}
-                          className="block w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-500/10"
+                          className="block w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors duration-200 rounded"
                         >
                           Sign out
                         </button>

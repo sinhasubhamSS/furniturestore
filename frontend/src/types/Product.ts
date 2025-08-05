@@ -1,23 +1,47 @@
+export type Variant = {
+  color?: string;
+  size?: string;
+  price: number;
+  basePrice: number;
+  gstRate: number;
+  stock: number;
+  images: {
+    url: string;
+    public_id: string;
+  }[];
+};
+
 export type Product = {
   _id: string;
   name: string;
   slug: string;
   title: string;
   description: string;
-  gstRate: number;
-  price: number;
-  basePrice: number;
-  images: {
-    url: string;
-    public_id: string;
+  specifications: {
+    key: string;
+    value: string;
   }[];
-  stock: number;
+  measurements?: {
+    width?: number;
+    height?: number;
+    depth?: number;
+    weight?: number;
+  };
+  variants?: Variant[]; // ✅ Variant support
+  colors?: string[];
+  sizes?: string[];
+  warranty?: string;
+  disclaimer?: string;
 
-  // ✅ Change this:
   category: {
     _id: string;
     name: string;
   };
+
+  stock: number;
+  basePrice: number;
+  gstRate: number;
+  price: number;
 
   createdBy: string;
   createdAt: string;
@@ -31,6 +55,7 @@ export type AdminProductResponse = {
   page: number;
   limit: number;
 };
+
 export type UserProductResponse = {
   products: Product[];
   totalItems: number;

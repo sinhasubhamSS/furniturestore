@@ -21,30 +21,34 @@ export const createProduct = catchAsync(
     if (!parsedData.images || parsedData.images.length === 0)
       throw new AppError("No images provided", 400);
 
-    let {
+    const {
       basePrice,
-      gstRate,
+      gstRate, // e.g., 18 for 18%
       name,
       images,
       isPublished = false,
       ...rest
     } = parsedData;
 
-    gstRate = gstRate > 1 ? gstRate / 100 : gstRate;
-    const finalPrice = basePrice + basePrice * gstRate;
+    // ✅ Convert GST rate from percent to decimal (e.g., 18 -> 0.18)
+    const finalGstRate = gstRate / 100;
 
+    // ✅ Calculate final price = basePrice + (basePrice * gst)
+    const finalPrice = basePrice + basePrice * finalGstRate;
+
+    // ✅ Generate slug from name
     const slug = slugify(name, { lower: true, strict: true });
 
+    // ✅ Construct product input for DB
     const productInput = {
       name,
       slug,
       basePrice,
-      gstRate,
-      price: finalPrice,
+      gstRate, // keep original value like 18
+      price: finalPrice, // includes GST
       isPublished,
-      images, // array of cloudinary URLs
-
-      ...rest,
+      images,
+      ...rest, // include size, color, variants, etc.
     };
 
     const product = await productService.createProduct(
@@ -68,27 +72,31 @@ export const updateProduct = catchAsync(
 
     let { name, basePrice, gstRate, ...rest } = parsedData;
 
-    // Normalize gstRate (if provided)
-    if (typeof gstRate !== "undefined") {
-      gstRate = gstRate > 1 ? gstRate / 100 : gstRate;
-    }
-
-    // Recalculate price (if both basePrice and gstRate are provided)
+    // ✅ Separate variable to avoid overwriting the original gstRate
+    let finalGstRate: number | undefined = undefined;
     let price: number | undefined = undefined;
-    if (typeof basePrice !== "undefined" && typeof gstRate !== "undefined") {
-      price = basePrice + basePrice * gstRate;
+
+    if (typeof gstRate !== "undefined") {
+      finalGstRate = gstRate / 100;
     }
 
-    // Generate slug if name is updated
+    if (
+      typeof basePrice !== "undefined" &&
+      typeof finalGstRate !== "undefined"
+    ) {
+      price = basePrice + basePrice * finalGstRate;
+    }
+
     const slug = name
       ? slugify(name, { lower: true, strict: true })
       : undefined;
 
-    // Final payload
     const updatedProductInput = {
-      ...parsedData,
+      ...rest,
+      ...(name && { name }),
       ...(slug && { slug }),
-      ...(typeof gstRate !== "undefined" && { gstRate }),
+      ...(typeof basePrice !== "undefined" && { basePrice }),
+      ...(typeof gstRate !== "undefined" && { gstRate }), // ✅ percentage value stored
       ...(typeof price !== "undefined" && { price }),
     };
 

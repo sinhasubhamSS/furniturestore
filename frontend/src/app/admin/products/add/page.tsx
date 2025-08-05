@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
-import ProductForm from "@/components/admin/ProductForm";
+import ProductForm from "@/components/admin/product/ProductForm";
 import { useCreateProductMutation } from "@/redux/services/admin/adminProductapi";
 import { CreateProductInput } from "@/lib/validations/product.schema";
 
@@ -21,13 +21,7 @@ const AddProductPage = () => {
     }
   };
 
-  return (
-    <ProductForm
-      onSubmit={handleCreate}
-      isEdit={false}
-      loading={isLoading}
-    />
-  );
+  return <ProductForm onSubmit={handleCreate} isEdit={false} />;
 };
 
 export default AddProductPage;

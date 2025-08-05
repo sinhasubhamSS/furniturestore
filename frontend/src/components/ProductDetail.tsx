@@ -1,10 +1,11 @@
 "use client";
 
 import { useGetProductBySlugQuery } from "@/redux/services/user/publicProductApi";
+import { useAddToCartMutation } from "@/redux/services/user/cartApi";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Button from "@/components/ui/Button";
-import { useRouter } from "next/navigation";
-import { useAddToCartMutation } from "@/redux/services/user/cartApi";
+
 interface Props {
   slug: string;
 }
@@ -12,19 +13,18 @@ interface Props {
 const ProductDetail = ({ slug }: Props) => {
   const { data: product, isLoading, error } = useGetProductBySlugQuery(slug);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const router = useRouter();
   const [addToCart, { isLoading: isAdding }] = useAddToCartMutation();
+  const router = useRouter();
 
   const handleBuyNow = () => {
     router.push(`/checkout?product=${product!._id}`);
   };
+
   const handleAddToCart = async () => {
     try {
       await addToCart({ productId: product!._id, quantity: 1 }).unwrap();
-      // optional toast/alert
-    } catch (error: any) {
-      console.error("Error adding to cart:", error);
-      // show toast or error UI
+    } catch (err) {
+      console.error("Add to cart failed:", err);
     }
   };
 
@@ -50,59 +50,68 @@ const ProductDetail = ({ slug }: Props) => {
     selectedImage || product.images?.[0]?.url || "/placeholder.png";
 
   return (
-    <div className="w-full mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row gap-8 bg-[--color-card] text-[--text-dark] dark:text-[--text-light] p-6 rounded-xl shadow-md border border-[--color-border]">
-        {/* Product Images */}
-        <div className="flex-1 space-y-4">
-          <img
-            src={mainImage}
-            alt={product.name}
-            className="w-full h-96 object-contain rounded-lg border border-[--color-border] bg-white"
-          />
-
-          {product.images.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto">
-              {product.images.map((img, idx) => (
-                <img
-                  key={idx}
-                  src={img.url}
-                  alt={`Product ${idx + 1}`}
-                  onMouseEnter={() => setSelectedImage(img.url)}
-                  onClick={() => setSelectedImage(img.url)}
-                  className={`w-20 h-20 object-contain rounded-md border cursor-pointer transition-all duration-200 hover:scale-105 border-[--color-border] ${
-                    mainImage === img.url ? "ring-2 ring-[--color-ring]" : ""
-                  }`}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Product Info */}
-        <div className="flex-1 space-y-4">
-          <h1 className="text-3xl font-bold">{product.name}</h1>
-          <p className="text-muted-foreground text-base">{product.title}</p>
-          <p className="text-base">{product.description}</p>
-
-          {/* Price */}
-          <div className="text-2xl font-semibold text-[--color-accent]">
-            ₹ {product.price.toFixed(2)}
+    <div className="w-full px-6 md:px-10 py-10 max-w-[1400px] mx-auto">
+      <div className="flex flex-col md:flex-row gap-12">
+        {/* Left: Images */}
+        <div className="flex gap-6">
+          {/* Thumbnails */}
+          <div className="hidden md:flex flex-col gap-3">
+            {product.images.map((img, idx) => (
+              <img
+                key={idx}
+                src={img.url}
+                alt={`Product ${idx + 1}`}
+                onMouseEnter={() => setSelectedImage(img.url)}
+                onClick={() => setSelectedImage(img.url)}
+                className={`w-16 h-16 rounded-md object-contain border transition-all duration-300 cursor-pointer hover:scale-105 ${
+                  mainImage === img.url ? "ring-2 ring-[--color-accent]" : ""
+                }`}
+              />
+            ))}
           </div>
 
-          <p className="text-sm text-muted-foreground">
-            GST Included: {product.gstRate}%
+          {/* Main Image */}
+          <div className="border rounded-xl p-4 bg-white shadow-lg max-w-[500px] h-[600px] flex items-center justify-center">
+            <img
+              src={mainImage}
+              alt={product.name}
+              className="object-contain h-full w-full"
+            />
+          </div>
+        </div>
+
+        {/* Right: Info */}
+        <div className="flex-1 space-y-6 text-[--text-dark] dark:text-[--text-light]">
+          {/* Title */}
+          <div>
+            <h1 className="text-3xl font-semibold">{product.name}</h1>
+            <p className="text-muted-foreground text-lg">{product.title}</p>
+          </div>
+
+          {/* Price */}
+          <div className="space-y-2">
+            <div className="text-4xl font-bold text-[--color-accent]">
+              ₹ {product.price.toFixed(2)}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Inclusive of GST ({product.gstRate}%)
+            </p>
+            <div className="text-sm text-gray-500">
+              Category:{" "}
+              <span className="font-medium text-[--text-accent]">
+                {product.category?.name}
+              </span>
+            </div>
+          </div>
+
+          {/* Description */}
+          <p className="text-base leading-relaxed text-foreground/90">
+            {product.description}
           </p>
 
-          <p className="text-sm">
-            Category:{" "}
-            <span className="text-[--text-accent] font-medium">
-              {product.category?.name}
-            </span>
-          </p>
-
-          {/* Stock Badge */}
+          {/* Stock Status */}
           <div
-            className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${
+            className={`inline-block px-5 py-2 rounded-full text-base font-semibold transition ${
               product.stock > 0
                 ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
                 : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
@@ -112,21 +121,18 @@ const ProductDetail = ({ slug }: Props) => {
           </div>
 
           {/* Buttons */}
-          <div className="mt-4 flex gap-4">
+          <div className="mt-6 flex gap-4 flex-wrap">
             <Button
               onClick={handleAddToCart}
               disabled={isAdding || product.stock <= 0}
-              className="bg-[--color-secondary] text-[--text-accent] hover:opacity-90 transition"
+              className="flex-1 bg-[--color-accent]/10 text-[--color-accent] hover:bg-[--color-accent]/20 transition font-medium py-2.5 px-6 rounded-lg shadow-md disabled:opacity-50"
             >
               {isAdding ? "Adding..." : "Add to Cart"}
             </Button>
-
             <Button
-              disabled={product.stock <= 0}
               onClick={handleBuyNow}
-              className={`bg-[--color-accent] text-white hover:brightness-110 transition ${
-                product.stock <= 0 ? "opacity-50 cursor-not-allowed" : ""
-              }`}
+              disabled={product.stock <= 0}
+              className="flex-1 bg-[--color-accent] text-white hover:brightness-110 transition font-medium py-2.5 px-6 rounded-lg shadow-md disabled:opacity-50"
             >
               Buy Now
             </Button>
