@@ -10,6 +10,7 @@ interface InputProps {
   required?: boolean;
   register?: UseFormRegisterReturn;
   error?: string;
+  step?: string;
 }
 
 const Input: React.FC<InputProps> = ({
@@ -20,6 +21,8 @@ const Input: React.FC<InputProps> = ({
   required = false,
   register,
   error,
+  step,
+
 }) => {
   const isNumber = type === "number";
 
@@ -54,6 +57,8 @@ const Input: React.FC<InputProps> = ({
         {...register}
         onFocus={handleFocus}
         onBlur={handleBlur}
+          step={step}
+        
         className={`w-full px-2 py-2 rounded-md bg-[var(--color-secondary)] text-[var(--foreground)] border ${
           error
             ? "border-red-500 focus:ring-red-500"

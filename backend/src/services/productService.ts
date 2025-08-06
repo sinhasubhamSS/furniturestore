@@ -1,4 +1,4 @@
-import { FilterQuery } from "mongoose";
+import { FilterQuery, Types } from "mongoose";
 import cloudinary from "../config/cloudinary";
 import Category from "../models/category.model";
 import Product from "../models/product.models";
@@ -31,18 +31,54 @@ class ProductService {
     return query.skip(skip).limit(limit);
   }
 
-  // ✅ Create Product
-  async createProduct(parsedData: IProductInput, userId: string) {
-    if (!Array.isArray(parsedData.images) || parsedData.images.length === 0) {
-      throw new AppError("Images array is required", 400);
+  async createProduct(productData: IProductInput, userId: string) {
+    // Validate variants
+    if (!productData.variants || productData.variants.length === 0) {
+      throw new AppError("At least one variant is required", 400);
     }
 
-    return await Product.create({
-      ...parsedData,
-      createdBy: userId,
-      isPublished: parsedData.isPublished ?? false,
-      slug: this.buildSlug(parsedData.name),
+    // Process variants
+    const processedVariants = productData.variants.map((variant) => {
+      // Validate variant images
+      if (!variant.images || variant.images.length === 0) {
+        throw new AppError("Each variant must have at least one image", 400);
+      }
+
+      // Calculate final price
+      const gstDecimal = variant.gstRate / 100;
+      const finalPrice = variant.basePrice + variant.basePrice * gstDecimal;
+
+      return {
+        ...variant,
+        price: finalPrice,
+        stock: variant.stock || 0, // Default to 0 if missing
+      };
     });
+
+    // Compute product-level fields
+    const minPrice = Math.min(...processedVariants.map((v) => v.price));
+    const totalStock = processedVariants.reduce((sum, v) => sum + v.stock, 0);
+
+    const colors = [...new Set(processedVariants.map((v) => v.color))];
+    const sizes = [...new Set(processedVariants.map((v) => v.size))];
+
+    // Generate slug
+
+    // Prepare product document
+    const productDocument = {
+      ...productData,
+      slug: this.buildSlug(productData.name),
+      variants: processedVariants,
+      price: minPrice,
+      stock: totalStock,
+      colors,
+      sizes,
+      createdBy: userId,
+      isPublished: productData.isPublished || false,
+    };
+
+    // Create and return product
+    return await Product.create(productDocument);
   }
 
   // ✅ Update Product

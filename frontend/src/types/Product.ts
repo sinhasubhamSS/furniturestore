@@ -11,23 +11,32 @@ export type Variant = {
   }[];
 };
 
+export type Specification = {
+  section: string;
+  specs: {
+    key: string;
+    value: string;
+  }[];
+};
+
 export type Product = {
   _id: string;
   name: string;
   slug: string;
   title: string;
   description: string;
-  specifications: {
-    key: string;
-    value: string;
-  }[];
+
+  // ✅ Use the shared Specification type
+  specifications: Specification[];
+
   measurements?: {
     width?: number;
     height?: number;
     depth?: number;
     weight?: number;
   };
-  variants?: Variant[]; // ✅ Variant support
+
+  variants: Variant[];
   colors?: string[];
   sizes?: string[];
   warranty?: string;
@@ -38,10 +47,9 @@ export type Product = {
     name: string;
   };
 
-  stock: number;
-  basePrice: number;
-  gstRate: number;
-  price: number;
+  stock?: number;
+  
+  price?: number;
 
   createdBy: string;
   createdAt: string;

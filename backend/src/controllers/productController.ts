@@ -13,52 +13,10 @@ import {
 // ✅ Create Product
 export const createProduct = catchAsync(
   async (req: AuthRequest, res: Response) => {
-    console.log("reached here");
-    const parsedData = createProductSchema.parse(req.body);
-    console.log("Parsed Data:", parsedData);
-
     if (!req.userId) throw new AppError("Unauthorized", 401);
-    if (!parsedData.images || parsedData.images.length === 0)
-      throw new AppError("No images provided", 400);
-
-    const {
-      basePrice,
-      gstRate, // e.g., 18 for 18%
-      name,
-      images,
-      isPublished = false,
-      ...rest
-    } = parsedData;
-
-    // ✅ Convert GST rate from percent to decimal (e.g., 18 -> 0.18)
-    const finalGstRate = gstRate / 100;
-
-    // ✅ Calculate final price = basePrice + (basePrice * gst)
-    const finalPrice = basePrice + basePrice * finalGstRate;
-
-    // ✅ Generate slug from name
-    const slug = slugify(name, { lower: true, strict: true });
-
-    // ✅ Construct product input for DB
-    const productInput = {
-      name,
-      slug,
-      basePrice,
-      gstRate, // keep original value like 18
-      price: finalPrice, // includes GST
-      isPublished,
-      images,
-      ...rest, // include size, color, variants, etc.
-    };
-
-    const product = await productService.createProduct(
-      productInput,
-      req.userId
-    );
-
-    res
-      .status(201)
-      .json(new ApiResponse(201, product, "Product created successfully"));
+    const parsedData = createProductSchema.parse(req.body);
+    const product = await productService.createProduct(parsedData, req.userId);
+    res.status(201).json(new ApiResponse(201, product, "Product created successfully"));
   }
 );
 

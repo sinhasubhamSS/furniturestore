@@ -14,7 +14,7 @@ const objectId = z.preprocess(
   })
 );
 
-// ✅ Image schema (used in variants and main images)
+// ✅ Image schema
 const imageSchema = z.object({
   url: z.string().url({ message: "Invalid image URL" }),
   public_id: z.string().min(1, "public_id is required"),
@@ -22,19 +22,35 @@ const imageSchema = z.object({
 
 // ✅ Variant schema
 const variantSchema = z.object({
-  color: z.string().optional(),
-  size: z.string().optional(),
-  price: z.preprocess((val) => Number(val), z.number().min(0)),
-  basePrice: z.preprocess((val) => Number(val), z.number().min(0)),
-  gstRate: z.preprocess((val) => Number(val), z.number().min(0)),
-  stock: z.preprocess((val) => Number(val), z.number().min(0)),
-  images: z.array(imageSchema).min(1),
+  sku: z.string().min(1, "SKU is required"),
+  color: z.string().min(1, "Color is required"),
+  size: z.string().min(1, "Size is required"),
+  basePrice: z.preprocess(
+    (val) => Number(val),
+    z.number().positive("Base price must be positive")
+  ),
+  gstRate: z.preprocess(
+    (val) => Number(val),
+    z.number().min(0).max(100, "GST must be 0-100%")
+  ),
+  stock: z.preprocess(
+    (val) => Number(val),
+    z.number().int().nonnegative().default(0)
+  ),
+  images: z.array(imageSchema).min(1, "At least one image per variant"),
 });
 
-// ✅ Specification schema
+// ✅ Structured Specification Schema
 const specificationSchema = z.object({
-  key: z.string().min(1),
-  value: z.string().min(1),
+  section: z.string().min(1, "Section name is required"),
+  specs: z
+    .array(
+      z.object({
+        key: z.string().min(1, "Spec key is required"),
+        value: z.string().min(1, "Spec value is required"),
+      })
+    )
+    .min(1, "At least one spec is required"),
 });
 
 // ✅ Measurements schema
@@ -45,29 +61,38 @@ const measurementsSchema = z.object({
   weight: z.number().optional(),
 });
 
-// ✅ Create product schema
+// ✅ Create Product Schema (Final Corrected Version)
 export const createProductSchema = z.object({
-  name: z.string().min(1),
-  title: z.string().min(1),
-  description: z.string().min(1),
-  gstRate: z.preprocess((val) => Number(val), z.number().min(0)),
-  basePrice: z.preprocess((val) => Number(val), z.number().min(0)),
-  stock: z.preprocess((val) => Number(val), z.number().min(0)),
+  // Core product information
+  name: z.string().min(1, "Product name is required"),
+  title: z.string().min(1, "Product title is required"),
+  description: z.string().min(1, "Description is required"),
   category: objectId,
-  slug: z.string().optional(),
-  isPublished: z.boolean().optional(),
 
-  // ✅ New fields
-  variants: z.array(variantSchema).optional(),
+  // Variants - required with at least one
+  variants: z.array(variantSchema).min(1, "At least one variant is required"),
+
+  // Optional metadata
   specifications: z.array(specificationSchema).optional(),
   measurements: measurementsSchema.optional(),
-  colors: z.array(z.string()).optional(),
-  sizes: z.array(z.string()).optional(),
   warranty: z.string().optional(),
   disclaimer: z.string().optional(),
 
-  images: z.array(imageSchema).min(1, "At least one image is required"),
+  // Auto-generated fields (should not be provided)
+  slug: z
+    .string()
+    .optional()
+    .refine((val) => !val, {
+      message: "Slug is auto-generated and should not be provided",
+    }),
+  isPublished: z.boolean().optional().default(false),
 });
 
-// ✅ Update schema — make all fields optional
-export const updateProductSchema = createProductSchema.partial();
+// ✅ Update Schema - Partial but with variant constraints
+export const updateProductSchema = createProductSchema
+  .partial()
+  .refine((data) => {
+    // Prevent removing all variants
+    if (data.variants?.length === 0) return false;
+    return true;
+  }, "Cannot remove all variants");
