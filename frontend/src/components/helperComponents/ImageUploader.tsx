@@ -5,6 +5,7 @@ import { FiUpload, FiX } from "react-icons/fi";
 import toast from "react-hot-toast";
 import { uploadImageToCloudinary } from "../../../utils/uploadToCloudinary";
 
+
 interface UploadedImage {
   url: string;
   public_id: string;
@@ -27,8 +28,9 @@ export default function ImageUploader({
   const [previews, setPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>(defaultUrls);
 
-  // 🔁 Clean up previews on update/unmount
+  // Cleanup previews on unmount
   useEffect(() => {
     return () => {
       previews.forEach((url) => URL.revokeObjectURL(url));
@@ -42,8 +44,8 @@ export default function ImageUploader({
     const allowed = ["image/jpeg", "image/png", "image/webp", "image/avif"];
     const sizeLimitMB = 5;
 
-    if (files.length > maxFiles) {
-      toast.error(`Only ${maxFiles} image(s) allowed`);
+    if (files.length + uploadedImages.length > maxFiles) {
+      toast.error(`Only ${maxFiles} image(s) allowed in total`);
       return;
     }
 
@@ -58,17 +60,15 @@ export default function ImageUploader({
       }
     }
 
-    // 🧹 Clear previous previews
-    previews.forEach((url) => URL.revokeObjectURL(url));
-    setPreviews(Array.from(files).map((file) => URL.createObjectURL(file)));
-
+    const previewUrls = Array.from(files).map((file) => URL.createObjectURL(file));
+    setPreviews(previewUrls);
     await uploadImages(files);
   };
 
   const uploadImages = async (files: FileList | File[]) => {
     setUploading(true);
     setProgress(0);
-    const uploadedImages: UploadedImage[] = [];
+    const newUploaded: UploadedImage[] = [];
 
     for (let i = 0; i < files.length; i++) {
       try {
@@ -81,9 +81,8 @@ export default function ImageUploader({
             setProgress(current + p / files.length);
           }
         );
-
-        uploadedImages.push({ url, public_id });
-      } catch (err) {
+        newUploaded.push({ url, public_id });
+      } catch {
         toast.error(`Failed to upload ${files[i].name}`);
       }
     }
@@ -91,63 +90,71 @@ export default function ImageUploader({
     setUploading(false);
     setProgress(0);
 
-    if (uploadedImages.length === files.length) {
+    const updated = [...uploadedImages, ...newUploaded];
+    setUploadedImages(updated);
+    setPreviews([]);
+    onUpload(updated);
+
+    if (newUploaded.length === files.length) {
       toast.success("All images uploaded!");
-      onUpload(uploadedImages);
-    } else if (uploadedImages.length > 0) {
+    } else {
       toast.error("Some images failed to upload");
-      onUpload(uploadedImages); // Optional: You can skip this if partial uploads aren't allowed
     }
   };
 
   const removeImage = (index: number) => {
-    URL.revokeObjectURL(previews[index]);
-    const updated = [...previews];
+    const updated = [...uploadedImages];
     updated.splice(index, 1);
-    setPreviews(updated);
+    setUploadedImages(updated);
+    onUpload(updated);
   };
 
   return (
-    <div className="space-y-3">
-      <label className="cursor-pointer flex items-center gap-2 text-sm font-medium text-blue-600">
-        <FiUpload className="w-5 h-5" />
-        Upload Image
+    <div className="space-y-4">
+      <div
+        className="relative border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-md p-6 flex flex-col items-center justify-center cursor-pointer text-gray-500 hover:text-blue-500 transition"
+        onClick={() => inputRef.current?.click()}
+      >
+        <FiUpload className="text-3xl mb-2" />
+        <p className="text-sm font-medium">Click to upload or drag images here</p>
         <input
-          type="file"
           ref={inputRef}
-          onChange={handleChange}
+          type="file"
           className="hidden"
           accept="image/jpeg, image/png, image/webp, image/avif"
           multiple={maxFiles > 1}
+          onChange={handleChange}
         />
-      </label>
+      </div>
 
       {uploading && (
         <div className="w-full bg-gray-200 h-2 rounded">
           <div
-            className="bg-blue-500 h-2 rounded transition-all duration-200"
+            className="bg-blue-500 h-2 rounded transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {previews.map((src, i) => (
-          <div key={i} className="relative group">
-            <img
-              src={src}
-              className="w-full h-28 object-cover rounded shadow"
-              alt="preview"
-            />
-            <button
-              onClick={() => removeImage(i)}
-              className="absolute top-1 right-1 bg-black bg-opacity-50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"
-            >
-              <FiX size={16} />
-            </button>
-          </div>
-        ))}
-      </div>
+      {uploadedImages.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {uploadedImages.map((img, i) => (
+            <div key={i} className="relative group">
+              <img
+                src={img.url}
+                className="w-full h-28 object-cover rounded shadow border"
+                alt={`Uploaded ${i}`}
+              />
+              <button
+                onClick={() => removeImage(i)}
+                className="absolute top-1 right-1 bg-black bg-opacity-60 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"
+              >
+                <FiX size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

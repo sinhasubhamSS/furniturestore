@@ -2,15 +2,11 @@
 import React from "react";
 import { UseFormRegisterReturn } from "react-hook-form";
 
-interface InputProps {
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
-  type?: string;
   name: string;
-  placeholder?: string;
-  required?: boolean;
   register?: UseFormRegisterReturn;
   error?: string;
-  step?: string;
 }
 
 const Input: React.FC<InputProps> = ({
@@ -22,7 +18,13 @@ const Input: React.FC<InputProps> = ({
   register,
   error,
   step,
-
+  value,
+  readOnly,
+  disabled,
+  onChange,
+  onFocus,
+  onBlur,
+  ...rest
 }) => {
   const isNumber = type === "number";
 
@@ -30,12 +32,14 @@ const Input: React.FC<InputProps> = ({
     if (isNumber && e.target.value === "0") {
       e.target.value = "";
     }
+    onFocus?.(e);
   };
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     if (isNumber && e.target.value.trim() === "") {
       e.target.value = "0";
     }
+    onBlur?.(e);
   };
 
   return (
@@ -54,11 +58,15 @@ const Input: React.FC<InputProps> = ({
         type={type}
         placeholder={placeholder}
         required={required}
-        {...register}
+        step={step}
+        value={value}
+        readOnly={readOnly}
+        disabled={disabled}
+        onChange={onChange}
         onFocus={handleFocus}
         onBlur={handleBlur}
-          step={step}
-        
+        {...register}
+        {...rest}
         className={`w-full px-2 py-2 rounded-md bg-[var(--color-secondary)] text-[var(--foreground)] border ${
           error
             ? "border-red-500 focus:ring-red-500"

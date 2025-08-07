@@ -5,7 +5,7 @@
 import { Router } from "express";
 import {
   createProduct,
-  updateProduct,
+  // updateProduct,
   deleteProduct,
   getAllProducts,
   getProductBySlug,
@@ -21,7 +21,7 @@ import { isAdmin } from "../middlewares/isAdmin";
 const router = Router();
 
 router.post("/createproduct", authVerify, isAdmin, createProduct);
-router.put("/editproduct/:productId", authVerify, isAdmin, updateProduct);
+// router.put("/editproduct/:productId", authVerify, isAdmin, updateProduct);
 router.delete("/deleteproduct/:productId", authVerify, isAdmin, deleteProduct);
 router.get("/admin/getallproducts", authVerify, isAdmin, getAllProducts);
 

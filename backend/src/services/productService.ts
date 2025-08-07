@@ -31,84 +31,79 @@ class ProductService {
     return query.skip(skip).limit(limit);
   }
 
-  async createProduct(productData: IProductInput, userId: string) {
-    // Validate variants
-    if (!productData.variants || productData.variants.length === 0) {
-      throw new AppError("At least one variant is required", 400);
+async createProduct(productData: IProductInput, userId: string) {
+  // Validate variants
+  if (!productData.variants || productData.variants.length === 0) {
+    throw new AppError("At least one variant is required", 400);
+  }
+
+  // Process variants
+  const processedVariants = productData.variants.map(variant => {
+    // Validate variant images
+    if (!variant.images || variant.images.length === 0) {
+      throw new AppError("Each variant must have at least one image", 400);
     }
 
-    // Process variants
-    const processedVariants = productData.variants.map((variant) => {
-      // Validate variant images
-      if (!variant.images || variant.images.length === 0) {
-        throw new AppError("Each variant must have at least one image", 400);
-      }
+    // Calculate final price
+    const gstDecimal = variant.gstRate / 100;
+    const finalPrice = variant.basePrice + variant.basePrice * gstDecimal;
 
-      // Calculate final price
-      const gstDecimal = variant.gstRate / 100;
-      const finalPrice = variant.basePrice + variant.basePrice * gstDecimal;
-
-      return {
-        ...variant,
-        price: finalPrice,
-        stock: variant.stock || 0, // Default to 0 if missing
-      };
-    });
-
-    // Compute product-level fields
-    const minPrice = Math.min(...processedVariants.map((v) => v.price));
-    const totalStock = processedVariants.reduce((sum, v) => sum + v.stock, 0);
-
-    const colors = [...new Set(processedVariants.map((v) => v.color))];
-    const sizes = [...new Set(processedVariants.map((v) => v.size))];
-
-    // Generate slug
-
-    // Prepare product document
-    const productDocument = {
-      ...productData,
-      slug: this.buildSlug(productData.name),
-      variants: processedVariants,
-      price: minPrice,
-      stock: totalStock,
-      colors,
-      sizes,
-      createdBy: userId,
-      isPublished: productData.isPublished || false,
+    return {
+      ...variant,
+      price: finalPrice,
+      stock: variant.stock || 0,
     };
+  });
 
-    // Create and return product
-    return await Product.create(productDocument);
-  }
+  // Compute product-level fields
+  const minPrice = Math.min(...processedVariants.map(v => v.price));
+  const totalStock = processedVariants.reduce((sum, v) => sum + v.stock, 0);
+  const colors = [...new Set(processedVariants.map(v => v.color))];
+  const sizes = [...new Set(processedVariants.map(v => v.size))];
 
-  // ✅ Update Product
-  async updateProduct(
-    data: Partial<IProductInput>,
-    productId: string,
-    userId: string
-  ) {
-    const product = await Product.findOne({
-      _id: productId,
-      createdBy: userId,
-    });
-    if (!product) throw new AppError("Product not found or unauthorized", 404);
+  // Prepare product document
+  const productDocument: IProductInput = {
+    ...productData,
+    slug: this.buildSlug(productData.name),
+    variants: processedVariants,
+    price: minPrice,
+    stock: totalStock,
+    colors,
+    sizes,
+    // createdBy: new Types.ObjectId(userId), // Convert string to ObjectId
+    isPublished: productData.isPublished || false
+  };
 
-    if (data.name) {
-      product.slug = this.buildSlug(data.name);
-    }
+  // Create and return product
+  return await Product.create(productDocument);
+}
+  // async updateProduct(
+  //   data: Partial<IProductInput>,
+  //   productId: string,
+  //   userId: string
+  // ) {
+  //   const product = await Product.findOne({
+  //     _id: productId,
+  //     createdBy: userId,
+  //   });
+  //   if (!product) throw new AppError("Product not found or unauthorized", 404);
 
-    if (Array.isArray(data.images)) {
-      await this.deleteRemovedImages(product.images, data.images);
-      product.images = data.images;
-    }
+  //   if (data.name) {
+  //     product.slug = this.buildSlug(data.name);
+  //   }
 
-    if (typeof data.isPublished === "boolean") {
-      product.isPublished = data.isPublished;
-    }
+  //   if (Array.isArray(data.images)) {
+  //     await this.deleteRemovedImages(product.images, data.images);
+  //     product.images = data.images;
+  //   }
 
-    Object.assign(product, data);
-    return await product.save();
-  }
+  //   if (typeof data.isPublished === "boolean") {
+  //     product.isPublished = data.isPublished;
+  //   }
+
+  //   Object.assign(product, data);
+  //   return await product.save();
+  // }
 
   // ✅ Delete Product
   async deleteProduct(productId: string, userId: string) {

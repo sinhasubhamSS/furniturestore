@@ -6,9 +6,10 @@ import {
   UseFormGetValues,
 } from "react-hook-form";
 import { Variant } from "@/types/Product";
-import ImageUploader from "@/components/helperComponents/ImageUploader";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+
+import ImageUploader from "@/components/helperComponents/ImageUploader";
 
 interface VariantFormProps {
   index: number;
@@ -42,6 +43,14 @@ const VariantForm: React.FC<VariantFormProps> = ({
         </Button>
       </div>
 
+      {/* ⬆️ Move image section to the top */}
+      <ImageUploader
+        folder="variants"
+        maxFiles={5}
+        onUpload={(images) => setValue(`variants.${index}.images`, images)}
+        defaultUrls={getValues(`variants.${index}.images`) || []}
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
           label="Color"
@@ -53,12 +62,7 @@ const VariantForm: React.FC<VariantFormProps> = ({
           placeholder="e.g. Medium"
           {...register(`variants.${index}.size`)}
         />
-        <Input
-          label="Price"
-          type="number"
-          step="0.01"
-          {...register(`variants.${index}.price`, { valueAsNumber: true })}
-        />
+
         <Input
           label="Base Price"
           type="number"
@@ -74,18 +78,6 @@ const VariantForm: React.FC<VariantFormProps> = ({
           label="Stock"
           type="number"
           {...register(`variants.${index}.stock`, { valueAsNumber: true })}
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium mb-1 text-foreground">
-          Upload Images
-        </label>
-        <ImageUploader
-          folder="variants"
-          maxFiles={5}
-          onUpload={handleImageUpload}
-          defaultUrls={getValues(`variants.${index}.images`) || []}
         />
       </div>
     </div>

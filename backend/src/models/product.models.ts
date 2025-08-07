@@ -2,10 +2,10 @@ import { Schema, model, models, Document, Types } from "mongoose";
 import slugify from "slugify";
 
 // Variant Schema & Interface
-export interface IVariant {
+export interface IVariant extends Document {
   sku: string;
-  color?: string;
-  size?: string;
+  color: string;
+  size: string;
   basePrice: number;
   gstRate: number;
   price: number;
@@ -18,12 +18,12 @@ export interface IVariant {
 
 const variantSchema = new Schema<IVariant>({
   sku: { type: String, required: true, unique: true },
-  color: { type: String },
-  size: { type: String },
+  color: { type: String, required: true },
+  size: { type: String, required: true },
   basePrice: { type: Number, required: true },
   gstRate: { type: Number, required: true },
   price: { type: Number, required: true },
-  stock: { type: Number, default: 0 },
+  stock: { type: Number, required: true, default: 0 },
   images: [
     {
       url: { type: String, required: true },
@@ -38,23 +38,24 @@ export interface IProduct extends Document {
   slug: string;
   title: string;
   description: string;
-  specifications: { key: string; value: string }[];
+  specifications?: {
+    section: string;
+    specs: { key: string; value: string }[];
+  }[];
   measurements?: {
     width?: number;
     height?: number;
     depth?: number;
     weight?: number;
   };
-  variants?: IVariant[];
-  colors?: string[];
-  sizes?: string[];
+  variants: Types.DocumentArray<IVariant>; // Required array
+  colors: string[]; // Computed from variants
+  sizes: string[]; // Computed from variants
   warranty?: string;
   disclaimer?: string;
   category: Types.ObjectId;
-  stock: number;
-  basePrice?: number; // optional when variants exist
-  gstRate?: number; // optional when variants exist
-  price?: number; // optional when variants exist
+  stock: number; // Computed total stock
+  price: number; // Computed min price
   createdBy: Types.ObjectId;
   createdAt: Date;
   isPublished: boolean;
@@ -67,7 +68,15 @@ const productSchema = new Schema<IProduct>(
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true },
 
-    variants: { type: [variantSchema], required: true, default: undefined },
+    // Variants are required and must have at least one
+    variants: {
+      type: [variantSchema],
+      required: true,
+      validate: {
+        validator: (v: IVariant[]) => v.length > 0,
+        message: "At least one variant is required",
+      },
+    },
 
     specifications: [
       {
@@ -88,6 +97,7 @@ const productSchema = new Schema<IProduct>(
       weight: { type: Number },
     },
 
+    // Computed from variants
     colors: { type: [String], default: [] },
     sizes: { type: [String], default: [] },
 
@@ -96,65 +106,48 @@ const productSchema = new Schema<IProduct>(
 
     category: { type: Schema.Types.ObjectId, ref: "Category", required: true },
 
+    // Computed from variants
     stock: { type: Number, required: true, default: 0 },
-
-    // Pricing at product root level - optional if variants exist
- 
-    price: { type: Number, default: undefined },
+    price: { type: Number, required: true }, // Min variant price
 
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    createdAt: { type: Date, default: Date.now },
     isPublished: { type: Boolean, default: false },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
 );
 
-// Pre-save middleware to generate slug and sync price and stock from variants if present
-productSchema.pre("save", function (this: IProduct, next) {
+// Pre-save middleware for slug generation
+productSchema.pre("save", function (next) {
   if (this.isModified("name")) {
-    this.slug = slugify(this.name, { lower: true, strict: true });
+    this.slug = slugify(this.name, {
+      lower: true,
+      strict: true,
+      remove: /[*+~.()'"!:@]/g,
+    });
   }
-
-  if (this.variants && this.variants.length > 0) {
-    // Sync representative pricing & total stock from variants
-    this.basePrice = this.variants[0].basePrice;
-    this.gstRate = this.variants[0].gstRate;
-    this.price = this.variants[0].price;
-
-    this.stock = this.variants.reduce(
-      (total, variant) => total + variant.stock,
-      0
-    );
-  } else {
-    // If no variants and basePrice/gstRate changed, recalc price
-    if (this.isModified("basePrice") || this.isModified("gstRate")) {
-      if (
-        typeof this.basePrice === "number" &&
-        typeof this.gstRate === "number"
-      ) {
-        this.price = this.basePrice + (this.basePrice * this.gstRate) / 100;
-      }
-    }
-  }
-
   next();
 });
 
-// Indexes for search optimization
+
+// Indexes for optimization
+productSchema.index({ slug: 1 }, { unique: true });
+productSchema.index({ category: 1 });
+productSchema.index({ price: 1 });
+productSchema.index({ stock: 1 });
+productSchema.index({ "variants.sku": 1 }, { unique: true });
+
+// Text search index
 productSchema.index(
+  { name: "text", title: "text", description: "text" },
   {
-    name: "text",
-    title: "text",
-    description: "text",
-    "specifications.value": "text",
-  },
-  {
-    weights: { name: 10, title: 5, description: 3, "specifications.value": 2 },
+    weights: { name: 10, title: 5, description: 3 },
     name: "productSearchIndex",
   }
 );
-
-productSchema.index({ category: 1, price: -1 });
 
 const Product = models.Product || model<IProduct>("Product", productSchema);
 export default Product;

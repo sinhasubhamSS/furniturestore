@@ -14,14 +14,13 @@ const AddProductPage = () => {
   const handleCreate = async (data: CreateProductInput) => {
     try {
       await createProduct(data).unwrap();
-
       router.push("/admin/products");
     } catch (error: any) {
       toast.error(error?.data?.message || "Failed to create product");
     }
   };
 
-  return <ProductForm onSubmit={handleCreate} isEdit={false} />;
+  return <ProductForm onSubmit={handleCreate} />;
 };
 
 export default AddProductPage;

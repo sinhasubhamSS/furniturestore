@@ -9,66 +9,89 @@ import {
   createProductSchema,
   updateProductSchema,
 } from "../validations/product.validation";
+import { Types } from "mongoose";
+import { generateSKU } from "../utils/genetateSku";
 
 // ✅ Create Product
 export const createProduct = catchAsync(
   async (req: AuthRequest, res: Response) => {
     if (!req.userId) throw new AppError("Unauthorized", 401);
     const parsedData = createProductSchema.parse(req.body);
-    const product = await productService.createProduct(parsedData, req.userId);
-    res.status(201).json(new ApiResponse(201, product, "Product created successfully"));
+    // Add price to each variant
+    const variantsWithPrice = parsedData.variants.map((variant) => {
+      const gstDecimal = variant.gstRate / 100;
+      const price = variant.basePrice + variant.basePrice * gstDecimal;
+      const sku = generateSKU(parsedData.name, variant.color, variant.size);
+      return {
+        ...variant,
+         sku,
+        price,
+      };
+    });
+    const productInput = {
+      ...parsedData,
+      variants: variantsWithPrice,
+      createdBy: new Types.ObjectId(req.userId),
+    };
+    const product = await productService.createProduct(
+      productInput,
+      req.userId
+    );
+    res
+      .status(201)
+      .json(new ApiResponse(201, product, "Product created successfully"));
   }
 );
 
 // ✅ Update Product
-export const updateProduct = catchAsync(
-  async (req: AuthRequest, res: Response) => {
-    console.log("📩 Reached update product");
+// export const updateProduct = catchAsync(
+//   async (req: AuthRequest, res: Response) => {
+//     console.log("📩 Reached update product");
 
-    const parsedData = updateProductSchema.parse(req.body);
-    if (!req.userId) throw new AppError("Unauthorized", 401);
+//     const parsedData = updateProductSchema.parse(req.body);
+//     if (!req.userId) throw new AppError("Unauthorized", 401);
 
-    let { name, basePrice, gstRate, ...rest } = parsedData;
+//     let { name, basePrice, gstRate, ...rest } = parsedData;
 
-    // ✅ Separate variable to avoid overwriting the original gstRate
-    let finalGstRate: number | undefined = undefined;
-    let price: number | undefined = undefined;
+//     // ✅ Separate variable to avoid overwriting the original gstRate
+//     let finalGstRate: number | undefined = undefined;
+//     let price: number | undefined = undefined;
 
-    if (typeof gstRate !== "undefined") {
-      finalGstRate = gstRate / 100;
-    }
+//     if (typeof gstRate !== "undefined") {
+//       finalGstRate = gstRate / 100;
+//     }
 
-    if (
-      typeof basePrice !== "undefined" &&
-      typeof finalGstRate !== "undefined"
-    ) {
-      price = basePrice + basePrice * finalGstRate;
-    }
+//     if (
+//       typeof basePrice !== "undefined" &&
+//       typeof finalGstRate !== "undefined"
+//     ) {
+//       price = basePrice + basePrice * finalGstRate;
+//     }
 
-    const slug = name
-      ? slugify(name, { lower: true, strict: true })
-      : undefined;
+//     const slug = name
+//       ? slugify(name, { lower: true, strict: true })
+//       : undefined;
 
-    const updatedProductInput = {
-      ...rest,
-      ...(name && { name }),
-      ...(slug && { slug }),
-      ...(typeof basePrice !== "undefined" && { basePrice }),
-      ...(typeof gstRate !== "undefined" && { gstRate }), // ✅ percentage value stored
-      ...(typeof price !== "undefined" && { price }),
-    };
+//     const updatedProductInput = {
+//       ...rest,
+//       ...(name && { name }),
+//       ...(slug && { slug }),
+//       ...(typeof basePrice !== "undefined" && { basePrice }),
+//       ...(typeof gstRate !== "undefined" && { gstRate }), // ✅ percentage value stored
+//       ...(typeof price !== "undefined" && { price }),
+//     };
 
-    const updated = await productService.updateProduct(
-      updatedProductInput,
-      req.params.productId,
-      req.userId
-    );
+//     const updated = await productService.updateProduct(
+//       updatedProductInput,
+//       req.params.productId,
+//       req.userId
+//     );
 
-    res
-      .status(200)
-      .json(new ApiResponse(200, updated, "Product updated successfully"));
-  }
-);
+//     res
+//       .status(200)
+//       .json(new ApiResponse(200, updated, "Product updated successfully"));
+//   }
+// );
 
 // ✅ Delete Product
 export const deleteProduct = catchAsync(

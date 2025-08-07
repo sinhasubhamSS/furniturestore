@@ -2,7 +2,7 @@
 import { Types } from "mongoose";
 
 export interface IVariant {
-  sku: string; // Made required
+  sku: string; 
   color: string; // Made required
   size: string; // Made required
   basePrice: number;

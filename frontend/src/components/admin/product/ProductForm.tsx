@@ -1,196 +1,196 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
-
+import { useForm, useFieldArray } from "react-hook-form";
+import { useState } from "react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
-
-import VariantsField from "./VariantsField";
-import SpecificationsField from "./SpecificationsField";
 import VisibilityToggle from "./VisibilityToggle";
+import VariantForm from "./VariantsField"; // Handles only color, size, images
+import SpecificationForm from "./SpecificationsField"; // Full specs
+import CategoryDropdown from "./CategoryDropdown"; // Custom select
+import { Product } from "@/types/Product";
+import { CreateProductInput } from "@/lib/validations/product.schema";
+// ----- Types -----
 
-import {
-  createProductSchema,
-  CreateProductInput,
-} from "@/lib/validations/product.schema";
-import { useGetCategoriesQuery } from "@/redux/services/admin/adminCategoryapi";
-import ImageUploader from "@/components/helperComponents/ImageUploader";
-
-interface ProductFormProps {
-  onSubmit: (data: CreateProductInput) => Promise<void>;
-  defaultValues?: Partial<CreateProductInput>;
+type ProductFormProps = {
+  onSubmit: (data: CreateProductInput) => void;
   isEdit?: boolean;
-}
+};
+
+// ----- Component -----
+
+const defaultVariant = {
+  color: "",
+  size: "",
+  images: [],
+  basePrice: 0,
+  gstRate: 0,
+  stock: 0,
+};
 
 const ProductForm: React.FC<ProductFormProps> = ({
   onSubmit,
-  defaultValues,
   isEdit = false,
 }) => {
-  const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [colors, setColors] = useState<string[]>(
-    defaultValues?.variants?.color || [""]
-  );
-  const [sizes, setSizes] = useState<string[]>(
-    defaultValues?.variants?.size || [""]
-  );
-  const [specs, setSpecs] = useState(
-    defaultValues?.specifications || [{ key: "", value: "" }]
-  );
+  const [visibility, setVisibility] = useState(true);
 
   const {
     register,
+    control,
     handleSubmit,
     setValue,
-    reset,
-    watch,
+    getValues,
     formState: { errors },
-  } = useForm<CreateProductInput>({
-    resolver: zodResolver(createProductSchema),
+  } = useForm<Product>({
     defaultValues: {
+      variants: [defaultVariant],
+      specifications: [],
+      measurements: {},
       isPublished: true,
-      ...defaultValues,
     },
   });
 
-  const { data: categories = [], isLoading: loadingCategories } =
-    useGetCategoriesQuery();
+  const {
+    fields: variantFields,
+    append: appendVariant,
+    remove: removeVariant,
+  } = useFieldArray({
+    control,
+    name: "variants",
+  });
 
-  useEffect(() => {
-    if (defaultValues) {
-      reset({ ...defaultValues });
-    }
-  }, [defaultValues, reset]);
+  const handleFormSubmit = (data: Product) => {
+    data.isPublished = visibility;
+    onSubmit(data);
+  };
 
-  const handleFormSubmit = async (data: CreateProductInput) => {
-    setIsSubmitting(true);
-    try {
-      const finalData: CreateProductInput = {
-        ...data,
-        variants: { color: colors, size: sizes },
-        specifications: specs,
-      };
-
-      await onSubmit(finalData);
-      toast.success(isEdit ? "Product updated" : "Product created");
-      if (!isEdit) reset();
-      router.push("/admin/products");
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Error occurred");
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleSpecificationChange = (specs: Product["specifications"]) => {
+    setValue("specifications", specs);
   };
 
   return (
-    <div className="max-w-3xl mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-6 text-center">
+    <form
+      onSubmit={handleSubmit(handleFormSubmit)}
+      className="space-y-6 max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md"
+    >
+      <h2 className="text-2xl font-bold">
         {isEdit ? "Edit Product" : "Create Product"}
-      </h1>
+      </h2>
 
-      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-        <Input
-          label="Name"
-          name="name"
-          placeholder="Product name"
-          register={register("name")}
-          error={errors.name?.message}
-        />
-        <Input
-          label="Title"
-          name="title"
-          placeholder="Short title"
-          register={register("title")}
-          error={errors.title?.message}
-        />
-        <Input
-          label="Description"
-          name="description"
-          placeholder="Product description"
-          register={register("description")}
-          error={errors.description?.message}
-        />
-        <Input
-          type="number"
-          label="Price (₹)"
-          name="basePrice"
-          placeholder="Base price"
-          register={register("basePrice", { valueAsNumber: true })}
-          error={errors.basePrice?.message}
-        />
-        <Input
-          type="number"
-          label="GST Rate (%)"
-          name="gstRate"
-          placeholder="e.g. 18"
-          register={register("gstRate", { valueAsNumber: true })}
-          error={errors.gstRate?.message}
-        />
-        <Input
-          type="number"
-          label="Stock"
-          name="stock"
-          placeholder="Quantity in stock"
-          register={register("stock", { valueAsNumber: true })}
-          error={errors.stock?.message}
-        />
+      <Input
+        name="name"
+        label="Product Name"
+        placeholder="e.g. Leather Wallet"
+        required
+        register={register("name", { required: "Product name is required" })}
+        error={errors.name?.message}
+      />
 
-        {/* Category Select */}
-        <div>
-          <label className="block font-medium mb-1">Category</label>
-          <select
-            {...register("category")}
-            className="w-full border p-2 rounded"
-          >
-            <option value="">Select category</option>
-            {categories.map((cat) => (
-              <option key={cat._id} value={cat._id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-          {errors.category?.message && (
-            <p className="text-red-500 text-sm">{errors.category.message}</p>
-          )}
+      <Input
+        name="title"
+        label="Title"
+        placeholder="Optional product title"
+        register={register("title")}
+      />
+
+      <div>
+        <label className="block text-sm font-medium mb-1">Description</label>
+        <textarea
+          {...register("description", { required: "Description is required" })}
+          className="w-full p-2 rounded-md border border-gray-300"
+          placeholder="Enter product description"
+        />
+        {errors.description && (
+          <p className="text-red-500 text-sm">{errors.description.message}</p>
+        )}
+      </div>
+
+      {/* Category Dropdown */}
+      <CategoryDropdown
+        value={getValues("category") ?? ""}
+        onChange={(value: string) => setValue("category", value)}
+      />
+
+      {/* Visibility Toggle */}
+      <VisibilityToggle value={visibility} onChange={setVisibility} />
+
+      {/* Variants Section */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-semibold">Variants</h3>
+          <Button type="button" onClick={() => appendVariant(defaultVariant)}>
+            + Add Variant
+          </Button>
         </div>
 
-        {/* Images */}
-        <ImageUploader
-          maxFiles={5}
-          folder="products"
-          onUpload={(urls) =>
-            setValue("images", urls, { shouldValidate: true })
-          }
-          defaultUrls={defaultValues?.images || []}
-        />
+        {variantFields.map((field, index) => (
+          <VariantForm
+            key={field.id}
+            index={index}
+            register={register}
+            setValue={setValue}
+            getValues={getValues}
+            remove={() => removeVariant(index)}
+          />
+        ))}
+      </div>
 
-        {/* Variants */}
-        <VariantsField label="Colors" values={colors} onChange={setColors} />
-        <VariantsField label="Sizes" values={sizes} onChange={setSizes} />
+      {/* Specification Section */}
+      <SpecificationForm onChange={handleSpecificationChange} />
 
-        {/* Specifications */}
-        <SpecificationsField specs={specs} onChange={setSpecs} />
+      {/* Measurements Section */}
+      <div>
+        <h3 className="text-lg font-semibold mb-2">Measurements</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <Input
+            name="measurements.width"
+            label="Width (cm)"
+            type="number"
+            step="0.01"
+            register={register("measurements.width", { valueAsNumber: true })}
+          />
+          <Input
+            name="measurements.height"
+            label="Height (cm)"
+            type="number"
+            step="0.01"
+            register={register("measurements.height", { valueAsNumber: true })}
+          />
+          <Input
+            name="measurements.depth"
+            label="Depth (cm)"
+            type="number"
+            step="0.01"
+            register={register("measurements.depth", { valueAsNumber: true })}
+          />
+          <Input
+            name="measurements.weight"
+            label="Weight (kg)"
+            type="number"
+            step="0.01"
+            register={register("measurements.weight", { valueAsNumber: true })}
+          />
+        </div>
+      </div>
 
-        {/* Visibility */}
-        <VisibilityToggle
-          value={watch("isPublished") ?? false}
-          onChange={(val) => setValue("isPublished", val)}
-        />
+      <Input
+        name="warranty"
+        label="Warranty Info"
+        placeholder="e.g. 1-year warranty included"
+        register={register("warranty")}
+      />
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting
-            ? "Submitting..."
-            : isEdit
-            ? "Update Product"
-            : "Create Product"}
-        </Button>
-      </form>
-    </div>
+      <Input
+        name="disclaimer"
+        label="Disclaimer"
+        placeholder="Any important disclaimers"
+        register={register("disclaimer")}
+      />
+
+      <Button type="submit" className="w-full mt-6">
+        {isEdit ? "Update Product" : "Create Product"}
+      </Button>
+    </form>
   );
 };
 

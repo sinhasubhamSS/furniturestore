@@ -22,7 +22,7 @@ const imageSchema = z.object({
 
 // ✅ Variant schema
 const variantSchema = z.object({
-  sku: z.string().min(1, "SKU is required"),
+  sku: z.string().min(1, "SKU is required").optional(),
   color: z.string().min(1, "Color is required"),
   size: z.string().min(1, "Size is required"),
   basePrice: z.preprocess(

@@ -1,11 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-type Category = {
-  _id: string;
-  name: string;
-};
+import { useGetCategoriesQuery } from "@/redux/services/admin/adminCategoryapi";
+import { useEffect } from "react";
 
 type Props = {
   value: string;
@@ -13,24 +9,13 @@ type Props = {
 };
 
 const CategoryDropdown = ({ value, onChange }: Props) => {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: categories = [], isLoading, error } = useGetCategoriesQuery();
 
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const res = await fetch("/api/categories"); // 🔁 Adjust endpoint if needed
-        const data = await res.json();
-        setCategories(data.categories || []);
-      } catch (error) {
-        console.error("Failed to fetch categories", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCategories();
-  }, []);
+    if (error) {
+      console.error("Failed to fetch categories", error);
+    }
+  }, [error]);
 
   return (
     <div className="w-full">
@@ -41,7 +26,7 @@ const CategoryDropdown = ({ value, onChange }: Props) => {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full p-2 border border-gray-300 rounded-md"
-        disabled={loading}
+        disabled={isLoading}
       >
         <option value="">-- Choose Category --</option>
         {categories.map((cat) => (
