@@ -10,7 +10,7 @@ export const cartApi = createApi({
     // ✅ Add item to cart
     addToCart: builder.mutation<
       CartResponse,
-      { productId: string; quantity: number }
+      { productId: string; variantId?: string; quantity: number }
     >({
       query: ({ productId, quantity }) => ({
         url: `/cart/add`,

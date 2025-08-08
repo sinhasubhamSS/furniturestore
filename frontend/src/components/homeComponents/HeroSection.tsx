@@ -1,6 +1,6 @@
 "use client";
 
-import useLatestProducts from "@/hooks/useLatestProduct";
+import { useGetLatestProductsQuery } from "@/redux/services/user/publicProductApi";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
 
@@ -8,9 +8,12 @@ const slideDuration = 6000;
 
 const HeroSection = () => {
   const router = useRouter();
-  const { product: products, loading } = useLatestProducts();
-  const images =
-    products?.map((product) => product.images?.[0]).filter(Boolean) || [];
+  const { data, isLoading } = useGetLatestProductsQuery();
+
+  // ✅ Use image directly from product (not from variants)
+  const products = data || [];
+
+  const images = products.map((product) => product.image).filter(Boolean);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -81,7 +84,7 @@ const HeroSection = () => {
   };
 
   return (
-    <section className="  bg-[var(--color-primary)] text-[var(--color-foreground)] transition-colors duration-300">
+    <section className="bg-[var(--color-primary)] text-[var(--color-foreground)] transition-colors duration-300">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-10 w-full mx-auto items-center">
         {/* Left - Text */}
         <div className="col-span-1 md:col-span-5 text-center md:text-left space-y-6">
@@ -101,7 +104,7 @@ const HeroSection = () => {
           </div>
         </div>
 
-        {/* Right - Enhanced Image Slider */}
+        {/* Right - Image Slider */}
         <div className="col-span-1 md:col-span-7 relative flex justify-center md:justify-end my-8">
           <div
             className="relative w-full max-w-2xl aspect-[3/2] rounded-3xl overflow-hidden bg-[var(--color-card)] shadow-2xl border border-[var(--color-border)]"
@@ -110,7 +113,7 @@ const HeroSection = () => {
             onTouchStart={handlePause}
             onTouchEnd={handleResume}
           >
-            {loading ? (
+            {isLoading ? (
               <div className="flex items-center justify-center h-full">
                 <span className="text-[var(--color-foreground)]">
                   Loading latest products...

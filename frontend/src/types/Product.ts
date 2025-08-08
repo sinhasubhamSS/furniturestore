@@ -1,4 +1,6 @@
+// Base shared structure
 export type Variant = {
+  _id?: string;
   color?: string;
   size?: string;
   basePrice: number;
@@ -8,22 +10,14 @@ export type Variant = {
     url: string;
     public_id: string;
   }[];
+  price?: number;
 };
 
-export type Specification = {
-  section: string;
-  specs: {
-    key: string;
-    value: string;
-  }[];
-};
-
-export type Product = {
+export type BaseProduct = {
   _id: string;
   name: string;
   title: string;
   description: string;
-  category: string;
   variants: Variant[];
   specifications?: Specification[];
   measurements?: {
@@ -33,13 +27,36 @@ export type Product = {
     weight?: number;
   };
   isPublished: boolean;
-  // Optional meta fields
   warranty?: string;
   disclaimer?: string;
 };
 
+// Input/Create: used when sending data (category is just ID)
+export type Product = BaseProduct & {
+  category: string; // just the ID
+};
+
+// Display/View: used when receiving data (category is populated)
+export type DisplayProduct = BaseProduct & {
+  category: {
+    _id: string;
+    name: string;
+  };
+};
+
+// Variant & Specification stay as-is
+
+export type Specification = {
+  section: string;
+  specs: {
+    key: string;
+    value: string;
+  }[];
+};
+
+// Response types
 export type AdminProductResponse = {
-  products: Product[];
+  products: DisplayProduct[];
   totalItems: number;
   totalPages: number;
   page: number;
@@ -47,7 +64,7 @@ export type AdminProductResponse = {
 };
 
 export type UserProductResponse = {
-  products: Product[];
+  products: DisplayProduct[];
   totalItems: number;
   totalPages: number;
   page: number;

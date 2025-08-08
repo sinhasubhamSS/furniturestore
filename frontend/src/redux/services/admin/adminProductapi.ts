@@ -5,6 +5,7 @@ import type { AdminProductResponse } from "@/types/Product";
 import { CreateProductInput } from "@/lib/validations/product.schema";
 import { axiosBaseQuery } from "@/redux/api/customBaseQuery";
 
+
 export const adminProductApi = createApi({
   reducerPath: "adminProductApi",
   baseQuery: axiosBaseQuery(),
@@ -20,8 +21,10 @@ export const adminProductApi = createApi({
         method: "GET",
         params: { page, limit },
       }),
-      transformResponse: (response: { data: AdminProductResponse }) =>
-        response.data,
+      transformResponse: (response: { data: AdminProductResponse }) => {
+        console.log("📦 Backend Response (Admin Products):", response.data);
+        return response.data;
+      },
       providesTags: ["AdminProducts"],
     }),
 
@@ -54,6 +57,7 @@ export const adminProductApi = createApi({
       }),
       invalidatesTags: ["AdminProducts"],
     }),
+  
   }),
 });
 
@@ -62,4 +66,5 @@ export const {
   useCreateProductMutation,
   useEditProductMutation,
   useDeleteProductMutation,
+
 } = adminProductApi;

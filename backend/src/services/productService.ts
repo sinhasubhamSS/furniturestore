@@ -31,52 +31,52 @@ class ProductService {
     return query.skip(skip).limit(limit);
   }
 
-async createProduct(productData: IProductInput, userId: string) {
-  // Validate variants
-  if (!productData.variants || productData.variants.length === 0) {
-    throw new AppError("At least one variant is required", 400);
-  }
-
-  // Process variants
-  const processedVariants = productData.variants.map(variant => {
-    // Validate variant images
-    if (!variant.images || variant.images.length === 0) {
-      throw new AppError("Each variant must have at least one image", 400);
+  async createProduct(productData: IProductInput, userId: string) {
+    // Validate variants
+    if (!productData.variants || productData.variants.length === 0) {
+      throw new AppError("At least one variant is required", 400);
     }
 
-    // Calculate final price
-    const gstDecimal = variant.gstRate / 100;
-    const finalPrice = variant.basePrice + variant.basePrice * gstDecimal;
+    // Process variants
+    const processedVariants = productData.variants.map((variant) => {
+      // Validate variant images
+      if (!variant.images || variant.images.length === 0) {
+        throw new AppError("Each variant must have at least one image", 400);
+      }
 
-    return {
-      ...variant,
-      price: finalPrice,
-      stock: variant.stock || 0,
+      // Calculate final price
+      const gstDecimal = variant.gstRate / 100;
+      const finalPrice = variant.basePrice + variant.basePrice * gstDecimal;
+
+      return {
+        ...variant,
+        price: finalPrice,
+        stock: variant.stock || 0,
+      };
+    });
+
+    // Compute product-level fields
+    const minPrice = Math.min(...processedVariants.map((v) => v.price));
+    const totalStock = processedVariants.reduce((sum, v) => sum + v.stock, 0);
+    const colors = [...new Set(processedVariants.map((v) => v.color))];
+    const sizes = [...new Set(processedVariants.map((v) => v.size))];
+
+    // Prepare product document
+    const productDocument: IProductInput = {
+      ...productData,
+      slug: this.buildSlug(productData.name),
+      variants: processedVariants,
+      price: minPrice,
+      stock: totalStock,
+      colors,
+      sizes,
+      // createdBy: new Types.ObjectId(userId), // Convert string to ObjectId
+      isPublished: productData.isPublished || false,
     };
-  });
 
-  // Compute product-level fields
-  const minPrice = Math.min(...processedVariants.map(v => v.price));
-  const totalStock = processedVariants.reduce((sum, v) => sum + v.stock, 0);
-  const colors = [...new Set(processedVariants.map(v => v.color))];
-  const sizes = [...new Set(processedVariants.map(v => v.size))];
-
-  // Prepare product document
-  const productDocument: IProductInput = {
-    ...productData,
-    slug: this.buildSlug(productData.name),
-    variants: processedVariants,
-    price: minPrice,
-    stock: totalStock,
-    colors,
-    sizes,
-    // createdBy: new Types.ObjectId(userId), // Convert string to ObjectId
-    isPublished: productData.isPublished || false
-  };
-
-  // Create and return product
-  return await Product.create(productDocument);
-}
+    // Create and return product
+    return await Product.create(productDocument);
+  }
   // async updateProduct(
   //   data: Partial<IProductInput>,
   //   productId: string,
@@ -210,11 +210,27 @@ async createProduct(productData: IProductInput, userId: string) {
 
   // ✅ Get Latest Products
   async getLatestProducts(limit: number = 8) {
-    return Product.find({})
+    const products = await Product.find({})
       .sort({ createdAt: -1 })
       .limit(limit)
-      .select("name price images createdAt")
+      .select(" slug variants createdAt")
       .lean();
+
+    // Only return the first image and price from the first variant
+    const modifiedProducts = products.map((product) => {
+      const firstVariant = product.variants?.[0];
+
+      return {
+        _id: product._id,
+        name: product.name,
+        slug:product.slug,
+        image: firstVariant?.images?.[0]?.url || "",
+        price:firstVariant?.price,
+        createdAt: product.createdAt,
+      };
+    });
+
+    return modifiedProducts;
   }
 }
 

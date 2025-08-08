@@ -7,15 +7,17 @@ import {
   useGetAdminProductsQuery,
   useDeleteProductMutation,
 } from "@/redux/services/admin/adminProductapi";
+
 const ProductTable = () => {
   const { data, isLoading, error } = useGetAdminProductsQuery({
     page: 1,
     limit: 10,
   });
-  console.log("Admin Products Response:", data);
+
   const products = data?.products || [];
   const router = useRouter();
   const [deleteProduct] = useDeleteProductMutation();
+
   if (isLoading) return <p className="p-4">Loading...</p>;
   if (error) return <p className="p-4 text-red-500">Error fetching products</p>;
 
@@ -33,53 +35,71 @@ const ProductTable = () => {
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--border)] bg-[var(--secondary-light)]">
-          {products.map((product) => (
-            <tr
-              key={product._id}
-              className="hover:bg-[var(--secondary-light)]/90 transition"
-            >
-              <td className="px-4 py-2">
-                <img
-                  src={
-                    product.images[0]?.url || "https://via.placeholder.com/60"
-                  }
-                  alt={product.name}
-                  className="w-14 h-14 object-cover rounded-md border border-[var(--border)]"
-                />
-              </td>
-              <td className="px-4 py-2 font-medium">{product.name}</td>
-              <td className="px-4 py-2">{product.stock}</td>
-              <td className="px-4 py-2">{product.category?.name}</td>
-              <td className="px-4 py-2">₹{product.price.toLocaleString()}</td>
-              <td className="px-4 py-2 text-center">
-                <div className="flex items-center justify-center gap-3">
-                  <button
-                    title="Edit"
-                    className="hover:text-[var(--color-accent)] transition-colors"
-                    onClick={() =>
-                      router.push(`/admin/products/edit/${product._id}`)
-                    }
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button
-                    title="Delete"
-                    className="hover:text-[var(--text-error)] transition-colors"
-                    onClick={() => deleteProduct(product._id)}
-                  >
-                    <Trash2 size={16} />
-                  </button>
+          {products.map((product) => {
+            const firstVariant = product.variants?.[0];
+            const imageUrl =
+              firstVariant?.images?.[0]?.url ||
+              "https://via.placeholder.com/60";
 
-                  <button
-                    title="View"
-                    className="hover:text-[var(--color-accent)] transition-colors"
-                  >
-                    <Eye size={16} />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
+            return (
+              <tr
+                key={product._id}
+                className="hover:bg-[var(--secondary-light)]/90 transition"
+              >
+                <td className="px-4 py-2">
+                  <img
+                    src={imageUrl}
+                    alt={product.name}
+                    className="w-14 h-14 object-cover rounded-md border border-[var(--border)]"
+                  />
+                </td>
+
+                <td className="px-4 py-2 font-medium">{product.name}</td>
+
+                <td className="px-4 py-2">{firstVariant?.stock ?? "—"}</td>
+
+                <td className="px-4 py-2">
+                  {typeof product.category === "string"
+                    ? product.category
+                    : product.category?.name ?? "—"}
+                </td>
+
+                <td className="px-4 py-2">
+                  ₹{firstVariant?.price?.toLocaleString() ?? "—"}
+                </td>
+
+                <td className="px-4 py-2 text-center">
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      title="Edit"
+                      className="hover:text-[var(--color-accent)] transition-colors"
+                      onClick={() =>
+                        router.push(`/admin/products/edit/${product._id}`)
+                      }
+                    >
+                      <Pencil size={16} />
+                    </button>
+
+                    <button
+                      title="Delete"
+                      className="hover:text-[var(--text-error)] transition-colors"
+                      onClick={() => deleteProduct(product._id)}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+
+                    <button
+                      title="View"
+                      className="hover:text-[var(--color-accent)] transition-colors"
+                      onClick={() => router.push(`/products/${product._id}`)}
+                    >
+                      <Eye size={16} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
