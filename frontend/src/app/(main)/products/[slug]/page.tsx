@@ -1,5 +1,5 @@
 "use client";
-import ProductDetail from "@/components/ProductDetail";
+import ProductDetail from "@/components/ProductDetail/ProductDetail";
 import { use } from "react";
 
 interface PageProps {
