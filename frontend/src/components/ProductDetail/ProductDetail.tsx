@@ -1,23 +1,20 @@
 "use client";
 
-import React, { useEffect } from "react"; // useState हटा दिया
+import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useGetProductBySlugQuery } from "@/redux/services/user/publicProductApi";
 import { useAddToCartMutation } from "@/redux/services/user/cartApi";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "@/redux/store";
 import {
-  setSelectedVariant,
-  setSelectedImage,
-  setSelectedColor,
-  setSelectedSize,
   setQuantity,
   resetProductState,
-} from "@/redux/slices/ProductDetailSlice"; // Slice actions import
+} from "@/redux/slices/ProductDetailSlice"; // Removed variant-related imports (handled in VariantSelector)
 
 import Button from "@/components/ui/Button";
 import { FaHeart, FaShippingFast, FaShieldAlt } from "react-icons/fa";
-import ImageGallery from "./ImageGallery"; // Existing import
+import ImageGallery from "./ImageGallery";
+import VariantSelector from "./VariantSelector";
 
 interface Props {
   slug: string;
@@ -25,46 +22,21 @@ interface Props {
 
 const ProductDetail = ({ slug }: Props) => {
   const dispatch = useDispatch<AppDispatch>();
-  const {
-    selectedVariant,
-    selectedColor,
-    selectedSize,
-    quantity,
-  } = useSelector((state: RootState) => state.productDetail);
+  const { selectedVariant, quantity } = useSelector(
+    (state: RootState) => state.productDetail
+  );
 
   const { data: product, isLoading, error } = useGetProductBySlugQuery(slug);
-
   const [addToCart, { isLoading: isAdding }] = useAddToCartMutation();
   const router = useRouter();
 
+  // Initial setup only for non-variant states (e.g., quantity)
   useEffect(() => {
-    if (product && product.variants.length > 0) {
-      const firstVariant = product.variants[0];
-      dispatch(setSelectedVariant(firstVariant));
-
-      dispatch(setSelectedColor(firstVariant.color || null));
-      dispatch(setQuantity(1)); // Initial quantity
+    if (product) {
+      dispatch(setQuantity(1)); // Only quantity here now
+      console.log("Transformed Product Data:", product);
     }
-    console.log("Transformed Product Data:", product);
   }, [product, dispatch]);
-
-  useEffect(() => {
-    if (product && (selectedColor || selectedSize)) {
-      const variant =
-        product.variants.find(
-          (v) => v.color === selectedColor && v.size === selectedSize
-        ) ||
-        product.variants.find(
-          (v) => v.color === selectedColor || v.size === selectedSize
-        ) ||
-        product.variants[0];
-
-      if (variant) {
-        dispatch(setSelectedVariant(variant));
-        dispatch(setSelectedImage(variant.images?.[0]?.url || null));
-      }
-    }
-  }, [selectedColor, selectedSize, product, dispatch]);
 
   // Optional: Reset state on unmount
   useEffect(() => {
@@ -120,25 +92,10 @@ const ProductDetail = ({ slug }: Props) => {
     );
   }
 
-  // Get unique colors and sizes (same as before)
-  const colors = [
-    ...new Set(product.variants.map((v) => v.color).filter(Boolean)),
-  ] as string[];
-  const sizes = [
-    ...new Set(
-      (selectedColor
-        ? product.variants
-            .filter((v) => v.color === selectedColor)
-            .map((v) => v.size)
-        : product.variants.map((v) => v.size)
-      ).filter(Boolean)
-    ),
-  ] as string[];
-
   return (
     <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-10">
       <div className="flex flex-col lg:flex-row gap-10">
-        <ImageGallery /> {/* Redux से manage हो रहा है */}
+        <ImageGallery /> {/* Redux se manage ho raha hai */}
         <div className="w-full lg:w-1/2">
           <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
             {/* Title and Category */}
@@ -152,7 +109,7 @@ const ProductDetail = ({ slug }: Props) => {
               <p className="text-gray-600 mt-2">{product.title}</p>
             </div>
 
-            {/* Price – Redux से selectedVariant */}
+            {/* Price – Redux se selectedVariant */}
             <div className="flex items-center justify-between py-4 border-t border-b border-gray-100">
               <div>
                 <span className="text-3xl font-bold text-[--color-accent]">
@@ -176,55 +133,9 @@ const ProductDetail = ({ slug }: Props) => {
               </div>
             </div>
 
-            {/* Variant Selectors – Dispatch से update */}
+            {/* Variant and Quantity Selectors */}
             <div className="py-6 space-y-6">
-              {/* Color Selector */}
-              {colors.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">
-                    Color
-                  </h3>
-                  <div className="flex flex-wrap gap-3">
-                    {colors.map((color, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => dispatch(setSelectedColor(color))}
-                        className={`px-4 py-2 rounded-full border transition-all ${
-                          selectedColor === color
-                            ? "bg-[--color-accent]/10 border-[--color-accent] font-medium"
-                            : "border-gray-300"
-                        }`}
-                      >
-                        {color}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Size Selector */}
-              {sizes.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">
-                    Size
-                  </h3>
-                  <div className="flex flex-wrap gap-3">
-                    {sizes.map((size, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => dispatch(setSelectedSize(size))}
-                        className={`w-14 h-14 flex items-center justify-center rounded-lg border transition-all ${
-                          selectedSize === size
-                            ? "bg-[--color-accent] text-white border-[--color-accent]"
-                            : "border-gray-300"
-                        }`}
-                      >
-                        {size}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <VariantSelector variants={product.variants} />
 
               {/* Quantity Selector */}
               <div className="flex items-center">
@@ -253,7 +164,7 @@ const ProductDetail = ({ slug }: Props) => {
               </div>
             </div>
 
-            {/* Stock Status – Redux से */}
+            {/* Stock Status – Redux se */}
             <div
               className={`mb-6 py-3 px-4 rounded-lg ${
                 selectedVariant?.stock && selectedVariant.stock > 0
