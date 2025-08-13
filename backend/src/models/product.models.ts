@@ -17,7 +17,7 @@ export interface IVariant extends Document {
 }
 
 const variantSchema = new Schema<IVariant>({
-  sku: { type: String, required: true, unique: true },
+  sku: { type: String, required: true,  },
   color: { type: String, required: true },
   size: { type: String, required: true },
   basePrice: { type: Number, required: true },
@@ -64,7 +64,7 @@ export interface IProduct extends Document {
 const productSchema = new Schema<IProduct>(
   {
     name: { type: String, required: true, trim: true },
-    slug: { type: String, required: true, unique: true },
+    slug: { type: String, required: true, },
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true },
 
