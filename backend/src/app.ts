@@ -22,6 +22,7 @@ import categoryRoute from "./routes/categoryRoutes";
 
 import dashboardRoutes from "./routes/adminRoutes";
 import { errorMiddleware } from "./middlewares/errorMiddleware";
+import reviewRoutes from "./routes/reviewRoutes";
 app.use("/api/user", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
@@ -32,5 +33,7 @@ app.use("/api/payment", paymentRoute);
 
 app.use("/api/category", categoryRoute);
 app.use("/api/admin", dashboardRoutes);
+//reviews
+app.use("/api/reviews", reviewRoutes);
 app.use(errorMiddleware);
 export default app;
