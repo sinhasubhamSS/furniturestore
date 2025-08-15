@@ -34,6 +34,6 @@ app.use("/api/payment", paymentRoute);
 app.use("/api/category", categoryRoute);
 app.use("/api/admin", dashboardRoutes);
 //reviews
-app.use("/api/reviews", reviewRoutes);
+app.use("/api", reviewRoutes);
 app.use(errorMiddleware);
 export default app;

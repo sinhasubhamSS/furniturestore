@@ -26,36 +26,43 @@ const reviewVideoSchema = z.object({
   caption: z.string().max(100, "Caption too long").optional(),
 });
 
-// Create Review Schema - returns strings, not ObjectIds
+// ✅ FIXED: Create Review Schema (Myntra-style)
 export const createReviewSchema = z.object({
   body: z.object({
-    productId: productIdSchema,
+    // ✅ REMOVED: productId from body (comes from URL params)
+    // productId: productIdSchema,
 
+    // ✅ KEEP: Rating is required (star rating always needed)
     rating: z.coerce.number().int("Rating must be integer").min(1).max(5),
 
+    // ✅ FIXED: Content is now optional and minimum 1 char
     content: z
       .string()
-      .min(10, "Review must be at least 10 characters")
+      .min(1, "Review must be at least 1 character") // ✅ Changed from 10 to 1
       .max(1000, "Review cannot exceed 1000 characters")
-      .trim(),
+      .trim()
+      .optional(), // ✅ Made optional
 
+    // ✅ KEEP: Images optional (already correct)
     images: z
       .array(reviewImageSchema)
       .max(5, "Maximum 5 images allowed")
       .optional()
       .default([]),
 
+    // ✅ KEEP: Videos optional (already correct)
     videos: z
       .array(reviewVideoSchema)
       .max(2, "Maximum 2 videos allowed")
       .optional()
       .default([]),
 
+    // ✅ KEEP: Verified purchase optional (already correct)
     isVerifiedPurchase: z.coerce.boolean().optional().default(false),
   }),
 });
 
-// Update Review Schema
+// ✅ FIXED: Update Review Schema
 export const updateReviewSchema = z.object({
   params: z.object({
     reviewId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid review ID format"),
@@ -64,7 +71,15 @@ export const updateReviewSchema = z.object({
   body: z
     .object({
       rating: z.coerce.number().int().min(1).max(5).optional(),
-      content: z.string().min(10).max(1000).trim().optional(),
+
+      // ✅ FIXED: Content minimum 1 char in update too
+      content: z
+        .string()
+        .min(1, "Review must be at least 1 character") // ✅ Changed from 10 to 1
+        .max(1000)
+        .trim()
+        .optional(),
+
       images: z.array(reviewImageSchema).max(5).optional(),
       videos: z.array(reviewVideoSchema).max(2).optional(),
     })
@@ -73,7 +88,7 @@ export const updateReviewSchema = z.object({
     }),
 });
 
-// Query Schema
+// ✅ KEEP: Query Schema (already perfect)
 export const reviewQuerySchema = z.object({
   page: z.coerce.number().min(1).optional().default(1),
   limit: z.coerce.number().min(1).max(50).optional().default(10),

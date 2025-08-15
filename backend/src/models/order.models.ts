@@ -9,9 +9,8 @@ export enum OrderStatus {
   Delivered = "delivered",
   Cancelled = "cancelled",
   Refunded = "refunded",
-  Failed = "failed",             // delivery failed add kar sakte hain
+  Failed = "failed", // delivery failed add kar sakte hain
 }
-
 
 // Enum for payment method (optional but good practice)
 export enum PaymentMethod {
@@ -29,6 +28,11 @@ export interface OrderItemSnapshot {
   image?: string;
   quantity: number;
   price: number;
+  // ✅ OPTIONAL: Add these if you want variant tracking in orders
+  variantId?: Types.ObjectId;
+  color?: string;
+  size?: string;
+  sku?: string;
 }
 
 // Shipping Address snapshot interface

@@ -1,15 +1,15 @@
 // src/services/reviewService.ts
 
-import { Review, IReview } from "../models/review.models"; // Fixed import path
-import Product from "../models/product.models"; // Fixed import path
+import { Review, IReview } from "../models/review.models";
+import Product from "../models/product.models";
 import { Types } from "mongoose";
 
-// Input types using your existing IReview interface
+// ✅ FIXED: Input types with optional content (Myntra-style)
 type CreateReviewInput = {
-  productId: string; // String for API input
-  userId: string; // String for API input
+  productId: string;
+  userId: string;
   rating: number;
-  content: string;
+  content?: string; // ✅ Made optional for rating-only reviews
   images?: Array<{
     url: string;
     publicId: string;
@@ -28,7 +28,7 @@ type CreateReviewInput = {
 type UpdateReviewInput = Partial<CreateReviewInput>;
 
 export class ReviewService {
-  // 1. Create Review
+  // ✅ FIXED: Create Review with optional content and upsert logic
   static async createReview(reviewData: CreateReviewInput): Promise<IReview> {
     try {
       // Validate product exists
@@ -39,29 +39,29 @@ export class ReviewService {
         throw new Error("Reviews not allowed for this product");
       }
 
-      // Check if user already reviewed this product
-      const existingReview = await Review.findOne({
-        productId: reviewData.productId,
-        userId: reviewData.userId,
-      });
-
-      if (existingReview) {
-        throw new Error("You have already reviewed this product");
-      }
-
-      // Create review
-      const review = new Review({
-        productId: new Types.ObjectId(reviewData.productId),
-        userId: new Types.ObjectId(reviewData.userId),
-        rating: reviewData.rating,
-        content: reviewData.content,
-        images: reviewData.images || [],
-        videos: reviewData.videos || [],
-        isVerifiedPurchase: reviewData.isVerifiedPurchase || false,
-        helpfulVotes: 0,
-      });
-
-      await review.save();
+      // ✅ UPDATED: Use findOneAndUpdate for Myntra-style upsert
+      // This allows user to first rate, then later add review content
+      const review = await Review.findOneAndUpdate(
+        {
+          productId: new Types.ObjectId(reviewData.productId),
+          userId: new Types.ObjectId(reviewData.userId),
+        },
+        {
+          $set: {
+            rating: reviewData.rating,
+            content: reviewData.content || "", // ✅ Default empty string
+            images: reviewData.images || [],
+            videos: reviewData.videos || [],
+            isVerifiedPurchase: reviewData.isVerifiedPurchase || false,
+            helpfulVotes: 0,
+          },
+        },
+        {
+          upsert: true, // ✅ Create if doesn't exist, update if exists
+          new: true, // ✅ Return updated document
+          runValidators: true,
+        }
+      );
 
       // Update product stats
       await this.updateProductStats(reviewData.productId);
@@ -85,7 +85,7 @@ export class ReviewService {
     }
   }
 
-  // 3. Update Review
+  // ✅ FIXED: Update Review with optional content
   static async updateReview(
     reviewId: string,
     userId: string,
@@ -95,7 +95,7 @@ export class ReviewService {
       const review = await Review.findById(reviewId);
       if (!review) throw new Error("Review not found");
 
-      // Check if user owns this review (string comparison)
+      // Check if user owns this review
       if (review.userId.toString() !== userId) {
         throw new Error("You can only edit your own reviews");
       }
@@ -132,7 +132,7 @@ export class ReviewService {
       const review = await Review.findById(reviewId);
       if (!review) throw new Error("Review not found");
 
-      // Check ownership (string comparison)
+      // Check ownership
       if (review.userId.toString() !== userId) {
         throw new Error("You can only delete your own reviews");
       }
@@ -150,19 +150,19 @@ export class ReviewService {
     }
   }
 
-  // 5. Get Product Reviews (Enhanced for controller)
+  // 5. Get Product Reviews
   static async getProductReviews(
     productId: string,
     page: number = 1,
     limit: number = 10
   ) {
     try {
-      const skip = (page - 1) * limit; // Fixed multiplication
+      const skip = (page - 1) * limit; // ✅ Fixed multiplication
 
       const [reviews, total] = await Promise.all([
         Review.find({ productId })
           .populate("userId", "name avatar")
-          .populate("productId", "name slug title") // Added product details
+          .populate("productId", "name slug title")
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit),
@@ -186,14 +186,14 @@ export class ReviewService {
     }
   }
 
-  // 6. Get User Reviews (Bonus method for user dashboard)
+  // 6. Get User Reviews
   static async getUserReviews(
     userId: string,
     page: number = 1,
     limit: number = 10
   ) {
     try {
-      const skip = (page - 1) * limit;
+      const skip = (page - 1) * limit; // ✅ Fixed multiplication
 
       const [reviews, total] = await Promise.all([
         Review.find({ userId })

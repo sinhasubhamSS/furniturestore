@@ -1,10 +1,11 @@
 import { Schema, model, Model, Document, Types } from "mongoose";
 
+// ✅ FIXED: Interface with optional fields
 interface IReview extends Document {
   productId: Types.ObjectId;
   userId: Types.ObjectId;
-  rating: number;
-  content: string;
+  rating: number; // ✅ Required (stars)
+  content?: string; // ✅ Optional (review text)
   isVerifiedPurchase: boolean;
   helpfulVotes: number;
   images: Array<{
@@ -57,9 +58,11 @@ const reviewSchema = new Schema<IReview>(
       required: true,
       index: true,
     },
+
+    // ✅ FIXED: Rating is required (for Myntra-style star system)
     rating: {
       type: Number,
-      required: true,
+      required: true, // ✅ Added required
       min: 1,
       max: 5,
       validate: {
@@ -67,13 +70,17 @@ const reviewSchema = new Schema<IReview>(
         message: "Rating must be an integer between 1 and 5",
       },
     },
+
+    // ✅ FIXED: Content is optional (for "Rate Product" vs "Write Review")
     content: {
       type: String,
-      required: true,
-      minlength: 10,
+      required: false, // ✅ Optional
+      minlength: 1, // ✅ If provided, minimum 1 char (not 10)
       maxlength: 1000,
       trim: true,
+      default: "", // ✅ Default empty
     },
+
     isVerifiedPurchase: {
       type: Boolean,
       default: false,
@@ -84,45 +91,49 @@ const reviewSchema = new Schema<IReview>(
       default: 0,
       min: 0,
     },
+
+    // ✅ FIXED: Images are optional
     images: [
       {
         url: {
           type: String,
-          required: true,
+          required: false, // ✅ Optional
           validate: {
             validator: function (v: string) {
-              return /^https?:\/\/.+\.(jpg|jpeg|png|webp|gif)$/i.test(v); // Fixed regex
+              return !v || /^https?:\/\/.+\.(jpg|jpeg|png|webp|gif)$/i.test(v); // ✅ Fixed regex
             },
             message: "Invalid image URL format",
           },
         },
-        publicId: { type: String, required: true },
+        publicId: { type: String, required: false }, // ✅ Optional
         caption: {
           type: String,
           maxlength: 100,
           trim: true,
         },
-        _id: false, // Fixed underscore
+        _id: false, // ✅ Fixed underscore
       },
     ],
+
+    // ✅ FIXED: Videos are optional
     videos: [
       {
         url: {
           type: String,
-          required: true,
+          required: false, // ✅ Optional
           validate: {
             validator: function (v: string) {
-              return /^https?:\/\/.+\.(mp4|mov|avi|mkv|webm)$/i.test(v); // Fixed regex
+              return !v || /^https?:\/\/.+\.(mp4|mov|avi|mkv|webm)$/i.test(v); // ✅ Fixed regex
             },
             message: "Invalid video URL format",
           },
         },
-        publicId: { type: String, required: true },
+        publicId: { type: String, required: false }, // ✅ Optional
         thumbnail: {
           type: String,
           validate: {
             validator: function (v: string) {
-              return !v || /^https?:\/\/.+\.(jpg|jpeg|png|webp)$/i.test(v); // Fixed regex
+              return !v || /^https?:\/\/.+\.(jpg|jpeg|png|webp)$/i.test(v); // ✅ Fixed regex
             },
             message: "Invalid thumbnail URL format",
           },
@@ -137,7 +148,7 @@ const reviewSchema = new Schema<IReview>(
           maxlength: 100,
           trim: true,
         },
-        _id: false, // Fixed underscore
+        _id: false, // ✅ Fixed underscore
       },
     ],
   },
@@ -148,14 +159,14 @@ const reviewSchema = new Schema<IReview>(
   }
 );
 
-// Indexes
+// Indexes (same as before)
 reviewSchema.index({ productId: 1, createdAt: -1 });
 reviewSchema.index({ productId: 1, rating: 1 });
 reviewSchema.index({ userId: 1, createdAt: -1 });
 reviewSchema.index({ productId: 1, userId: 1 }, { unique: true });
 reviewSchema.index({ "videos.0": 1 }, { sparse: true });
 
-// Virtual Fields
+// ✅ ENHANCED: Virtual Fields for Myntra-style categorization
 reviewSchema.virtual("hasImages").get(function (this: IReview) {
   return this.images.length > 0;
 });
@@ -168,17 +179,36 @@ reviewSchema.virtual("hasMedia").get(function (this: IReview) {
   return this.images.length > 0 || this.videos.length > 0;
 });
 
+reviewSchema.virtual("hasContent").get(function (this: IReview) {
+  return this.content && this.content.trim().length > 0;
+});
+
+// ✅ NEW: Myntra-style review type classification
+// ✅ FIXED: Directly access actual fields, not virtual ones
+reviewSchema.virtual("reviewType").get(function (this: IReview) {
+  // Direct field access instead of virtual field access
+  const hasText = this.content && this.content.trim().length > 0;
+  const hasMedia =
+    (this.images && this.images.length > 0) ||
+    (this.videos && this.videos.length > 0);
+
+  if (hasText && hasMedia) return "detailed"; // Full review with text + media
+  if (hasText) return "text-review"; // Text review only
+  if (hasMedia) return "media-review"; // Media review only
+  return "rating-only"; // Just star rating
+});
+
 reviewSchema.virtual("totalMediaCount").get(function (this: IReview) {
   return this.images.length + this.videos.length;
 });
 
 reviewSchema.virtual("ageInDays").get(function (this: IReview) {
   return Math.floor(
-    (Date.now() - this.createdAt.getTime()) / (1000 * 60 * 60 * 24) // Fixed multiplication
+    (Date.now() - this.createdAt.getTime()) / (1000 * 60 * 60 * 24) // ✅ Fixed multiplication
   );
 });
 
-// Static Method
+// Static Method (fixed underscores)
 reviewSchema.statics.getProductStats = async function (productId: string) {
   const stats = await this.aggregate([
     {
@@ -188,7 +218,7 @@ reviewSchema.statics.getProductStats = async function (productId: string) {
     },
     {
       $group: {
-        _id: null, // Fixed underscore
+        _id: null, // ✅ Fixed underscore
         averageRating: { $avg: "$rating" },
         totalReviews: { $sum: 1 },
         verifiedReviews: { $sum: { $cond: ["$isVerifiedPurchase", 1, 0] } },

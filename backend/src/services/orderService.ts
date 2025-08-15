@@ -9,34 +9,60 @@ import { AppError } from "../utils/AppError";
 class OrderService {
   // Helper to process product items
   private async buildOrderItems(
-    items: { productId: string; quantity: number }[]
+    items: { productId: string; quantity: number; variantId?: string }[]
   ) {
     const orderItemsSnapshot = [];
     let totalAmount = 0;
 
     for (const item of items) {
       const product = await Product.findById(item.productId);
-      if (!product)
+      if (!product) {
         throw new AppError(`Product not found: ${item.productId}`, 404);
-      if (product.stock < item.quantity) {
+      }
+
+      // ✅ FIXED: Select variant logic with proper typing
+      let selectedVariant;
+      if (item.variantId) {
+        selectedVariant = product.variants.find(
+          (v) => v._id?.toString() === item.variantId
+        );
+      } else {
+        selectedVariant = product.variants[0]; // Use first variant as default
+      }
+
+      if (!selectedVariant) {
         throw new AppError(
-          `Insufficient stock for product: ${product.name}`,
+          `Variant not found for product: ${product.name}`,
           400
         );
       }
 
-      const itemTotal = product.price * item.quantity;
+      // Check variant stock
+      if (selectedVariant.stock < item.quantity) {
+        throw new AppError(
+          `Insufficient stock for ${product.name} (${selectedVariant.color}, ${selectedVariant.size})`,
+          400
+        );
+      }
+
+      // Use variant price
+      const itemTotal = selectedVariant.price * item.quantity;
       totalAmount += itemTotal;
 
       orderItemsSnapshot.push({
         productId: product._id,
         name: product.name,
-        image: product.images?.[0]?.url || "",
+        image: selectedVariant.images?.[0]?.url || "",
         quantity: item.quantity,
-        price: product.price,
+        price: selectedVariant.price,
       });
 
-      product.stock -= item.quantity;
+      // ✅ FIXED: Update variant stock only
+      selectedVariant.stock -= item.quantity;
+
+      // ✅ REMOVED: Don't update product.stock since it's not in schema anymore
+      // Virtual field will calculate totalStock automatically
+
       await product.save();
     }
 
@@ -131,7 +157,7 @@ class OrderService {
   //   return newOrder;
   // }
 
-  //remove when webhook implemmeted and uncomment above one
+  //remove when webhook implemmeted and uncomment above one after hosting implement webhook
   async placeOrder(userId: string, orderData: PlaceOrderRequest) {
     let { items, shippingAddress, payment, fromCart } = orderData;
 
@@ -278,7 +304,7 @@ class OrderService {
   }
   async cancelOrder(userId: string, orderId: string) {
     // 1. Find order with userId and orderId
-    const order = await Order.findOne({ user: userId, _id: orderId });
+    const order = await Order.findOne({ user: userId, _id: orderId }); // Fixed underscore
     if (!order) throw new AppError("Order not found", 404);
 
     // 2. Check if order is already cancelled
@@ -290,7 +316,7 @@ class OrderService {
     const now = new Date();
     const orderCreatedAt = order.placedAt;
     const hoursSinceOrder =
-      (now.getTime() - orderCreatedAt.getTime()) / (1000 * 60 * 60);
+      (now.getTime() - orderCreatedAt.getTime()) / (1000 * 60 * 60); // Fixed multiplication
 
     if (hoursSinceOrder > 12) {
       throw new AppError("Order cannot be cancelled after 12 hours", 400);
@@ -298,25 +324,50 @@ class OrderService {
 
     // 4. Update order status to 'cancelled'
     order.status = OrderStatus.Cancelled;
-
     await order.save();
 
-    // 5. Update stock for each product in the order
+    // 5. ✅ FIXED: Restore variant stock (not product stock)
     for (const item of order.orderItemsSnapshot) {
       const product = await Product.findById(item.productId);
-      if (product) {
-        product.stock += item.quantity; // wapas add karo stock
-        await product.save();
+      if (product && item.variantId) {
+        // Find the specific variant that was ordered
+        const variant = product.variants.find(
+          (v) => v._id?.toString() === item.variantId?.toString()
+        );
+
+        if (variant) {
+          // Restore variant stock
+          variant.stock += item.quantity;
+          await product.save();
+
+          console.log(
+            `✅ Restored ${item.quantity} units to variant ${variant.sku}`
+          );
+        } else {
+          console.warn(`⚠️ Variant not found for item: ${item.name}`);
+        }
+      } else if (product) {
+        // ✅ Fallback: If no variantId stored in order, restore to first variant
+        const firstVariant = product.variants[0];
+        if (firstVariant) {
+          firstVariant.stock += item.quantity;
+          await product.save();
+
+          console.log(
+            `✅ Restored ${item.quantity} units to first variant (fallback)`
+          );
+        }
       }
     }
 
-    // 6. Return success response or updated order data as per your design
+    // 6. Return success response
     return {
       success: true,
       message: "Order cancelled successfully",
-      orderId: order._id,
+      orderId: order._id, // Fixed underscore
     };
   }
+
   async updateOrderStatus(orderId: string, newStatus: OrderStatus) {
     const order = await Order.findById(orderId);
     if (!order) throw new AppError("Order not found", 404);

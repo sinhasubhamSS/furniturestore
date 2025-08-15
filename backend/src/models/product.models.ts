@@ -1,7 +1,7 @@
 import { Schema, model, Model, models, Document, Types } from "mongoose";
 import slugify from "slugify";
 
-// Variant Schema & Interface (Same as before)
+// Variant Schema & Interface
 export interface IVariant extends Document {
   sku: string;
   color: string;
@@ -12,7 +12,7 @@ export interface IVariant extends Document {
   stock: number;
   images: {
     url: string;
-    public_id: string; // Fixed underscore
+    public_id: string;
   }[];
 }
 
@@ -27,12 +27,12 @@ const variantSchema = new Schema<IVariant>({
   images: [
     {
       url: { type: String, required: true },
-      public_id: { type: String, required: true }, // Fixed underscore
+      public_id: { type: String, required: true },
     },
   ],
 });
 
-// Updated Product Interface (With Review Integration)
+// Updated Product Interface (Optimized)
 export interface IProduct extends Document {
   name: string;
   slug: string;
@@ -54,8 +54,7 @@ export interface IProduct extends Document {
   warranty?: string;
   disclaimer?: string;
   category: Types.ObjectId;
-  stock: number;
-  price: number;
+  price: number; // Lowest variant price (for search/filter)
   createdBy: Types.ObjectId;
   createdAt: Date;
   isPublished: boolean;
@@ -91,7 +90,7 @@ interface IProductModel extends Model<IProduct> {
   getTopRated(limit?: number): Promise<IProduct[]>;
 }
 
-// FIXED: Schema with proper typing
+// Product Schema
 const productSchema = new Schema<IProduct, IProductModel>(
   {
     name: { type: String, required: true, trim: true },
@@ -132,8 +131,7 @@ const productSchema = new Schema<IProduct, IProductModel>(
     warranty: { type: String, default: "" },
     disclaimer: { type: String, default: "" },
     category: { type: Schema.Types.ObjectId, ref: "Category", required: true },
-    stock: { type: Number, required: true, default: 0 },
-    price: { type: Number, required: true },
+    price: { type: Number, required: true }, // Cached lowest variant price
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     isPublished: { type: Boolean, default: false },
 
@@ -144,7 +142,7 @@ const productSchema = new Schema<IProduct, IProductModel>(
         default: 0,
         min: 0,
         max: 5,
-        set: (v: number) => Math.round(v * 10) / 10, // Fixed multiplication
+        set: (v: number) => Math.round(v * 10) / 10,
       },
       totalReviews: { type: Number, default: 0, min: 0 },
       ratingDistribution: {
@@ -173,24 +171,31 @@ const productSchema = new Schema<IProduct, IProductModel>(
   }
 );
 
-// Pre-save middleware for slug generation
+// Pre-save middleware for slug generation and price update
 productSchema.pre("save", function (next) {
+  // Update slug if name changed
   if (this.isModified("name")) {
     this.slug = slugify(this.name, {
       lower: true,
       strict: true,
-      remove: /[*+~.()'"!:@]/g, // Fixed regex escaping
+      remove: /[*+~.()'"!:@]/g,
     });
   }
+
+  // Update price to lowest variant price
+  if (this.variants && this.variants.length > 0) {
+    this.price = Math.min(...this.variants.map((v) => v.price));
+  }
+
   next();
 });
 
-// Existing Indexes + New Review-related Indexes
+// Optimized Indexes (removed stock index)
 productSchema.index({ slug: 1 }, { unique: true });
 productSchema.index({ category: 1 });
-productSchema.index({ price: 1 });
-productSchema.index({ stock: 1 });
+productSchema.index({ price: 1 }); // For price filtering
 productSchema.index({ "variants.sku": 1 }, { unique: true });
+productSchema.index({ isPublished: 1 });
 
 // Review-related Performance Indexes
 productSchema.index({ "reviewStats.averageRating": -1 });
@@ -211,6 +216,16 @@ productSchema.index(
   }
 );
 
+// Virtual Fields for Stock Management
+productSchema.virtual("totalStock").get(function (this: IProduct) {
+  return this.variants.reduce((sum, variant) => sum + variant.stock, 0);
+});
+
+productSchema.virtual("inStock").get(function (this: IProduct) {
+  return this.variants.some((variant) => variant.stock > 0);
+});
+
+
 // Virtual Fields for Reviews
 productSchema.virtual("hasReviews").get(function (this: IProduct) {
   return this.reviewStats.totalReviews > 0;
@@ -222,7 +237,7 @@ productSchema.virtual("reviewsAllowed").get(function (this: IProduct) {
 
 productSchema.virtual("ratingDisplay").get(function (this: IProduct) {
   return this.reviewStats.averageRating > 0
-    ? `${this.reviewStats.averageRating} (${this.reviewStats.totalReviews} reviews)` // Fixed template literal
+    ? `${this.reviewStats.averageRating} (${this.reviewStats.totalReviews} reviews)`
     : "No reviews yet";
 });
 
@@ -273,7 +288,30 @@ productSchema.statics.getTopRated = function (limit: number = 10) {
     .limit(limit);
 };
 
-// CRITICAL FIX: Proper TypeScript Export
+// Additional Utility Methods
+productSchema.statics.getInStockProducts = function () {
+  return this.find({
+    "variants.stock": { $gt: 0 },
+    isPublished: true,
+  });
+};
+
+productSchema.statics.getLowStockProducts = function (threshold: number = 10) {
+  return this.aggregate([
+    { $unwind: "$variants" },
+    { $match: { "variants.stock": { $lte: threshold }, isPublished: true } },
+    {
+      $group: {
+        _id: "$_id",
+        name: { $first: "$name" },
+        lowStockVariants: { $push: "$variants" },
+        totalLowStockItems: { $sum: "$variants.stock" },
+      },
+    },
+  ]);
+};
+
+// Export Model
 let Product: IProductModel;
 
 if (models.Product) {

@@ -12,30 +12,30 @@ import {
 
 class ReviewController {
   // Create review
-  createReview = catchAsync(
-    async (req: AuthRequest, res: Response, next: NextFunction) => {
-      // Zod validation - destructure body
-      const { body: validatedData } = createReviewSchema.parse({
-        body: req.body,
-      });
+  createReview = catchAsync(async (req: AuthRequest, res: Response) => {
+    // Zod validation - destructure body
+    const { body: validatedData } = createReviewSchema.parse({
+      body: req.body,
+    });
+    console.log(req.body);
 
-      // Ensure userId exists
-      if (!req.userId) {
-        throw new AppError("Authentication required", 401);
-      }
-
-      const reviewData = {
-        ...validatedData,
-        userId: req.userId, // Now guaranteed to be string
-      };
-
-      const review = await ReviewService.createReview(reviewData);
-
-      res
-        .status(201)
-        .json(new ApiResponse(201, review, "Review created successfully"));
+    // Ensure userId exists
+    if (!req.userId) {
+      throw new AppError("Authentication required", 401);
     }
-  );
+
+    const reviewData = {
+      ...validatedData,
+      userId: req.userId, // Now guaranteed to be string
+      productId: req.params.productId, // Get productId from route params
+    };
+
+    const review = await ReviewService.createReview(reviewData);
+
+    res
+      .status(201)
+      .json(new ApiResponse(201, review, "Review created successfully"));
+  });
 
   // Get single review by ID
   getReviewById = catchAsync(
