@@ -1,29 +1,50 @@
 import { Schema, model, Model, models, Document, Types } from "mongoose";
 import slugify from "slugify";
 
-// Variant Schema & Interface
+// Variant Interface including discount fields
 export interface IVariant extends Document {
   sku: string;
   color: string;
   size: string;
+
   basePrice: number;
   gstRate: number;
+
   price: number;
+  discountedPrice: number;
+  savings: number;
+
+  hasDiscount: boolean;
+  discountPercent: number;
+  discountValidUntil?: Date;
+
   stock: number;
+
   images: {
     url: string;
     public_id: string;
   }[];
 }
 
+// Variant Schema with discount fields and default values
 const variantSchema = new Schema<IVariant>({
   sku: { type: String, required: true },
   color: { type: String, required: true },
   size: { type: String, required: true },
+
   basePrice: { type: Number, required: true },
   gstRate: { type: Number, required: true },
-  price: { type: Number, required: true },
+
+  price: { type: Number, default: 0 },
+  discountedPrice: { type: Number, default: 0 },
+  savings: { type: Number, default: 0 },
+
+  hasDiscount: { type: Boolean, default: false },
+  discountPercent: { type: Number, default: 0, min: 0, max: 70 },
+  discountValidUntil: { type: Date },
+
   stock: { type: Number, required: true, default: 0 },
+
   images: [
     {
       url: { type: String, required: true },
@@ -32,34 +53,73 @@ const variantSchema = new Schema<IVariant>({
   ],
 });
 
-// Updated Product Interface (Optimized)
+// Pre-save hook for variant to calculate price, discountedPrice and savings
+variantSchema.pre("save", function (this: IVariant, next) {
+  this.price = this.basePrice + (this.basePrice * this.gstRate) / 100;
+
+  const isDiscountValid =
+    this.hasDiscount &&
+    this.discountPercent > 0 &&
+    (!this.discountValidUntil || this.discountValidUntil > new Date());
+
+  if (isDiscountValid) {
+    const discountAmount = (this.basePrice * this.discountPercent) / 100;
+    const discountedBasePrice = this.basePrice - discountAmount;
+
+    this.discountedPrice =
+      discountedBasePrice + (discountedBasePrice * this.gstRate) / 100;
+    this.savings = this.price - this.discountedPrice;
+  } else {
+    this.discountedPrice = this.price;
+    this.savings = 0;
+    this.hasDiscount = false;
+  }
+
+  this.price = Math.round(this.price * 100) / 100;
+  this.discountedPrice = Math.round(this.discountedPrice * 100) / 100;
+  this.savings = Math.round(this.savings * 100) / 100;
+
+  next();
+});
+
+// Product Interface
 export interface IProduct extends Document {
   name: string;
   slug: string;
+
   title: string;
   description: string;
+
   specifications?: {
     section: string;
     specs: { key: string; value: string }[];
   }[];
+
   measurements?: {
     width?: number;
     height?: number;
     depth?: number;
     weight?: number;
   };
+
   variants: Types.DocumentArray<IVariant>;
+
   colors: string[];
   sizes: string[];
+
   warranty?: string;
   disclaimer?: string;
+
   category: Types.ObjectId;
-  price: number; // Lowest variant price (for search/filter)
+
+  price: number; // Lowest variant price
+  lowestDiscountedPrice: number;
+  maxSavings: number;
+
   createdBy: Types.ObjectId;
   createdAt: Date;
   isPublished: boolean;
 
-  // Review Integration Fields
   reviewStats: {
     averageRating: number;
     totalReviews: number;
@@ -75,7 +135,6 @@ export interface IProduct extends Document {
     lastUpdated: Date;
   };
 
-  // Review Settings
   reviewSettings: {
     allowReviews: boolean;
     requireVerification: boolean;
@@ -83,7 +142,7 @@ export interface IProduct extends Document {
   };
 }
 
-// Static Methods Interface for Product
+// Static methods interface
 interface IProductModel extends Model<IProduct> {
   updateReviewStats(productId: string, stats: any): Promise<IProduct | null>;
   getByRatingRange(minRating: number, maxRating?: number): Promise<IProduct[]>;
@@ -95,6 +154,7 @@ const productSchema = new Schema<IProduct, IProductModel>(
   {
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true },
+
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true },
 
@@ -128,22 +188,22 @@ const productSchema = new Schema<IProduct, IProductModel>(
 
     colors: { type: [String], default: [] },
     sizes: { type: [String], default: [] },
+
     warranty: { type: String, default: "" },
     disclaimer: { type: String, default: "" },
+
     category: { type: Schema.Types.ObjectId, ref: "Category", required: true },
-    price: { type: Number, required: true }, // Cached lowest variant price
+
+    price: { type: Number, required: true },
+    lowestDiscountedPrice: { type: Number, required: true },
+    maxSavings: { type: Number, default: 0 },
+
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+
     isPublished: { type: Boolean, default: false },
 
-    // Review Statistics (Cached for Performance)
     reviewStats: {
-      averageRating: {
-        type: Number,
-        default: 0,
-        min: 0,
-        max: 5,
-        set: (v: number) => Math.round(v * 10) / 10,
-      },
+      averageRating: { type: Number, default: 0, min: 0, max: 5 },
       totalReviews: { type: Number, default: 0, min: 0 },
       ratingDistribution: {
         5: { type: Number, default: 0, min: 0 },
@@ -157,7 +217,6 @@ const productSchema = new Schema<IProduct, IProductModel>(
       lastUpdated: { type: Date, default: Date.now },
     },
 
-    // Review Configuration
     reviewSettings: {
       allowReviews: { type: Boolean, default: true },
       requireVerification: { type: Boolean, default: false },
@@ -171,77 +230,54 @@ const productSchema = new Schema<IProduct, IProductModel>(
   }
 );
 
-// Pre-save middleware for slug generation and price update
+// Pre-save hook for slug and price aggregation including discount
 productSchema.pre("save", function (next) {
-  // Update slug if name changed
   if (this.isModified("name")) {
     this.slug = slugify(this.name, {
       lower: true,
       strict: true,
-      remove: /[*+~.()'"!:@]/g,
+      remove: /[\*+\~.()'"!:@]/g,
     });
   }
 
-  // Update price to lowest variant price
-  if (this.variants && this.variants.length > 0) {
-    this.price = Math.min(...this.variants.map((v) => v.price));
+  if (this.variants && this.variants.length) {
+    this.price = Math.min(...this.variants.map((v) => v.price ?? 0));
+    this.lowestDiscountedPrice = Math.min(
+      ...this.variants.map((v) => v.discountedPrice ?? 0)
+    );
+    this.maxSavings = Math.max(...this.variants.map((v) => v.savings ?? 0));
+
+    this.colors = [...new Set(this.variants.map((v) => v.color))];
+    this.sizes = [...new Set(this.variants.map((v) => v.size))];
   }
 
   next();
 });
 
-// Optimized Indexes (removed stock index)
-productSchema.index({ slug: 1 }, { unique: true });
-productSchema.index({ category: 1 });
-productSchema.index({ price: 1 }); // For price filtering
-productSchema.index({ "variants.sku": 1 }, { unique: true });
-productSchema.index({ isPublished: 1 });
-
-// Review-related Performance Indexes
-productSchema.index({ "reviewStats.averageRating": -1 });
-productSchema.index({ "reviewStats.totalReviews": -1 });
-productSchema.index({
-  "reviewStats.averageRating": -1,
-  "reviewStats.totalReviews": -1,
-});
-productSchema.index({ "reviewSettings.allowReviews": 1 });
-productSchema.index({ isPublished: 1, "reviewSettings.allowReviews": 1 });
-
-// Text search index
-productSchema.index(
-  { name: "text", title: "text", description: "text" },
-  {
-    weights: { name: 10, title: 5, description: 3 },
-    name: "productSearchIndex",
-  }
-);
-
-// Virtual Fields for Stock Management
+// Virtual fields
 productSchema.virtual("totalStock").get(function (this: IProduct) {
-  return this.variants.reduce((sum, variant) => sum + variant.stock, 0);
+  return this.variants.reduce((sum, v) => sum + v.stock, 0);
 });
 
 productSchema.virtual("inStock").get(function (this: IProduct) {
-  return this.variants.some((variant) => variant.stock > 0);
+  return this.variants.some((v) => v.stock > 0);
 });
 
-
-// Virtual Fields for Reviews
-productSchema.virtual("hasReviews").get(function (this: IProduct) {
-  return this.reviewStats.totalReviews > 0;
+productSchema.virtual("hasAnyDiscount").get(function (this: IProduct) {
+  return this.variants.some((v) => v.hasDiscount);
 });
 
-productSchema.virtual("reviewsAllowed").get(function (this: IProduct) {
-  return this.reviewSettings.allowReviews && this.isPublished;
+productSchema.virtual("totalSavings").get(function (this: IProduct) {
+  return this.variants.reduce((sum, v) => sum + (v.savings ?? 0), 0);
 });
 
-productSchema.virtual("ratingDisplay").get(function (this: IProduct) {
-  return this.reviewStats.averageRating > 0
-    ? `${this.reviewStats.averageRating} (${this.reviewStats.totalReviews} reviews)`
-    : "No reviews yet";
-});
-
-// Static Methods for Review Integration
+// Indexes for performance
+productSchema.index({ slug: 1 }, { unique: true });
+productSchema.index({ category: 1 });
+productSchema.index({ price: 1 });
+productSchema.index({ lowestDiscountedPrice: 1 });
+productSchema.index({ maxSavings: -1 });
+productSchema.index({ isPublished: 1 });
 productSchema.statics.updateReviewStats = async function (
   productId: string,
   stats: any
@@ -311,9 +347,8 @@ productSchema.statics.getLowStockProducts = function (threshold: number = 10) {
   ]);
 };
 
-// Export Model
+// Export model
 let Product: IProductModel;
-
 if (models.Product) {
   Product = models.Product as IProductModel;
 } else {

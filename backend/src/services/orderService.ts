@@ -1,4 +1,4 @@
-import Product from "../models/product.models";
+import Product, { IVariant } from "../models/product.models";
 import { Order, OrderStatus } from "../models/order.models";
 import { PlaceOrderRequest } from "../types/orderservicetypes";
 import { Cart } from "../models/cart.model";
@@ -24,7 +24,7 @@ class OrderService {
       let selectedVariant;
       if (item.variantId) {
         selectedVariant = product.variants.find(
-          (v) => v._id?.toString() === item.variantId
+          (v: IVariant) => v._id?.toString() === item.variantId
         );
       } else {
         selectedVariant = product.variants[0]; // Use first variant as default
@@ -332,7 +332,7 @@ class OrderService {
       if (product && item.variantId) {
         // Find the specific variant that was ordered
         const variant = product.variants.find(
-          (v) => v._id?.toString() === item.variantId?.toString()
+          (v: IVariant) => v._id?.toString() === item.variantId?.toString()
         );
 
         if (variant) {

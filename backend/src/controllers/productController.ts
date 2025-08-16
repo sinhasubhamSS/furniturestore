@@ -4,7 +4,7 @@ import { AuthRequest } from "../types/app-request";
 import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 import { ApiResponse } from "../utils/ApiResponse";
-import slugify from "slugify";
+
 import {
   createProductSchema,
   updateProductSchema,
@@ -17,26 +17,17 @@ export const createProduct = catchAsync(
   async (req: AuthRequest, res: Response) => {
     if (!req.userId) throw new AppError("Unauthorized", 401);
     const parsedData = createProductSchema.parse(req.body);
-    // Add price to each variant
-    const variantsWithPrice = parsedData.variants.map((variant) => {
-      const gstDecimal = variant.gstRate / 100;
-      const price = variant.basePrice + variant.basePrice * gstDecimal;
-      const sku = generateSKU(parsedData.name, variant.color, variant.size);
-      return {
-        ...variant,
-         sku,
-        price,
-      };
-    });
     const productInput = {
       ...parsedData,
-      variants: variantsWithPrice,
-      createdBy: new Types.ObjectId(req.userId),
+      createdBy: new Types.ObjectId(req.userId), // 🟢 यहाँ createdBy जोड़ा गया है
     };
+
+    // Call service without SKU/price logic here
     const product = await productService.createProduct(
       productInput,
       req.userId
     );
+
     res
       .status(201)
       .json(new ApiResponse(201, product, "Product created successfully"));

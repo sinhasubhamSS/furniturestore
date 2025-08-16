@@ -5,6 +5,7 @@ import Product from "../models/product.models";
 import { IProductInput } from "../types/productservicetype";
 import { AppError } from "../utils/AppError";
 import slugify from "slugify";
+import { generateSKU } from "../utils/genetateSku";
 
 class ProductService {
   private buildSlug(name: string) {
@@ -32,50 +33,75 @@ class ProductService {
   }
 
   async createProduct(productData: IProductInput, userId: string) {
-    // Validate variants
     if (!productData.variants || productData.variants.length === 0) {
       throw new AppError("At least one variant is required", 400);
     }
 
-    // Process variants
     const processedVariants = productData.variants.map((variant) => {
-      // Validate variant images
       if (!variant.images || variant.images.length === 0) {
         throw new AppError("Each variant must have at least one image", 400);
       }
 
-      // Calculate final price
+      // Generate SKU using shared util
+      const sku = generateSKU(productData.name, variant.color, variant.size);
+
+      // Calculate price with GST
       const gstDecimal = variant.gstRate / 100;
-      const finalPrice = variant.basePrice + variant.basePrice * gstDecimal;
+      const price = variant.basePrice + variant.basePrice * gstDecimal;
+
+      // Calculate discounted price and savings
+      let discountedPrice = price;
+      let savings = 0;
+      const isDiscountValid =
+        variant.hasDiscount &&
+        variant.discountPercent > 0 &&
+        (!variant.discountValidUntil ||
+          new Date(variant.discountValidUntil) > new Date());
+
+      if (isDiscountValid) {
+        const discountAmount =
+          (variant.basePrice * variant.discountPercent) / 100;
+        const discountedBasePrice = variant.basePrice - discountAmount;
+        discountedPrice =
+          discountedBasePrice + discountedBasePrice * gstDecimal;
+        savings = price - discountedPrice;
+      }
 
       return {
         ...variant,
-        price: finalPrice,
+        sku,
+        price: Math.round(price * 100) / 100,
+        discountedPrice: Math.round(discountedPrice * 100) / 100,
+        savings: Math.round(savings * 100) / 100,
         stock: variant.stock || 0,
       };
     });
 
-    // Compute product-level fields
+    // Calculate product-level stats
     const minPrice = Math.min(...processedVariants.map((v) => v.price));
-    const totalStock = processedVariants.reduce((sum, v) => sum + v.stock, 0);
+    const minDiscountedPrice = Math.min(
+      ...processedVariants.map((v) => v.discountedPrice)
+    );
+    const maxSavings = Math.max(...processedVariants.map((v) => v.savings));
+
     const colors = [...new Set(processedVariants.map((v) => v.color))];
     const sizes = [...new Set(processedVariants.map((v) => v.size))];
 
-    // Prepare product document
     const productDocument: IProductInput = {
       ...productData,
       slug: this.buildSlug(productData.name),
       variants: processedVariants,
       price: minPrice,
-      stock: totalStock,
+      lowestDiscountedPrice: minDiscountedPrice,
+      maxSavings,
       colors,
       sizes,
-      // createdBy: new Types.ObjectId(userId), // Convert string to ObjectId
+      createdBy: new Types.ObjectId(userId),
       isPublished: productData.isPublished || false,
     };
 
-    // Create and return product
-    return await Product.create(productDocument);
+    const product = await Product.create(productDocument);
+    return product;
   }
   // async updateProduct(
   //   data: Partial<IProductInput>,
@@ -223,9 +249,9 @@ class ProductService {
       return {
         _id: product._id,
         name: product.name,
-        slug:product.slug,
+        slug: product.slug,
         image: firstVariant?.images?.[0]?.url || "",
-        price:firstVariant?.price,
+        price: firstVariant?.price,
         createdAt: product.createdAt,
       };
     });

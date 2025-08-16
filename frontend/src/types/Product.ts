@@ -1,8 +1,8 @@
 // Base shared structure
 export type Variant = {
   _id?: string;
-  color?: string;
-  size?: string;
+  color: string;
+  size: string;
   basePrice: number;
   gstRate: number;
   stock: number;
@@ -11,6 +11,11 @@ export type Variant = {
     public_id: string;
   }[];
   price?: number;
+  hasDiscount: boolean;
+  discountPercent: number;
+  discountValidUntil?: string; // ISO date string from API
+  discountedPrice: number; // Final price after discount
+  savings?: number; // Amount saved
 };
 
 export type BaseProduct = {
@@ -29,6 +34,20 @@ export type BaseProduct = {
   isPublished: boolean;
   warranty?: string;
   disclaimer?: string;
+
+  // ✅ Pricing fields (existing)
+  price?: number; // Lowest original price
+
+  // ✅ NEW: Product-level discount info
+  lowestDiscountedPrice?: number; // Best discounted price
+  maxSavings?: number; // Maximum savings across variants
+
+  // ✅ NEW: Computed discount info (from virtuals)
+  hasAnyDiscount?: boolean; // Any variant has discount
+  maxDiscountPercent?: number; // Highest discount percentage
+  activeDiscountsCount?: number; // Number of variants with active discounts
+  totalStock?: number; // Total stock across variants
+  inStock?: boolean; // Has any stock
 };
 
 // Input/Create: used when sending data (category is just ID)

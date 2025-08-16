@@ -2,25 +2,34 @@
 import { Types } from "mongoose";
 
 export interface IVariant {
-  sku: string; 
-  color: string; // Made required
-  size: string; // Made required
+  sku?: string;
+  color: string;
+  size: string;
   basePrice: number;
   gstRate: number;
-  price: number; // Final calculated price
-  stock: number; // Made required
+
+  // Calculated pricing fields - OPTIONAL करें
+  price?: number; // Optional, pre-save में कैलकुलेट
+  discountedPrice?: number; // Optional, pre-save में कैलकुलेट
+  savings?: number; // Optional, pre-save में कैलकुलेट
+
+  hasDiscount: boolean;
+  discountPercent: number;
+  discountValidUntil?: Date;
+
+  stock: number;
   images: {
     url: string;
-    public_id: string;
+    public_id: string; // Fixed underscore notation
   }[];
 }
 
 export interface IProductInput {
   name: string;
-  slug?: string; // Will be generated
+  slug?: string; // Auto-generated
   title: string;
   description: string;
-  variants: IVariant[]; // Made required
+  variants: IVariant[]; // Required
 
   specifications?: {
     section: string;
@@ -39,10 +48,10 @@ export interface IProductInput {
 
   category: Types.ObjectId;
   price?: number; // Computed min price
-  stock?: number; // Computed total stock
   colors?: string[]; // Computed from variants
   sizes?: string[]; // Computed from variants
-
+  lowestDiscountedPrice?: number;
+  maxSavings?: number;
   createdBy: Types.ObjectId;
   createdAt?: Date;
   isPublished?: boolean;

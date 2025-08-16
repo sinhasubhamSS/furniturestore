@@ -26,6 +26,10 @@ const defaultVariant = {
   basePrice: 0,
   gstRate: 0,
   stock: 0,
+  hasDiscount: false,
+  discountPercent: 0,
+  discountValidUntil: "",
+  discountedPrice: 0, // Added to satisfy Variant type
 };
 
 const ProductForm: React.FC<ProductFormProps> = ({
@@ -37,6 +41,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
   const {
     register,
     control,
+    watch,
     handleSubmit,
     setValue,
     getValues,
@@ -130,6 +135,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
             register={register}
             setValue={setValue}
             getValues={getValues}
+            watch={watch}
             remove={() => removeVariant(index)}
           />
         ))}
