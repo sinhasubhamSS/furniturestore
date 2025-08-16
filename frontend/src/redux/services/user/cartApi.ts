@@ -1,21 +1,21 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { axiosBaseQuery } from "@/redux/api/customBaseQuery";
-import { CartResponse } from "@/types/cart"; // correct usage
+import { CartResponse } from "@/types/cart";
 
 export const cartApi = createApi({
   reducerPath: "cartApi",
   baseQuery: axiosBaseQuery(),
   tagTypes: ["Cart"],
   endpoints: (builder) => ({
-    // ✅ Add item to cart
+    // ✅ Add item with variant support
     addToCart: builder.mutation<
       CartResponse,
-      { productId: string; variantId?: string; quantity: number }
+      { productId: string; variantId: string; quantity: number }
     >({
-      query: ({ productId, quantity }) => ({
+      query: ({ productId, variantId, quantity }) => ({
         url: `/cart/add`,
         method: "POST",
-        data: { productId, quantity },
+        data: { productId, variantId, quantity }, // ✅ Include variantId
       }),
       invalidatesTags: ["Cart"],
     }),
@@ -26,29 +26,32 @@ export const cartApi = createApi({
         url: `/cart/`,
         method: "GET",
       }),
-      transformResponse: (response: any) => response.data, // ✅ Only extract `.data`
+      transformResponse: (response: any) => response.data,
       providesTags: ["Cart"],
     }),
 
-    // ✅ Update quantity
+    // ✅ Update quantity with variant support
     updateQuantity: builder.mutation<
       CartResponse,
-      { productId: string; quantity: number }
+      { productId: string; variantId: string; quantity: number }
     >({
-      query: ({ productId, quantity }) => ({
+      query: ({ productId, variantId, quantity }) => ({
         url: `/cart/update`,
-        method: "PATCH",
-        data: { productId, quantity },
+        method: "PUT", // ✅ Match backend method
+        data: { productId, variantId, quantity }, // ✅ Include variantId
       }),
       invalidatesTags: ["Cart"],
     }),
 
-    // ✅ Remove item
-    removeItem: builder.mutation<CartResponse, { productId: string }>({
-      query: ({ productId }) => ({
+    // ✅ Remove item with variant support
+    removeItem: builder.mutation<
+      CartResponse,
+      { productId: string; variantId: string }
+    >({
+      query: ({ productId, variantId }) => ({
         url: `/cart/remove`,
         method: "DELETE",
-        data: { productId },
+        data: { productId, variantId }, // ✅ Include variantId
       }),
       invalidatesTags: ["Cart"],
     }),
@@ -63,7 +66,7 @@ export const cartApi = createApi({
     }),
 
     // ✅ Get cart item count
-    getCartCount: builder.query<number, void>({
+    getCartCount: builder.query<{ count: number }, void>({
       query: () => ({
         url: `/cart/count`,
         method: "GET",

@@ -1,16 +1,9 @@
 import Image from "next/image";
-
-export type Product = {
-  _id: string;
-  name: string;
-  description?: string;
-  price: number;
-  stock: number;
-  images: { url: string }[];
-};
+import { Product, DisplayProduct, Variant } from "@/types/Product";
 
 export type CheckoutItem = {
-  product: Product;
+  product: Product | DisplayProduct;
+  variantId: string;
   quantity: number;
 };
 
@@ -34,12 +27,30 @@ const CheckoutSummary = ({
     <div className="max-w-xl mx-auto bg-[--color-card] text-[--text] p-6 rounded-xl shadow-lg border border-[--color-border]">
       <h2 className="text-2xl font-bold mb-6">Checkout Summary</h2>
       <div className="space-y-4 max-h-96 overflow-auto">
-        {items.map(({ product, quantity }, idx) => {
-          const itemTotal = product.price * quantity;
+        {items.map(({ product, variantId, quantity }, idx) => {
+          // ✅ Find the selected variant
+          const selectedVariant = product.variants?.find(
+            (v) => v._id === variantId
+          );
+
+          if (!selectedVariant) {
+            console.error(
+              `Variant ${variantId} not found for product ${product._id}`
+            );
+            return null;
+          }
+
+          // ✅ Use variant's pricing (with discount)
+          const itemTotal = selectedVariant.discountedPrice * quantity;
+
           return (
-            <div key={product._id} className="flex gap-4 items-center">
+            <div
+              key={`${product._id}-${variantId}`}
+              className="flex gap-4 items-center"
+            >
+              {/* ✅ Use variant's image */}
               <Image
-                src={product.images?.[0]?.url || "/placeholder.jpg"}
+                src={selectedVariant.images?.[0]?.url || "/placeholder.jpg"}
                 alt={product.name}
                 width={100}
                 height={100}
@@ -47,18 +58,49 @@ const CheckoutSummary = ({
               />
               <div className="flex-1">
                 <h3 className="text-lg font-semibold">{product.name}</h3>
+
+                {/* ✅ Show variant details */}
+                <p className="text-sm text-muted">
+                  {selectedVariant.color} • {selectedVariant.size}
+                </p>
+
                 {product.description && (
                   <p className="text-sm text-muted line-clamp-2">
                     {product.description}
                   </p>
                 )}
-                <p className="mt-1 font-medium text-accent">
-                  ₹{product.price.toFixed(2)}
-                  {quantity > 1 && ` × ${quantity} = ₹${itemTotal.toFixed(2)}`}
-                </p>
+
+                <div className="mt-1">
+                  {/* ✅ Show discount pricing */}
+                  {selectedVariant.hasDiscount ? (
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-accent">
+                        ₹{selectedVariant.discountedPrice.toFixed(2)}
+                      </span>
+                      <span className="text-sm line-through text-muted">
+                        ₹{selectedVariant.basePrice.toFixed(2)}
+                      </span>
+                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                        {selectedVariant.discountPercent}% OFF
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="font-medium text-accent">
+                      ₹{selectedVariant.basePrice.toFixed(2)}
+                    </span>
+                  )}
+
+                  {quantity > 1 && (
+                    <p className="text-sm text-muted">
+                      × {quantity} = ₹{itemTotal.toFixed(2)}
+                    </p>
+                  )}
+                </div>
+
                 <p className="text-xs text-muted">
-                  Available Stock: {product.stock}
+                  Available Stock: {selectedVariant.stock}
                 </p>
+
                 {allowQuantityEdit && onQuantityChange && (
                   <div className="flex gap-2 mt-3">
                     <button
@@ -71,7 +113,7 @@ const CheckoutSummary = ({
                     <span className="w-6 text-center">{quantity}</span>
                     <button
                       className="btn-xs"
-                      disabled={quantity >= product.stock}
+                      disabled={quantity >= selectedVariant.stock}
                       onClick={() => onQuantityChange(idx, quantity + 1)}
                     >
                       +

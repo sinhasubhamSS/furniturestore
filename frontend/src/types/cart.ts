@@ -1,33 +1,22 @@
-export type CartProduct = {
-  _id: string;
-  name: string;
-  slug: string;
-  title: string;
-  basePrice: number;
-  gstRate: number;
-  price: number;
-  stock: number;
-  images: {
-    url: string;
-    public_id: string;
-  }[];
-};
+// types/cart.ts - ✅ Updated to match new backend structure
+import { DisplayProduct } from "./Product";
 
 export type CartItem = {
-  _id: string;
-  product: CartProduct;
+  _id?: string; // Optional for embedded items
+  product: DisplayProduct; // ✅ Full product with variants
+  variantId: string; // ✅ Added variant tracking
   quantity: number;
-  subtotal: number;
-  gstAmount: number;
-  totalWithGST: number;
+  addedAt: Date;
 };
 
 export type CartResponse = {
-  _id: string;
+  _id: string | null;
   user: string;
   items: CartItem[];
+  totalItems: number; // ✅ Updated field names
   cartSubtotal: number;
   cartGST: number;
   cartTotal: number;
-  totalVerification: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
 };

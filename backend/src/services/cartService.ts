@@ -1,168 +1,155 @@
 import { Types } from "mongoose";
 import { Cart } from "../models/cart.model";
-import { CartItem } from "../models/cartItems.model";
 import { AppError } from "../utils/AppError";
 
 class CartService {
-  async addToCart(userId: string, productId: string, quantity: number) {
-    if (!productId || quantity <= 0)
-      throw new AppError("Product ID or quantity is required", 403);
+  // ✅ Add item with variant support
+  async addToCart(
+    userId: string,
+    productId: string,
+    variantId: string,
+    quantity: number
+  ) {
+    if (!productId || !variantId || quantity <= 0) {
+      throw new AppError(
+        "Product ID, Variant ID and quantity are required",
+        400
+      );
+    }
 
     let cart = await Cart.findOne({ user: userId });
     if (!cart) {
-      cart = await Cart.create({ user: userId, items: [] });
+      cart = new Cart({ user: userId, items: [] });
     }
 
-    let existingItem = await CartItem.findOne({
-      user: userId,
-      product: productId,
-    });
+    // Check if item already exists (same product + variant)
+    const existingItemIndex = cart.items.findIndex(
+      (item) =>
+        item.product.toString() === productId &&
+        item.variantId.toString() === variantId
+    );
 
-    if (existingItem) {
-      existingItem.quantity += quantity;
-      await existingItem.save();
+    if (existingItemIndex > -1) {
+      // Update existing item quantity
+      cart.items[existingItemIndex].quantity += quantity;
     } else {
-      const newItem = await CartItem.create({
-        user: userId,
-        product: productId,
+      // Add new item
+      cart.items.push({
+        product: new Types.ObjectId(productId),
+        variantId: new Types.ObjectId(variantId),
         quantity,
         addedAt: new Date(),
       });
-      cart.items.push(newItem._id as Types.ObjectId);
-      await cart.save();
     }
 
+    // ✅ Auto-calculate totals using the new method
+    await cart.calculateTotals();
     return this.getCart(userId);
   }
 
+  // ✅ Get cart with populated data
   async getCart(userId: string) {
-    const cart = await Cart.aggregate([
-      { $match: { user: new Types.ObjectId(userId) } },
-
-      // Lookup and process items in a single stage
-      {
-        $lookup: {
-          from: "cartitems",
-          localField: "items",
-          foreignField: "_id",
-          as: "items",
-          pipeline: [
-            // Lookup product details
-            {
-              $lookup: {
-                from: "products",
-                localField: "product",
-                foreignField: "_id",
-                as: "product",
-              },
-            },
-            // Unwind product while preserving items
-            { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
-
-            // Add calculated fields
-            {
-              $addFields: {
-                subtotal: {
-                  $cond: [
-                    { $ifNull: ["$product", false] },
-                    { $multiply: ["$quantity", "$product.basePrice"] },
-                    0,
-                  ],
-                },
-                gstAmount: {
-                  $cond: [
-                    { $ifNull: ["$product", false] },
-                    {
-                      $multiply: [
-                        { $multiply: ["$quantity", "$product.basePrice"] },
-                        "$product.gstRate",
-                      ],
-                    },
-                    0,
-                  ],
-                },
-                totalWithGST: {
-                  $cond: [
-                    { $ifNull: ["$product", false] },
-                    { $multiply: ["$quantity", "$product.price"] },
-                    0,
-                  ],
-                },
-              },
-            },
-          ],
+    const cart = await Cart.findOne({ user: userId })
+      .populate({
+        path: "items.product",
+        select: "name title variants category slug price lowestDiscountedPrice",
+        populate: {
+          path: "category",
+          select: "name",
         },
-      },
+      })
+      .lean();
 
-      // Calculate cart totals
-      {
-        $addFields: {
-          cartSubtotal: { $sum: "$items.subtotal" },
-          cartGST: { $sum: "$items.gstAmount" },
-          cartTotal: { $sum: "$items.totalWithGST" },
-        },
-      },
-
-      // Add verification field
-      {
-        $addFields: {
-          totalVerification: {
-            $eq: [
-              { $round: ["$cartTotal", 2] },
-              { $round: [{ $add: ["$cartSubtotal", "$cartGST"] }, 2] },
-            ],
-          },
-        },
-      },
-    ]);
-
-    if (!cart.length) throw new AppError("Cart not found", 404);
-    return cart[0];
-  }
-  async updateQuantity(userId: string, productId: string, quantity: number) {
-    if (quantity <= 0) {
-      return this.removeItem(userId, productId);
+    if (!cart) {
+      // Return empty cart structure
+      return {
+        _id: null,
+        user: userId,
+        items: [],
+        totalItems: 0,
+        cartSubtotal: 0,
+        cartGST: 0,
+        cartTotal: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
     }
 
-    const item = await CartItem.findOne({ user: userId, product: productId });
-    if (!item) throw new AppError("Item not found in cart", 404);
+    return cart;
+  }
 
-    item.quantity = quantity;
-    await item.save();
+  // ✅ Update quantity with variant support
+  async updateQuantity(
+    userId: string,
+    productId: string,
+    variantId: string,
+    quantity: number
+  ) {
+    if (quantity <= 0) {
+      return this.removeItem(userId, productId, variantId);
+    }
+
+    const cart = await Cart.findOne({ user: userId });
+    if (!cart) throw new AppError("Cart not found", 404);
+
+    const itemIndex = cart.items.findIndex(
+      (item) =>
+        item.product.toString() === productId &&
+        item.variantId.toString() === variantId
+    );
+
+    if (itemIndex === -1) {
+      throw new AppError("Item not found in cart", 404);
+    }
+
+    cart.items[itemIndex].quantity = quantity;
+    await cart.calculateTotals();
 
     return this.getCart(userId);
   }
 
-  async removeItem(userId: string, productId: string) {
-    const item = await CartItem.findOneAndDelete({
-      user: userId,
-      product: productId,
-    });
-    if (!item) throw new AppError("Item not found", 404);
+  // ✅ Remove item with variant support
+  async removeItem(userId: string, productId: string, variantId: string) {
+    const cart = await Cart.findOne({ user: userId });
+    if (!cart) throw new AppError("Cart not found", 404);
 
-    await Cart.updateOne({ user: userId }, { $pull: { items: item._id } });
+    const itemIndex = cart.items.findIndex(
+      (item) =>
+        item.product.toString() === productId &&
+        item.variantId.toString() === variantId
+    );
+
+    if (itemIndex === -1) {
+      throw new AppError("Item not found in cart", 404);
+    }
+
+    cart.items.splice(itemIndex, 1);
+    await cart.calculateTotals();
 
     return this.getCart(userId);
   }
 
+  // ✅ Clear entire cart
   async clearCart(userId: string) {
     const cart = await Cart.findOne({ user: userId });
     if (!cart) throw new AppError("Cart not found", 404);
 
-    await CartItem.deleteMany({ _id: { $in: cart.items } });
     cart.items = [];
-    await cart.save();
+    await cart.save(); // Will auto-calculate totals as 0
 
     return this.getCart(userId);
   }
 
-  // async getCartCount(userId: string) {
-  //   const items = await CartItem.find({ user: userId });
-  //   return items.reduce((acc, item) => acc + item.quantity, 0);
-  // }
+  // ✅ Get cart count (total items)
   async getCartCount(userId: string) {
-    const items = await CartItem.find({ user: userId });
-    return items.length; // number of unique cart items
+    const cart = await Cart.findOne({ user: userId }).select("totalItems");
+    return cart?.totalItems || 0;
+  }
+
+  // ✅ Get unique items count
+  async getUniqueItemsCount(userId: string) {
+    const cart = await Cart.findOne({ user: userId }).select("items");
+    return cart?.items.length || 0;
   }
 }
 

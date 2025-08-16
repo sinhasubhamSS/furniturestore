@@ -24,8 +24,12 @@ const Navbar = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch();
   const router = useRouter();
-  const { data: cartCount, isLoading: cartCountLoading } =
-    useGetCartCountQuery();
+  
+  // ✅ Updated to handle new API response structure
+  const { data: cartCountData, isLoading: cartCountLoading } = useGetCartCountQuery();
+  
+  // ✅ Extract count from response data
+  const cartCount = cartCountData?.count || 0;
 
   const handleSignOut = () => {
     dispatch(clearActiveUser());
@@ -93,12 +97,18 @@ const Navbar = () => {
           <div className="flex items-center gap-4">
             <Link href="/cart">
               <button className="relative p-2 group">
-                <FiShoppingCart className="h-6 w-6 text-[var(--foreground)] group-hover:text-[var(--color-accent)]" />
+                <FiShoppingCart className="h-6 w-6 text-[var(--foreground)] group-hover:text-[var(--color-accent)] transition-colors" />
 
-                {!cartCountLoading && (cartCount ?? 0) > 0 && (
+                {/* ✅ Updated cart count display */}
+                {!cartCountLoading && cartCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-[var(--color-accent)] text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-bounce">
-                    {cartCount ?? 0}
+                    {cartCount > 99 ? '99+' : cartCount} {/* ✅ Handle large numbers */}
                   </span>
+                )}
+
+                {/* ✅ Loading state for cart count */}
+                {cartCountLoading && (
+                  <span className="absolute -top-1 -right-1 bg-gray-400 text-white text-xs rounded-full h-3 w-3 animate-pulse"></span>
                 )}
               </button>
             </Link>
@@ -114,7 +124,7 @@ const Navbar = () => {
                       <img
                         src={activeUser.avatar}
                         alt="User"
-                        className="h-8 w-8 rounded-full object-cover border-2 border-transparent group-hover:border-[var(--color-accent)]"
+                        className="h-8 w-8 rounded-full object-cover border-2 border-transparent group-hover:border-[var(--color-accent)] transition-colors"
                       />
                     ) : (
                       <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[var(--color-accent)] to-purple-500 flex items-center justify-center text-white">
@@ -209,7 +219,7 @@ const Navbar = () => {
                       <div className="py-1">
                         <Link
                           href="/auth/login"
-                          className=" px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-secondary)] flex items-center gap-2"
+                          className="px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-secondary)] flex items-center gap-2"
                         >
                           <RiLoginCircleLine className="h-4 w-4" />
                           Login / Register

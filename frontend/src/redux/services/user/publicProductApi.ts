@@ -46,12 +46,12 @@ export const userProductApi = createApi({
       ],
     }),
 
-    getProductByID: builder.query<UserProductResponse, string>({
+    getProductByID: builder.query<DisplayProduct, string>({
       query: (id) => ({
         url: `/products/getproductbyid/${id}`,
         method: "GET",
       }),
-      transformResponse: (res: { data: UserProductResponse }) => res.data,
+      transformResponse: (res: { data: DisplayProduct }) => res.data,
       providesTags: (_result, _error, id) => [{ type: "UserProducts", id }],
     }),
     getLatestProducts: builder.query<SimplifiedProduct[], void>({

@@ -3,63 +3,85 @@ import { catchAsync } from "../utils/catchAsync";
 import { AuthRequest } from "../types/app-request";
 import { ApiResponse } from "../utils/ApiResponse";
 import { cartService } from "../services/cartService";
+import { AppError } from "../utils/AppError";
 
+// ✅ Add to cart with variant support
 export const addToCart = catchAsync(async (req: AuthRequest, res: Response) => {
   const userId = req.userId;
-  const { productId, quantity } = req.body;
-  if (!userId) throw new Error("User not authenticated");
-  const product = await cartService.addToCart(userId, productId, quantity);
-  res.status(200).json(new ApiResponse(200, product, "product added to cart"));
+  const { productId, variantId, quantity } = req.body;
+
+  if (!userId) throw new AppError("User not authenticated", 401);
+
+  const cart = await cartService.addToCart(
+    userId,
+    productId,
+    variantId,
+    quantity
+  );
+  res.status(200).json(new ApiResponse(200, cart, "Product added to cart"));
 });
+
+// ✅ Get cart
 export const getCart = catchAsync(async (req: AuthRequest, res: Response) => {
   const userId = req.userId;
-  if (!userId) throw new Error("User not authenticated");
+
+  if (!userId) throw new AppError("User not authenticated", 401);
+
   const cart = await cartService.getCart(userId);
-  res.status(200).json(new ApiResponse(200, cart, "cart fetched"));
+  res.status(200).json(new ApiResponse(200, cart, "Cart fetched successfully"));
 });
+
+// ✅ Update quantity with variant support
 export const updateQuantity = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const userId = req.userId;
-    const { productId, quantity } = req.body;
-    if (!userId) throw new Error("User not authenticated");
-    const product = await cartService.updateQuantity(
+    const { productId, variantId, quantity } = req.body;
+
+    if (!userId) throw new AppError("User not authenticated", 401);
+
+    const cart = await cartService.updateQuantity(
       userId,
       productId,
+      variantId,
       quantity
     );
     res
       .status(200)
-      .json(new ApiResponse(200, product, "product quantity updated"));
+      .json(new ApiResponse(200, cart, "Quantity updated successfully"));
   }
 );
+
+// ✅ Remove item with variant support
 export const removeItem = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const userId = req.userId;
-    const { productId } = req.body;
-    if (!userId) throw new Error("User not authenticated");
-    const product = await cartService.removeItem(userId, productId);
-    res
-      .status(200)
-      .json(new ApiResponse(200, product, "product removed"));
+    const { productId, variantId } = req.body;
+
+    if (!userId) throw new AppError("User not authenticated", 401);
+
+    const cart = await cartService.removeItem(userId, productId, variantId);
+    res.status(200).json(new ApiResponse(200, cart, "Item removed from cart"));
   }
 );
+
+// ✅ Clear cart
 export const clearCart = catchAsync(async (req: AuthRequest, res: Response) => {
   const userId = req.userId;
 
-  if (!userId) throw new Error("User not authenticated");
-  const product = await cartService.clearCart(userId);
-  res
-    .status(200)
-    .json(new ApiResponse(200, product, "cart cleared"));
+  if (!userId) throw new AppError("User not authenticated", 401);
+
+  const cart = await cartService.clearCart(userId);
+  res.status(200).json(new ApiResponse(200, cart, "Cart cleared successfully"));
 });
+
+// ✅ Get cart count
 export const getCartCount = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const userId = req.userId;
 
-    if (!userId) throw new Error("User not authenticated");
-    const product = await cartService.getCartCount(userId);
-    res
-      .status(200)
-      .json(new ApiResponse(200, product, "got cart count "));
+    if (!userId) throw new AppError("User not authenticated", 401);
+
+    const count = await cartService.getCartCount(userId);
+    res.status(200).json(new ApiResponse(200, { count }, "Cart count fetched"));
   }
 );

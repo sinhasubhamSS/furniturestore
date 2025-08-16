@@ -1,19 +1,24 @@
+// routes/cart.routes.ts
 import { Router } from "express";
-import { authVerify } from "../middlewares/authVerify";
-import {
-  addToCart,
-  clearCart,
-  getCart,
-  getCartCount,
-  removeItem,
-  updateQuantity,
+import { 
+  addToCart, 
+  getCart, 
+  updateQuantity, 
+  removeItem, 
+  clearCart, 
+  getCartCount 
 } from "../controllers/cartController";
+import { authVerify } from "../middlewares/authVerify";
+
 
 const router = Router();
-router.post("/add", authVerify, addToCart); 
-router.get("/", authVerify, getCart); 
-router.patch("/update", authVerify, updateQuantity); 
-router.delete("/remove", authVerify, removeItem); 
-router.delete("/clear", authVerify, clearCart); 
+
+// ✅ All routes now support variants
+router.post("/add", authVerify, addToCart);           // { productId, variantId, quantity }
+router.get("/", authVerify, getCart);
+router.put("/update", authVerify, updateQuantity);    // { productId, variantId, quantity }
+router.delete("/remove", authVerify, removeItem);     // { productId, variantId }
+router.delete("/clear", authVerify, clearCart);
 router.get("/count", authVerify, getCartCount);
+
 export default router;
