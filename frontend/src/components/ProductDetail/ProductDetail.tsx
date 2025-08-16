@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useGetProductBySlugQuery } from "@/redux/services/user/publicProductApi";
-import { useSelector, useDispatch } from "react-redux";
-import { RootState, AppDispatch } from "@/redux/store";
+import { useDispatch } from "react-redux";
+import {  AppDispatch } from "@/redux/store";
 import {
   setQuantity,
   resetProductState,
@@ -83,7 +82,7 @@ const ProductDetail = ({ slug }: Props) => {
         <div className="w-full lg:w-1/2 mt-4 lg:mt-0"> {/* Add margin-top on mobile, remove on desktop */}
           <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-100">
             <ProductHeader product={product} />
-            <ProductPrice />
+            <ProductPrice  variants={product.variants} />
             <div className="py-4 space-y-4">
               <VariantSelector variants={product.variants} />
               <QuantitySelector />

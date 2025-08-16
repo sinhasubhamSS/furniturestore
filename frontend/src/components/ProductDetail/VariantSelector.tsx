@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect } from "react"; // Added useEffect
+import React, { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   setSelectedColor,
   setSelectedSize,
   setSelectedVariant,
-  setSelectedImage, // Added import if not already there
+  setSelectedImage,
 } from "@/redux/slices/ProductDetailSlice";
 import { RootState } from "@/redux/store";
 import { Variant } from "@/types/Product";
@@ -18,29 +18,26 @@ type Props = {
 const VariantSelector: React.FC<Props> = ({ variants }) => {
   const dispatch = useDispatch();
   const { selectedColor, selectedSize, selectedVariant } = useSelector(
-    // Added selectedVariant here
     (state: RootState) => state.productDetail
   );
 
-  // Initial setup on mount or variants change
+  // 🔹 Initialize default variant on first load
   useEffect(() => {
     if (variants.length > 0 && !selectedVariant) {
-      // Now selectedVariant is defined, so no error
-      // Only if not already set
-      const firstVariant = variants[0];
-      dispatch(setSelectedVariant(firstVariant));
-      dispatch(setSelectedColor(firstVariant.color || null));
-      dispatch(setSelectedSize(firstVariant.size || null));
-      dispatch(setSelectedImage(firstVariant.images?.[0]?.url || null));
+      const first = variants[0];
+      dispatch(setSelectedVariant(first));
+      dispatch(setSelectedColor(first.color || null));
+      dispatch(setSelectedSize(first.size || null));
+      dispatch(setSelectedImage(first.images?.[0]?.url || null));
     }
-  }, [variants, selectedVariant, dispatch]); // Added selectedVariant to dependencies for better reactivity
+  }, [variants, selectedVariant, dispatch]);
 
-  // Unique colors (filter out null/undefined)
+  // 🔹 Extract unique colors
   const colors = Array.from(
     new Set(variants.map((v) => v.color).filter(Boolean))
   ) as string[];
 
-  // Unique sizes, filtered by selected color if available
+  // 🔹 Extract unique sizes (filtered by selectedColor if chosen)
   const sizes = Array.from(
     new Set(
       (selectedColor
@@ -50,29 +47,35 @@ const VariantSelector: React.FC<Props> = ({ variants }) => {
     )
   ) as string[];
 
+  // 🔹 Handle Color Change
   const handleColorSelect = (color: string) => {
     dispatch(setSelectedColor(color));
-    // Find matching variant (with current size if selected)
+
     const variant =
       variants.find((v) => v.color === color && v.size === selectedSize) ||
-      variants.find((v) => v.color === color) || // Fallback
+      variants.find((v) => v.color === color) ||
       null;
-    dispatch(setSelectedVariant(variant));
+
     if (variant) {
-      dispatch(setSelectedImage(variant.images?.[0]?.url || null)); // Added for image sync
+      dispatch(setSelectedVariant(variant));
+      dispatch(setSelectedImage(variant.images?.[0]?.url || null));
+      dispatch(setSelectedSize(variant.size || null));
     }
   };
 
+  // 🔹 Handle Size Change
   const handleSizeSelect = (size: string) => {
     dispatch(setSelectedSize(size));
-    // Find matching variant (with current color if selected)
+
     const variant =
       variants.find((v) => v.size === size && v.color === selectedColor) ||
-      variants.find((v) => v.size === size) || // Fallback
+      variants.find((v) => v.size === size) ||
       null;
-    dispatch(setSelectedVariant(variant));
+
     if (variant) {
-      dispatch(setSelectedImage(variant.images?.[0]?.url || null)); // Added for image sync
+      dispatch(setSelectedVariant(variant));
+      dispatch(setSelectedImage(variant.images?.[0]?.url || null));
+      dispatch(setSelectedColor(variant.color || null));
     }
   };
 
@@ -90,7 +93,7 @@ const VariantSelector: React.FC<Props> = ({ variants }) => {
                 className={`w-10 h-10 rounded-full border-2 transition-all duration-200 ${
                   selectedColor === color
                     ? "border-black shadow-md"
-                    : "border-transparent"
+                    : "border-gray-300"
                 }`}
                 style={{ backgroundColor: color || "#ccc" }}
               />
@@ -105,7 +108,6 @@ const VariantSelector: React.FC<Props> = ({ variants }) => {
           <h3 className="font-medium mb-2">Select Size:</h3>
           <div className="flex gap-2 flex-wrap">
             {sizes.map((size) => {
-              // Optional: Disable if not available for selected color
               const isAvailable = variants.some(
                 (v) =>
                   v.color === selectedColor && v.size === size && v.stock > 0
