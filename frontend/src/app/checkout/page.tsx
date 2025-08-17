@@ -233,14 +233,24 @@ export default function CheckoutPage() {
               }
               onQuantityChange={handleQuantityChange}
             />
-
+            
             <button
               className={`mt-6 w-full rounded-lg py-3 font-semibold text-white transition-colors ${
                 addressSelected
                   ? "bg-blue-600 hover:bg-blue-700"
                   : "bg-gray-300 cursor-not-allowed"
               }`}
-              onClick={() => router.push("/checkout/payment")}
+              onClick={() => {
+                if (productId && variantId) {
+                  // Direct purchase - pass URL parameters
+                  router.push(
+                    `/checkout/payment?product=${productId}&variant=${variantId}&quantity=${quantity}`
+                  );
+                } else {
+                  // Cart purchase - no params needed
+                  router.push("/checkout/payment");
+                }
+              }}
               disabled={!addressSelected}
             >
               Proceed to Payment

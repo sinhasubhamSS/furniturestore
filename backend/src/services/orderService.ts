@@ -44,17 +44,26 @@ class OrderService {
           400
         );
       }
-
+      const finalPrice =
+        selectedVariant.hasDiscount && selectedVariant.discountedPrice > 0
+          ? selectedVariant.discountedPrice // discounted price (includes GST)
+          : selectedVariant.price;
       // Use variant price
-      const itemTotal = selectedVariant.price * item.quantity;
+      const itemTotal = finalPrice * item.quantity;
       totalAmount += itemTotal;
 
       orderItemsSnapshot.push({
         productId: product._id,
+        variantId: selectedVariant._id,
         name: product.name,
         image: selectedVariant.images?.[0]?.url || "",
         quantity: item.quantity,
-        price: selectedVariant.price,
+        price: finalPrice, // ✅ Only final price
+        hasDiscount: selectedVariant.hasDiscount,
+        discountPercent: selectedVariant.discountPercent || 0,
+        color: selectedVariant.color,
+        size: selectedVariant.size,
+        sku: selectedVariant.sku,
       });
 
       // ✅ FIXED: Update variant stock only
@@ -165,11 +174,11 @@ class OrderService {
       const cart = await Cart.findOne({ user: userId });
       if (!cart || cart.items.length === 0)
         throw new AppError("Cart is empty", 400);
-      const cartItems = await CartItem.find({
-        _id: { $in: cart.items },
-      }).populate("product");
-      items = cartItems.map((item: any) => ({
-        productId: item.product._id,
+
+      // ✅ Updated for new embedded cart structure
+      items = cart.items.map((item) => ({
+        productId: item.product.toString(),
+        variantId: item.variantId.toString(), // ✅ Include variantId
         quantity: item.quantity,
       }));
     }
@@ -206,7 +215,6 @@ class OrderService {
         throw new AppError("Razorpay payment verification failed", 400);
 
       paymentStatus = "paid";
-      paymentMethod = "RAZORPAY";
     }
 
     const newOrder = await Order.create({
@@ -224,11 +232,11 @@ class OrderService {
       status: "pending",
     });
 
+    // ✅ Updated cart clearing for new embedded structure
     if (fromCart) {
       const cart = await Cart.findOne({ user: userId });
       if (cart && cart.items.length > 0) {
-        await CartItem.deleteMany({ _id: { $in: cart.items } });
-        cart.items = [];
+        cart.items = []; // ✅ Clear embedded items array
         await cart.save();
       }
     }

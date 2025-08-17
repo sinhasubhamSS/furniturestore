@@ -77,3 +77,49 @@ export const verifyPayment = catchAsync(
       );
   }
 );
+
+export const verifyOrderAmount = catchAsync(
+  async (req: Request, res: Response) => {
+    console.log("Reached verify order amount");
+    const { items } = req.body;
+
+    console.log("📥 Verifying order amount for items:", items);
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      throw new AppError("Items array is required for verification", 400);
+    }
+
+    // Validate items structure
+    for (const item of items) {
+      if (
+        !item.productId ||
+        !item.variantId ||
+        typeof item.quantity !== "number" ||
+        item.quantity <= 0
+      ) {
+        throw new AppError(
+          "Each item must have valid productId, variantId, and quantity",
+          400
+        );
+      }
+    }
+
+    const verificationResult = await paymentService.verifyOrderAmount(items);
+
+    console.log(
+      "✅ Order amount verification successful:",
+      verificationResult.totalAmount
+    );
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          verificationResult,
+          "Order amount verified successfully"
+        )
+      );
+  }
+);
+

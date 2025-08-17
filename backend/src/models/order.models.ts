@@ -22,14 +22,16 @@ export enum PaymentMethod {
 }
 
 // Order Item snapshot interface
+// ✅ Clean interface - only what matters for user
 export interface OrderItemSnapshot {
   productId: Types.ObjectId;
+  variantId: Types.ObjectId;
   name: string;
   image?: string;
   quantity: number;
-  price: number;
-  // ✅ OPTIONAL: Add these if you want variant tracking in orders
-  variantId?: Types.ObjectId;
+  price: number; // ✅ Final price that user paid (either price or discountedPrice)
+  hasDiscount: boolean;
+  discountPercent?: number;
   color?: string;
   size?: string;
   sku?: string;
@@ -77,10 +79,17 @@ const orderSchema = new Schema<OrderDocument>(
     orderItemsSnapshot: [
       {
         productId: { type: Schema.Types.ObjectId, required: true },
+        variantId: { type: Schema.Types.ObjectId, required: true },
         name: { type: String, required: true },
         image: String,
         quantity: { type: Number, required: true },
-        price: { type: Number, required: true },
+        price: { type: Number, required: true }, // ✅ Only this price
+        hasDiscount: { type: Boolean, default: false },
+        discountPercent: { type: Number, default: 0 },
+        color: String,
+        size: String,
+        sku: String,
+        // No basePrice field
       },
     ],
 

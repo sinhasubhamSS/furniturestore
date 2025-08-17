@@ -1,7 +1,12 @@
 import razorpay from "../utils/razorpayinstace";
 import crypto from "crypto";
 import { AppError } from "../utils/AppError";
-
+import Product, { IVariant } from "../models/product.models";
+interface VerifyAmountItem {
+  productId: string;
+  variantId: string;
+  quantity: number;
+}
 class PaymentService {
   async createOrder(amountInRupees: number) {
     if (!amountInRupees || amountInRupees <= 0) {
@@ -54,7 +59,7 @@ class PaymentService {
       verified: true,
       method: paymentDetails.method?.toUpperCase(), // e.g. "UPI"
     };
-  }//remove it when webhook is implemented
+  } //remove it when webhook is implemented
 
   // verifySignatureAndGetDetails	Payment signature verification & payment info fetch	Payment verify karte waqt (e.g., order place time)
   // verifyWebhookSignature	Webhook payload signature verification	Webhook endpoint par webhook verify karte waqt
@@ -74,6 +79,52 @@ class PaymentService {
       .digest("hex");
 
     return generatedSignature === signature;
+  }
+
+  // ✅ SIMPLE: Only verify amount
+  async verifyOrderAmount(items: VerifyAmountItem[]) {
+    if (!items || items.length === 0) {
+      throw new AppError("No items provided for verification", 400);
+    }
+
+    let totalAmount = 0;
+
+    for (const item of items) {
+      if (!item.productId || !item.variantId || item.quantity <= 0) {
+        throw new AppError("Invalid item data", 400);
+      }
+
+      const product = await Product.findById(item.productId);
+      if (!product) {
+        throw new AppError(`Product not found`, 404);
+      }
+
+      const variant = product.variants.find(
+        (v: IVariant) => v._id?.toString() === item.variantId
+      );
+
+      if (!variant) {
+        throw new AppError(`Variant not found`, 404);
+      }
+
+      // Basic stock check
+      if (variant.stock < item.quantity) {
+        throw new AppError(`Insufficient stock`, 400);
+      }
+
+      // Calculate price (same as OrderService)
+      const actualPrice =
+        variant.hasDiscount && variant.discountedPrice > 0
+          ? variant.discountedPrice
+          : variant.price;
+
+      totalAmount += actualPrice * item.quantity;
+    }
+
+    return {
+      totalAmount,
+      verified: true,
+    };
   }
 }
 

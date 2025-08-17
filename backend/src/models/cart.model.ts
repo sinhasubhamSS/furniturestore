@@ -137,7 +137,7 @@ cartSchema.virtual("itemCount").get(function () {
 });
 
 // Indexes
-cartSchema.index({ user: 1 });
+
 cartSchema.index({ user: 1, "items.product": 1, "items.variantId": 1 });
 cartSchema.index({ user: 1, updatedAt: -1 });
 

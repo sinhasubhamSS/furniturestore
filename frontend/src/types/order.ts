@@ -27,6 +27,7 @@ export interface Order {
 export type PlaceOrderRequest = {
   items: {
     productId: string;
+     variantId: string;
     quantity: number;
   }[];
   shippingAddress: Address;

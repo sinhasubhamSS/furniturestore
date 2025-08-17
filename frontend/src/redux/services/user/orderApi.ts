@@ -2,6 +2,21 @@ import { axiosBaseQuery } from "@/redux/api/customBaseQuery";
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { Order, PlaceOrderRequest, RazorpayOrderResponse } from "@/types/order";
 
+// ✅ Add type for verification
+type VerifyAmountRequest = {
+  items: {
+    productId: string;
+    variantId: string;
+    quantity: number;
+  }[];
+};
+
+type VerifyAmountResponse = {
+  totalAmount: number;
+  verified: boolean;
+  itemCount: number;
+};
+
 export const orderApi = createApi({
   reducerPath: "orderApi",
   baseQuery: axiosBaseQuery(),
@@ -27,7 +42,20 @@ export const orderApi = createApi({
       transformResponse: (response: any) => response.data,
     }),
 
-    // ✅ Get user's own orders
+    // ✅ NEW: Verify order amount before payment
+    verifyOrderAmount: builder.mutation<
+      VerifyAmountResponse,
+      VerifyAmountRequest
+    >({
+      query: (data) => ({
+        url: `/payment/verify-amount`,
+        method: "POST",
+        data,
+      }),
+      transformResponse: (response: any) => response.data,
+    }),
+
+    // Get user's own orders
     getMyOrders: builder.query<Order[], void>({
       query: () => ({
         url: `/order/myorders`,
@@ -36,6 +64,8 @@ export const orderApi = createApi({
       transformResponse: (response: any) => response.data,
       providesTags: ["Orders"],
     }),
+
+    // Cancel order
     cancelOrder: builder.mutation<void, { orderId: string }>({
       query: ({ orderId }) => ({
         url: `/order/cancel-order`,
@@ -51,6 +81,7 @@ export const orderApi = createApi({
 export const {
   useCreateOrderMutation,
   useCreateRazorpayOrderMutation,
+  useVerifyOrderAmountMutation, // ✅ Export new hook
   useGetMyOrdersQuery,
   useCancelOrderMutation,
 } = orderApi;
