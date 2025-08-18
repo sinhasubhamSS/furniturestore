@@ -5,135 +5,115 @@ import { RootState } from "@/redux/store";
 import {
   useCreateOrderMutation,
   useCreateRazorpayOrderMutation,
-  useVerifyOrderAmountMutation, // ✅ Add this import
+  useVerifyOrderAmountMutation,
 } from "@/redux/services/user/orderApi";
 import { resetCheckout, setPaymentMethod } from "@/redux/slices/checkoutSlice";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useGetCartQuery } from "@/redux/services/user/cartApi";
 import { useGetProductByIDQuery } from "@/redux/services/user/publicProductApi";
 import { useState, useEffect, useMemo } from "react";
 
-type PlaceOrderItem = {
-  productId: string;
-  variantId: string;
-  quantity: number;
-};
-
 const PaymentPage = () => {
   const dispatch = useDispatch();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
-  // Get data from URL parameters
-  const urlProductId = searchParams.get("product");
-  const urlVariantId = searchParams.get("variant");
-  const urlQuantity = searchParams.get("quantity");
-
-  // Redux state selectors
+  // Strictly from Redux!
   const {
-    productId: reduxProductId,
-    quantity: reduxQuantity,
+    items,
+    type,
     selectedAddress: shippingAddress,
   } = useSelector((state: RootState) => state.checkout);
 
-  // Use URL params first, then Redux fallback
-  const actualProductId = urlProductId || reduxProductId;
-  const actualVariantId = urlVariantId;
-  const actualQuantity = urlQuantity ? parseInt(urlQuantity) : reduxQuantity;
-
-  // Fetch data
-  const { data: cartData } = useGetCartQuery();
+  // Fetch product for direct purchase
+  const productId =
+    type === "direct_purchase" && items.length ? items[0].productId : null;
   const { data: product, isLoading: loadingProduct } = useGetProductByIDQuery(
-    actualProductId || "",
-    { skip: !actualProductId }
+    productId || "",
+    { skip: !productId }
   );
-  const cartBased = !actualProductId && cartData && cartData.items.length > 0;
 
-  // Local state
+  // Fetch full cart data for cart purchase
+  const { data: cartData, isLoading: cartLoading } = useGetCartQuery(
+    undefined,
+    { skip: type !== "cart_purchase" }
+  );
+
+  // RTK Query hooks
+  const [createOrder, { isLoading: placingOrder }] = useCreateOrderMutation();
+  const [createRazorpayOrder] = useCreateRazorpayOrderMutation();
+  const [verifyOrderAmount, { isLoading: verifying }] =
+    useVerifyOrderAmountMutation();
+
+  // Local UI state
   const [selectedMethod, setSelectedMethod] = useState<
     "card" | "upi" | "netbanking" | "cod" | null
   >(null);
   const [serverAmount, setServerAmount] = useState<number | null>(null);
   const [priceVerified, setPriceVerified] = useState(false);
 
-  // ✅ RTK Query mutation hooks
-  const [createOrder, { isLoading: placingOrder }] = useCreateOrderMutation();
-  const [createRazorpayOrder] = useCreateRazorpayOrderMutation();
-  const [verifyOrderAmount, { isLoading: verifying }] = useVerifyOrderAmountMutation(); // ✅ Add this
+  // Calculate displayAmount for rendering
+  const displayAmount = useMemo(() => {
+    if (type === "direct_purchase" && items.length && product) {
+      const item = items[0];
+      const variant = product.variants?.find((v) => v._id === item.variantId);
+      return variant ? variant.discountedPrice * item.quantity : 0;
+    }
+    if (type === "cart_purchase" && cartData?.items?.length) {
+      return cartData.items.reduce((sum, item) => {
+        const variant = item.product.variants.find(
+          (v) => v._id === item.variantId
+        );
+        return sum + (variant ? variant.discountedPrice * item.quantity : 0);
+      }, 0);
+    }
+    return 0;
+  }, [type, items, product, cartData]);
 
-  // ✅ INDUSTRY STANDARD: Calculate display amount immediately
-  const { items, displayAmount } = useMemo(() => {
-    let orderItems: PlaceOrderItem[] = [];
-    let amount = 0;
-
-    if (actualProductId && product && actualVariantId) {
-      const variant = product.variants?.find((v) => v._id === actualVariantId);
-      if (variant) {
-        orderItems = [
-          {
-            productId: actualProductId,
-            variantId: actualVariantId,
-            quantity: actualQuantity,
-          },
-        ];
-        amount = variant.discountedPrice * actualQuantity;
-      }
-    } else if (cartData && cartData.items.length > 0) {
-      orderItems = cartData.items.map((item) => ({
+  // Prepare orderItems for backend
+  const orderItems = useMemo(() => {
+    if (type === "direct_purchase" && items.length) {
+      return items.map(({ productId, variantId, quantity }) => ({
+        productId,
+        variantId,
+        quantity,
+      }));
+    }
+    if (type === "cart_purchase" && cartData?.items?.length) {
+      return cartData.items.map((item) => ({
         productId: item.product._id,
         variantId: item.variantId,
         quantity: item.quantity,
       }));
-      amount = cartData.cartTotal || 0;
     }
+    return [];
+  }, [type, items, cartData]);
 
-    return { items: orderItems, displayAmount: amount };
-  }, [actualProductId, product, actualVariantId, actualQuantity, cartData]);
-
-  // ✅ RTK QUERY VERIFICATION: Proper API integration
+  // Background price verification (from backend)
   useEffect(() => {
     const doVerification = async () => {
-      if (items.length === 0) return;
-
+      if (!orderItems.length) return;
       try {
-        const result = await verifyOrderAmount({ items }).unwrap();
-        
+        const result = await verifyOrderAmount({ items: orderItems }).unwrap();
         setServerAmount(result.totalAmount);
-        
-        // Check if amounts match (allow small rounding differences)
-        const matches = Math.abs(result.totalAmount - displayAmount) < 1;
-        setPriceVerified(matches);
-
-        if (matches) {
-          console.log('✅ Price verification successful');
-        } else {
-          console.warn(`Price mismatch: Display=${displayAmount}, Server=${result.totalAmount}`);
-        }
-
-      } catch (error: any) {
-        console.error("Price verification failed:", error);
-        // Fallback - allow user to continue but with warning
+        setPriceVerified(Math.abs(result.totalAmount - displayAmount) < 1);
+      } catch {
         setServerAmount(displayAmount);
         setPriceVerified(false);
       }
     };
-
     doVerification();
-  }, [items, displayAmount, verifyOrderAmount]);
+  }, [orderItems, displayAmount, verifyOrderAmount]);
 
-  // Clear payment method selection on mount
+  // Reset payment selection every mount
   useEffect(() => {
     dispatch(setPaymentMethod(null));
     setSelectedMethod(null);
   }, [dispatch]);
 
-  // Razorpay SDK loader
+  // Razorpay loader
   const loadRazorpayScript = () =>
     new Promise<boolean>((resolve) => {
-      if (document.getElementById("razorpay-sdk")) {
-        resolve(true);
-        return;
-      }
+      if (document.getElementById("razorpay-sdk")) return resolve(true);
       const script = document.createElement("script");
       script.id = "razorpay-sdk";
       script.src = "https://checkout.razorpay.com/v1/checkout.js";
@@ -147,25 +127,14 @@ const PaymentPage = () => {
     dispatch(setPaymentMethod(method === "cod" ? "COD" : "RAZORPAY"));
   };
 
-  // ✅ SECURE PAYMENT: Use verified amount
+  // Payment handler
   const handlePayment = async () => {
-    if (!selectedMethod) {
-      alert("Please select a payment method.");
-      return;
-    }
-    if (!shippingAddress) {
-      alert("Please select a shipping address.");
-      return;
-    }
-    if (items.length === 0) {
-      alert("No products to order.");
-      return;
-    }
+    if (!selectedMethod) return alert("Please select a payment method.");
+    if (!shippingAddress) return alert("Please select a shipping address.");
+    if (!orderItems.length) return alert("No products to order.");
 
-    // Use server-verified amount if available, otherwise display amount
     const paymentAmount = serverAmount || displayAmount;
 
-    // Warn user if price wasn't verified
     if (
       !priceVerified &&
       serverAmount &&
@@ -179,35 +148,23 @@ const PaymentPage = () => {
       if (!confirm) return;
     }
 
-    console.log("Order payload:", {
-      items,
-      shippingAddress,
-      selectedMethod,
-      paymentAmount,
-      priceVerified,
-    });
-
-    // Handle COD flow
     if (selectedMethod === "cod") {
       try {
         const orderData = await createOrder({
           data: {
-            items,
+            items: orderItems,
             shippingAddress,
             payment: { method: "COD" as const },
-            fromCart: cartBased,
+            fromCart: type === "cart_purchase",
           },
         }).unwrap();
-
         alert("Order placed successfully with Cash on Delivery.");
         dispatch(resetCheckout());
-
         const orderId = orderData?.data?.orderId || orderData?.orderId;
         router.push(
           orderId ? `/order-success?orderId=${orderId}` : "/order-success"
         );
       } catch (error: any) {
-        console.error("COD Error:", error);
         alert(
           error?.data?.message || "Failed to place Cash on Delivery order."
         );
@@ -215,32 +172,29 @@ const PaymentPage = () => {
       return;
     }
 
-    // Handle Razorpay flow
+    // Razorpay
     const razorpayLoaded = await loadRazorpayScript();
-    if (!razorpayLoaded) {
-      alert(
+    if (!razorpayLoaded)
+      return alert(
         "Failed to load Razorpay payment SDK. Please refresh and try again."
       );
-      return;
-    }
-
     try {
-      // Use verified amount for Razorpay
       const razorpayOrder = await createRazorpayOrder(paymentAmount).unwrap();
-
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
         amount: razorpayOrder.amount,
         currency: razorpayOrder.currency,
         name: "SUVIDHA Store",
         description:
-          items.length > 1 ? `Order of ${items.length} items` : product?.name,
+          orderItems.length > 1
+            ? `Order of ${orderItems.length} items`
+            : product?.name,
         order_id: razorpayOrder.orderId,
         handler: async (response: any) => {
           try {
             const orderData = await createOrder({
               data: {
-                items,
+                items: orderItems,
                 shippingAddress,
                 payment: {
                   method: "RAZORPAY" as const,
@@ -248,19 +202,16 @@ const PaymentPage = () => {
                   razorpayPaymentId: response.razorpay_payment_id,
                   razorpaySignature: response.razorpay_signature,
                 },
-                fromCart: cartBased,
+                fromCart: type === "cart_purchase",
               },
             }).unwrap();
-
             alert("Payment successful and order placed!");
             dispatch(resetCheckout());
-
             const orderId = orderData?.data?.orderId || orderData?.orderId;
             router.push(
               orderId ? `/order-success?orderId=${orderId}` : "/order-success"
             );
           } catch (e: any) {
-            console.error("Order creation error:", e);
             alert(e?.data?.message || "Failed to record order after payment.");
           }
         },
@@ -268,28 +219,20 @@ const PaymentPage = () => {
           name: shippingAddress.fullName,
           contact: shippingAddress.mobile,
         },
-        theme: {
-          color: "#6366f1",
-        },
+        theme: { color: "#6366f1" },
         modal: {
-          ondismiss: () => {
-            console.log("Payment cancelled by user");
-          },
+          ondismiss: () => console.log("Payment cancelled by user"),
         },
       };
 
       const rzp = new (window as any).Razorpay(options);
-
-      rzp.on("payment.failed", (response: any) => {
-        console.error("Payment failed:", response.error);
+      rzp.on("payment.failed", (response: any) =>
         alert(
           `Payment failed: ${response.error.description || "Please try again"}`
-        );
-      });
-
+        )
+      );
       rzp.open();
     } catch (error: any) {
-      console.error("Razorpay error:", error);
       alert(
         error?.data?.message ||
           "Failed to initiate Razorpay payment. Please try again."
@@ -297,10 +240,15 @@ const PaymentPage = () => {
     }
   };
 
-  if (actualProductId && loadingProduct)
-    return <p className="text-center mt-10">Loading product details...</p>;
+  if (
+    (type === "direct_purchase" && loadingProduct) ||
+    (type === "cart_purchase" && cartLoading)
+  )
+    return (
+      <p className="text-center mt-10">Loading product and cart details...</p>
+    );
 
-  if (items.length === 0) {
+  if (!orderItems.length) {
     return (
       <div className="text-center mt-10 p-6">
         <div className="text-red-500 text-6xl mb-4">⚠️</div>
@@ -326,22 +274,20 @@ const PaymentPage = () => {
     );
   }
 
+  // ----------- Render
   return (
     <div className="max-w-lg mx-auto p-6">
       <div className="bg-white rounded-xl shadow-lg border">
-        {/* Header */}
         <div className="p-6 border-b text-center">
           <h1 className="text-2xl font-bold mb-2">Complete Payment</h1>
           <p className="text-gray-600 mb-2">
-            {items.length === 1 ? product?.name : `${items.length} products`}
+            {orderItems.length === 1
+              ? product?.name
+              : `${orderItems.length} products`}
           </p>
-
-          {/* ✅ SHOW PRICE IMMEDIATELY - like Myntra/Flipkart */}
           <p className="text-3xl font-bold text-blue-600">
             ₹{displayAmount.toFixed(2)}
           </p>
-
-          {/* ✅ Enhanced verification status indicators */}
           <div className="mt-2 text-sm">
             {verifying && (
               <p className="text-blue-500 flex items-center justify-center gap-1">
@@ -349,20 +295,19 @@ const PaymentPage = () => {
                 Verifying price...
               </p>
             )}
-            
             {!verifying && priceVerified && (
               <p className="text-green-600">✅ Price verified</p>
             )}
-            
             {!verifying && !priceVerified && serverAmount && (
               <p className="text-orange-600">⚠️ Price mismatch detected</p>
             )}
-            
-            {!verifying && serverAmount && Math.abs(serverAmount - displayAmount) > 1 && (
-              <p className="text-orange-500">
-                Server shows: ₹{serverAmount.toFixed(2)}
-              </p>
-            )}
+            {!verifying &&
+              serverAmount &&
+              Math.abs(serverAmount - displayAmount) > 1 && (
+                <p className="text-orange-500">
+                  Server shows: ₹{serverAmount.toFixed(2)}
+                </p>
+              )}
           </div>
         </div>
 
@@ -418,7 +363,9 @@ const PaymentPage = () => {
             {placingOrder
               ? "Processing..."
               : selectedMethod === "cod"
-              ? `Place COD Order - ₹${(serverAmount || displayAmount).toFixed(2)}`
+              ? `Place COD Order - ₹${(serverAmount || displayAmount).toFixed(
+                  2
+                )}`
               : `Pay ₹${(serverAmount || displayAmount).toFixed(2)}`}
           </button>
         </div>

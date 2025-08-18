@@ -2,85 +2,82 @@
 
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   useGetCartQuery,
   useUpdateQuantityMutation,
 } from "@/redux/services/user/cartApi";
-
 import { useGetProductByIDQuery } from "@/redux/services/user/publicProductApi";
 import CheckoutSummary, {
   CheckoutItem,
 } from "@/components/checkout/CheckoutSummary";
 import AddressSection from "@/components/checkout/AddressSection";
 import { RootState } from "@/redux/store";
-import { setQuantity, setProductId } from "@/redux/slices/checkoutSlice";
+import { updateQuantity } from "@/redux/slices/checkoutSlice"; // ✅ New action
 
 export default function CheckoutPage() {
   const dispatch = useDispatch();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
-  const productId = searchParams.get("product");
-  const variantId = searchParams.get("variant");
-  const urlQuantity = searchParams.get("quantity");
-
-  useEffect(() => {
-    if (productId) {
-      dispatch(setProductId(productId));
-    }
-    // ✅ Set quantity from URL if available
-    if (urlQuantity) {
-      dispatch(setQuantity(parseInt(urlQuantity) || 1));
-    }
-  }, [productId, urlQuantity, dispatch]);
-
-  const { data: cartData, isLoading: cartLoading } = useGetCartQuery();
-  const { data: product, isLoading: productLoading } = useGetProductByIDQuery(
-    productId || "",
-    {
-      skip: !productId,
-    }
-  );
-
-  const { quantity, selectedAddress } = useSelector(
+  // ✅ Get checkout data from Redux (no URL params!)
+  const { items, type, selectedAddress } = useSelector(
     (state: RootState) => state.checkout
   );
+
   const [addressSelected, setAddressSelected] = useState(!!selectedAddress);
+
+  // ✅ Get product data for direct purchases
+  const productId =
+    type === "direct_purchase" && items.length > 0 ? items[0].productId : null;
+  const { data: product, isLoading: productLoading } = useGetProductByIDQuery(
+    productId || "",
+    { skip: !productId }
+  );
+
+  // ✅ Get cart data for cart purchases
+  const { data: cartData, isLoading: cartLoading } = useGetCartQuery(
+    undefined,
+    { skip: type !== "cart_purchase" }
+  );
 
   // Hook for cart quantity update mutation
   const [updateQty] = useUpdateQuantityMutation();
 
-  // ✅ Prepare items and total with variant support
-  let items: CheckoutItem[] = [];
+  // ✅ Prepare checkout items based on purchase type
+  let checkoutItems: CheckoutItem[] = [];
   let total = 0;
 
-  if (productId && product && variantId) {
-    // ✅ Single product checkout with variant
-    const selectedVariant = product.variants?.find((v) => v._id === variantId);
+  if (type === "direct_purchase" && items.length > 0 && product) {
+    // ✅ Direct purchase from product detail
+    const item = items[0];
+    const selectedVariant = product.variants?.find(
+      (v) => v._id === item.variantId
+    );
 
     if (selectedVariant) {
-      items = [
+      checkoutItems = [
         {
           product,
           variantId: selectedVariant._id!,
-          quantity,
+          quantity: item.quantity,
         },
       ];
-      total = selectedVariant.discountedPrice * quantity;
+      total = selectedVariant.discountedPrice * item.quantity;
     } else {
-      console.error(`Variant ${variantId} not found for product ${productId}`);
+      console.error(
+        `Variant ${item.variantId} not found for product ${item.productId}`
+      );
     }
-  } else if (cartData?.items?.length) {
-    // ✅ Cart checkout - assuming backend returns variantId
-    items = cartData.items.map(({ product, variantId, quantity }) => ({
+  } else if (type === "cart_purchase" && cartData?.items?.length) {
+    // ✅ Cart purchase
+    checkoutItems = cartData.items.map(({ product, variantId, quantity }) => ({
       product,
       variantId,
       quantity,
     }));
 
-    // ✅ Calculate total using variant pricing
-    total = items.reduce((sum, item) => {
+    // Calculate total using variant pricing
+    total = checkoutItems.reduce((sum, item) => {
       const variant = item.product.variants?.find(
         (v) => v._id === item.variantId
       );
@@ -88,12 +85,12 @@ export default function CheckoutPage() {
     }, 0);
   }
 
-  // ✅ Handle Quantity Change with variant support
+  // ✅ Handle Quantity Change
   const handleQuantityChange = async (index: number, newQuantity: number) => {
-    const item = items[index];
+    const item = checkoutItems[index];
     if (!item) return;
 
-    // ✅ Find the variant for stock checking
+    // Find the variant for stock checking
     const variant = item.product.variants?.find(
       (v) => v._id === item.variantId
     );
@@ -102,13 +99,13 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (productId && variantId) {
-      // Single product quantity managed in Redux
-      const clamped = Math.max(1, Math.min(newQuantity, variant.stock));
-      dispatch(setQuantity(clamped));
-    } else {
-      // Cart quantity update via backend API call
-      const clamped = Math.max(1, Math.min(newQuantity, variant.stock));
+    const clamped = Math.max(1, Math.min(newQuantity, variant.stock));
+
+    if (type === "direct_purchase") {
+      // ✅ Update Redux for direct purchase
+      dispatch(updateQuantity(clamped));
+    } else if (type === "cart_purchase") {
+      // ✅ Update cart via API for cart purchase
       try {
         await updateQty({
           productId: item.product._id,
@@ -122,10 +119,29 @@ export default function CheckoutPage() {
     }
   };
 
+  // ✅ Handle Proceed to Payment
+  const handleProceedToPayment = () => {
+    if (!addressSelected) {
+      alert("Please select a delivery address");
+      return;
+    }
+
+    // ✅ Navigate to payment (no URL params needed!)
+    router.push("/checkout/payment");
+  };
+
   // Sync addressSelected with Redux address
   useEffect(() => {
     setAddressSelected(!!selectedAddress);
   }, [selectedAddress]);
+
+  // ✅ Redirect if no checkout data
+  useEffect(() => {
+    if (!type || items.length === 0) {
+      console.warn("No checkout data found, redirecting...");
+      router.push("/cart");
+    }
+  }, [type, items, router]);
 
   if (cartLoading || productLoading) {
     return (
@@ -138,23 +154,23 @@ export default function CheckoutPage() {
     );
   }
 
-  // ✅ Error handling for missing variant in direct purchase
-  if (productId && product && !variantId) {
+  // ✅ Error handling for missing product data
+  if (type === "direct_purchase" && (!product || !items.length)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center bg-white p-8 rounded-xl shadow-lg">
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
-            Variant Not Specified
+            Product Not Found
           </h2>
           <p className="text-gray-600 mb-6">
-            Please select a product variant before checkout.
+            The selected product is no longer available.
           </p>
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push("/products")}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Go Back & Select Variant
+            Browse Products
           </button>
         </div>
       </div>
@@ -162,8 +178,10 @@ export default function CheckoutPage() {
   }
 
   // ✅ Error handling for variant not found
-  if (productId && product && variantId) {
-    const selectedVariant = product.variants?.find((v) => v._id === variantId);
+  if (type === "direct_purchase" && product && items.length > 0) {
+    const selectedVariant = product.variants?.find(
+      (v) => v._id === items[0].variantId
+    );
     if (!selectedVariant) {
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -176,7 +194,7 @@ export default function CheckoutPage() {
               The selected product variant is no longer available.
             </p>
             <button
-              onClick={() => router.push(`/products/${productId}`)}
+              onClick={() => router.push(`/products/${items[0].productId}`)}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               View Product
@@ -187,13 +205,13 @@ export default function CheckoutPage() {
     }
   }
 
-  if (items.length === 0) {
+  if (checkoutItems.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center bg-white p-8 rounded-xl shadow-lg">
           <div className="text-gray-400 text-6xl mb-4">🛒</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
-            Cart is Empty
+            Nothing to Checkout
           </h2>
           <p className="text-gray-600 mb-6">
             Add some items to your cart to continue.
@@ -214,6 +232,10 @@ export default function CheckoutPage() {
       <div className="max-w-7xl mx-auto">
         <h1 className="text-center text-3xl font-bold mb-10 text-gray-800">
           Checkout
+          {/* ✅ Show purchase type indicator */}
+          <span className="text-sm text-gray-500 block mt-1">
+            {type === "direct_purchase" ? "Direct Purchase" : "Cart Purchase"}
+          </span>
         </h1>
 
         <div className="grid lg:grid-cols-[2fr_1fr] gap-8">
@@ -225,32 +247,19 @@ export default function CheckoutPage() {
           {/* Summary and Proceed Button */}
           <div className="sticky top-10 self-start bg-white p-6 rounded-xl shadow-lg border border-gray-200">
             <CheckoutSummary
-              items={items}
+              items={checkoutItems}
               total={total}
-              allowQuantityEdit={
-                (!!productId && !!variantId) ||
-                (cartData?.items?.length ?? 0) > 0
-              }
+              allowQuantityEdit={true}
               onQuantityChange={handleQuantityChange}
             />
-            
+
             <button
               className={`mt-6 w-full rounded-lg py-3 font-semibold text-white transition-colors ${
                 addressSelected
                   ? "bg-blue-600 hover:bg-blue-700"
                   : "bg-gray-300 cursor-not-allowed"
               }`}
-              onClick={() => {
-                if (productId && variantId) {
-                  // Direct purchase - pass URL parameters
-                  router.push(
-                    `/checkout/payment?product=${productId}&variant=${variantId}&quantity=${quantity}`
-                  );
-                } else {
-                  // Cart purchase - no params needed
-                  router.push("/checkout/payment");
-                }
-              }}
+              onClick={handleProceedToPayment} // ✅ Updated handler
               disabled={!addressSelected}
             >
               Proceed to Payment

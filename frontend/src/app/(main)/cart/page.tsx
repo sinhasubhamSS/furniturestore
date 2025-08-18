@@ -7,12 +7,36 @@ import {
 } from "@/redux/services/user/cartApi";
 import ProductCartItem from "@/components/cart/cartComponent";
 import { useRouter } from "next/navigation";
+import { useDispatch } from "react-redux"; // ✅ Import dispatch
+import { setCartPurchase } from "@/redux/slices/checkoutSlice"; // ✅ Import action
 
 const CartPage = () => {
   const { data, isLoading, error } = useGetCartQuery();
   const [updateQty] = useUpdateQuantityMutation();
   const [removeItem] = useRemoveItemMutation();
   const router = useRouter();
+  const dispatch = useDispatch(); // ✅ Add dispatch
+
+  // ✅ Handle checkout button click
+  const handleProceedToCheckout = () => {
+    if (!data || !data.items || data.items.length === 0) {
+      alert("Your cart is empty!");
+      return;
+    }
+
+    // ✅ Convert cart items to checkout format
+    const checkoutItems = data.items.map((item) => ({
+      productId: item.product._id,
+      variantId: item.variantId,
+      quantity: item.quantity,
+    }));
+
+    // ✅ Set cart purchase in Redux
+    dispatch(setCartPurchase(checkoutItems));
+
+    // ✅ Navigate to checkout
+    router.push("/checkout");
+  };
 
   if (isLoading) {
     return (
@@ -101,8 +125,9 @@ const CartPage = () => {
 
         <div className="flex justify-center mt-6">
           <button
-            onClick={() => router.push("/checkout")}
-            className="bg-[--color-accent] text-white px-8 py-3 rounded-lg font-semibold text-lg shadow hover:brightness-110 transition"
+            onClick={handleProceedToCheckout} // ✅ Updated handler
+            disabled={!data.items || data.items.length === 0} // ✅ Disable if empty
+            className="bg-[--color-accent] text-white px-8 py-3 rounded-lg font-semibold text-lg shadow hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Proceed to Checkout
           </button>

@@ -3,8 +3,9 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useAddToCartMutation } from "@/redux/services/user/cartApi";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/redux/store";
+import { setDirectPurchase } from "@/redux/slices/checkoutSlice"; // ✅ Import new action
 import Button from "@/components/ui/Button";
 
 type Props = {
@@ -13,17 +14,26 @@ type Props = {
 
 const ActionButtons: React.FC<Props> = ({ productId }) => {
   const router = useRouter();
+  const dispatch = useDispatch(); // ✅ Add dispatch
   const { selectedVariant, quantity } = useSelector(
     (state: RootState) => state.productDetail
   );
   const [addToCart, { isLoading: isAdding }] = useAddToCartMutation();
 
+  // ✅ Updated Buy Now handler - No URL params!
   const handleBuyNow = () => {
-    // ✅ Use productId prop instead of product._id
     if (selectedVariant?._id && productId) {
-      router.push(
-        `/checkout?product=${productId}&variant=${selectedVariant._id}&quantity=${quantity}`
+      // ✅ Set checkout data in Redux
+      dispatch(
+        setDirectPurchase({
+          productId: productId,
+          variantId: selectedVariant._id,
+          quantity: quantity,
+        })
       );
+
+      // ✅ Navigate to checkout (no URL params needed)
+      router.push("/checkout");
     }
   };
 

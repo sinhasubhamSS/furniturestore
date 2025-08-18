@@ -2,10 +2,8 @@ import Product, { IVariant } from "../models/product.models";
 import { Order, OrderStatus } from "../models/order.models";
 import { PlaceOrderRequest } from "../types/orderservicetypes";
 import { Cart } from "../models/cart.model";
-import { CartItem } from "../models/cartItems.model";
 import { paymentService } from "./paymentService";
 import { AppError } from "../utils/AppError";
-
 class OrderService {
   // Helper to process product items
   private async buildOrderItems(
