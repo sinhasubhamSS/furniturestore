@@ -4,16 +4,18 @@ import { PlaceOrderRequest } from "../types/orderservicetypes";
 import { Cart } from "../models/cart.model";
 import { paymentService } from "./paymentService";
 import { AppError } from "../utils/AppError";
+import mongoose from "mongoose";
 class OrderService {
   // Helper to process product items
   private async buildOrderItems(
-    items: { productId: string; quantity: number; variantId?: string }[]
+    items: { productId: string; quantity: number; variantId?: string }[],
+    session: mongoose.ClientSession
   ) {
     const orderItemsSnapshot = [];
     let totalAmount = 0;
 
     for (const item of items) {
-      const product = await Product.findById(item.productId);
+      const product = await Product.findById(item.productId).session(session);
       if (!product) {
         throw new AppError(`Product not found: ${item.productId}`, 404);
       }
@@ -70,7 +72,7 @@ class OrderService {
       // ✅ REMOVED: Don't update product.stock since it's not in schema anymore
       // Virtual field will calculate totalStock automatically
 
-      await product.save();
+      await product.save({ session });
     }
 
     return { orderItemsSnapshot, totalAmount };
@@ -166,80 +168,101 @@ class OrderService {
 
   //remove when webhook implemmeted and uncomment above one after hosting implement webhook
   async placeOrder(userId: string, orderData: PlaceOrderRequest) {
-    let { items, shippingAddress, payment, fromCart } = orderData;
+    const session = await mongoose.startSession(); // Create DB session
+    try {
+      let createdOrder: any;
 
-    if ((!items || items.length === 0) && fromCart) {
-      const cart = await Cart.findOne({ user: userId });
-      if (!cart || cart.items.length === 0)
-        throw new AppError("Cart is empty", 400);
+      await session.withTransaction(async () => {
+        let { items, shippingAddress, payment, fromCart } = orderData;
 
-      // ✅ Updated for new embedded cart structure
-      items = cart.items.map((item) => ({
-        productId: item.product.toString(),
-        variantId: item.variantId.toString(), // ✅ Include variantId
-        quantity: item.quantity,
-      }));
-    }
+        // If fromCart, fetch items from cart inside transaction (with session)
+        if ((!items || items.length === 0) && fromCart) {
+          const cart = await Cart.findOne({ user: userId }).session(session);
+          if (!cart || cart.items.length === 0)
+            throw new AppError("Cart is empty", 400);
 
-    if (!items || items.length === 0)
-      throw new AppError("No order items provided.", 400);
+          items = cart.items.map((item) => ({
+            productId: item.product.toString(),
+            variantId: item.variantId.toString(),
+            quantity: item.quantity,
+          }));
+        }
 
-    const { orderItemsSnapshot, totalAmount } = await this.buildOrderItems(
-      items
-    );
+        if (!items || items.length === 0)
+          throw new AppError("No order items provided.", 400);
 
-    let paymentStatus: "pending" | "paid" = "pending";
-    let paymentMethod: "COD" | "RAZORPAY" = payment.method as
-      | "COD"
-      | "RAZORPAY";
-    let provider = payment.method === "COD" ? "CASH" : "RAZORPAY";
+        // Build items snapshot (will decrement stock, all atomic inside this session)
+        const { orderItemsSnapshot, totalAmount } = await this.buildOrderItems(
+          items,
+          session
+        );
 
-    if (payment.method === "RAZORPAY") {
-      if (
-        !payment.razorpayOrderId ||
-        !payment.razorpayPaymentId ||
-        !payment.razorpaySignature
-      ) {
-        throw new AppError("Missing Razorpay payment information", 400);
-      }
+        // Payment verification as before (do outside transaction if it's all third-party/async)
+        let paymentStatus: "pending" | "paid" = "pending";
+        let paymentMethod: "COD" | "RAZORPAY" = payment.method as
+          | "COD"
+          | "RAZORPAY";
+        let provider = payment.method === "COD" ? "CASH" : "RAZORPAY";
 
-      const { verified } = await paymentService.verifySignatureAndGetDetails({
-        razorpay_order_id: payment.razorpayOrderId,
-        razorpay_payment_id: payment.razorpayPaymentId,
-        razorpay_signature: payment.razorpaySignature,
+        if (payment.method === "RAZORPAY") {
+          if (
+            !payment.razorpayOrderId ||
+            !payment.razorpayPaymentId ||
+            !payment.razorpaySignature
+          ) {
+            throw new AppError("Missing Razorpay payment information", 400);
+          }
+
+          const { verified } =
+            await paymentService.verifySignatureAndGetDetails({
+              razorpay_order_id: payment.razorpayOrderId,
+              razorpay_payment_id: payment.razorpayPaymentId,
+              razorpay_signature: payment.razorpaySignature,
+            });
+
+          if (!verified)
+            throw new AppError("Razorpay payment verification failed", 400);
+
+          paymentStatus = "paid";
+        }
+
+        // Order.create must use { session } and be in array form for atomicity
+        const [newOrder] = await Order.create(
+          [
+            {
+              user: userId,
+              orderItemsSnapshot,
+              shippingAddressSnapshot: shippingAddress,
+              paymentSnapshot: {
+                method: paymentMethod,
+                status: paymentStatus,
+                provider,
+                razorpayOrderId: payment.razorpayOrderId || null,
+                razorpayPaymentId: payment.razorpayPaymentId || null,
+              },
+              totalAmount,
+              status: "pending",
+            },
+          ],
+          { session }
+        );
+        createdOrder = newOrder;
+
+        // Clear user's cart if needed (also with session!)
+        if (fromCart) {
+          await Cart.findOneAndUpdate(
+            { user: userId },
+            { items: [] },
+            { session }
+          );
+        }
       });
-
-      if (!verified)
-        throw new AppError("Razorpay payment verification failed", 400);
-
-      paymentStatus = "paid";
+      // Transaction auto-commits if all succeeded
+      return createdOrder;
+    } finally {
+      // Ensure session is closed even if error thrown
+      await session.endSession();
     }
-
-    const newOrder = await Order.create({
-      user: userId,
-      orderItemsSnapshot,
-      shippingAddressSnapshot: shippingAddress,
-      paymentSnapshot: {
-        method: paymentMethod,
-        status: paymentStatus,
-        provider,
-        razorpayOrderId: payment.razorpayOrderId || null,
-        razorpayPaymentId: payment.razorpayPaymentId || null,
-      },
-      totalAmount,
-      status: "pending",
-    });
-
-    // ✅ Updated cart clearing for new embedded structure
-    if (fromCart) {
-      const cart = await Cart.findOne({ user: userId });
-      if (cart && cart.items.length > 0) {
-        cart.items = []; // ✅ Clear embedded items array
-        await cart.save();
-      }
-    }
-
-    return newOrder;
   }
 
   async handleRazorpayWebhook(data: {
