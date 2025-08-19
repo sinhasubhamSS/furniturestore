@@ -23,11 +23,15 @@ export const orderApi = createApi({
   tagTypes: ["Orders"],
   endpoints: (builder) => ({
     // Place order (COD or Razorpay)
-    createOrder: builder.mutation<any, { data: PlaceOrderRequest }>({
-      query: ({ data }) => ({
+    createOrder: builder.mutation<
+      any,
+      { data: PlaceOrderRequest; idempotencyKey?: string }
+    >({
+      query: ({ data, idempotencyKey }) => ({
         url: `/order/placeorder/`,
         method: "POST",
         data,
+        headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
       }),
       invalidatesTags: ["Orders"],
     }),

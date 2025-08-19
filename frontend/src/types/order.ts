@@ -4,6 +4,8 @@ import { Address } from "./address";
 
 export interface Order {
   _id: string;
+  orderId?: string;
+  idempotencyKey?: string;
   placedAt: string; // Example: "2025-07-31T05:53:53.664Z"
   paymentStatus: "paid" | "unpaid"; // Adjust as needed
   status: "pending" | "shipped" | "delivered" | "cancelled"; // Add more statuses as per your logic
@@ -23,11 +25,10 @@ export interface Order {
   };
 }
 
-
 export type PlaceOrderRequest = {
   items: {
     productId: string;
-     variantId: string;
+    variantId: string;
     quantity: number;
   }[];
   shippingAddress: Address;
@@ -38,6 +39,7 @@ export type PlaceOrderRequest = {
     razorpaySignature?: string;
   };
   fromCart?: boolean;
+  idempotencyKey?: string;
 };
 
 export type RazorpayOrderResponse = {

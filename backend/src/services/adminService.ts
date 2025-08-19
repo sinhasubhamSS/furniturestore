@@ -1,10 +1,8 @@
-
 import { Order, OrderStatus } from "../models/order.models";
 import Product from "../models/product.models";
 import User from "../models/user.models";
 
 class AdminService {
-  
   // Total registered users count
   async getTotalUsers(): Promise<number> {
     return User.countDocuments();
@@ -17,10 +15,7 @@ class AdminService {
 
   // Recent orders - by default last 5 orders sorted by creation date descending
   async getRecentOrders(limit: number = 5) {
-    return Order.find({})
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .lean(); // use lean() for plain JS objects if no mongoose docs needed
+    return Order.find({}).sort({ createdAt: -1 }).limit(limit).lean(); // use lean() for plain JS objects if no mongoose docs needed
   }
 
   // Count of orders which are in 'Pending' status

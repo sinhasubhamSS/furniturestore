@@ -1,0 +1,7 @@
+Unique Order Numbers	Short readable orderId	Better UX, easy support
+Idempotency	Prevent double charge/order	No accidental dup orders
+Deadlock Handling	Transaction timeout, error logs	Avoid stuck orders
+Logging	Per-event log with context	Debug, audit, analysis
+Extra Validation	Cross-check DB for every entity	Data integrity, security
+Restock on Cancel	Transactional cancel support	Inventory accuracy
+Rate Limiting	API limit per-user	Bot/abuse protection

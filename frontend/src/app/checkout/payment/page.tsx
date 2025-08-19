@@ -13,6 +13,14 @@ import { useGetCartQuery } from "@/redux/services/user/cartApi";
 import { useGetProductByIDQuery } from "@/redux/services/user/publicProductApi";
 import { useState, useEffect, useMemo } from "react";
 
+// ✅ IdempotencyKey generator function
+const generateIdempotencyKey = () => {
+  // You can get userId from auth context if needed
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).slice(2);
+  return `order_${timestamp}_${random}`;
+};
+
 const PaymentPage = () => {
   const dispatch = useDispatch();
   const router = useRouter();
@@ -50,6 +58,17 @@ const PaymentPage = () => {
   >(null);
   const [serverAmount, setServerAmount] = useState<number | null>(null);
   const [priceVerified, setPriceVerified] = useState(false);
+
+  // ✅ Store idempotencyKey to prevent regeneration on re-renders
+  const [currentIdempotencyKey, setCurrentIdempotencyKey] =
+    useState<string>("");
+
+  // ✅ Generate idempotencyKey once per payment session
+  useEffect(() => {
+    if (!currentIdempotencyKey) {
+      setCurrentIdempotencyKey(generateIdempotencyKey());
+    }
+  }, [currentIdempotencyKey]);
 
   // Calculate displayAmount for rendering
   const displayAmount = useMemo(() => {
@@ -127,11 +146,13 @@ const PaymentPage = () => {
     dispatch(setPaymentMethod(method === "cod" ? "COD" : "RAZORPAY"));
   };
 
-  // Payment handler
+  // ✅ Updated Payment handler with IdempotencyKey
   const handlePayment = async () => {
     if (!selectedMethod) return alert("Please select a payment method.");
     if (!shippingAddress) return alert("Please select a shipping address.");
     if (!orderItems.length) return alert("No products to order.");
+    if (!currentIdempotencyKey)
+      return alert("Payment session expired. Please refresh.");
 
     const paymentAmount = serverAmount || displayAmount;
 
@@ -148,6 +169,7 @@ const PaymentPage = () => {
       if (!confirm) return;
     }
 
+    // ✅ COD Order with IdempotencyKey
     if (selectedMethod === "cod") {
       try {
         const orderData = await createOrder({
@@ -157,10 +179,20 @@ const PaymentPage = () => {
             payment: { method: "COD" as const },
             fromCart: type === "cart_purchase",
           },
+          idempotencyKey: currentIdempotencyKey, // ✅ Pass idempotencyKey
         }).unwrap();
+
+        // ✅ Handle duplicate order response
+        if (orderData.isExisting) {
+          alert(`Order already exists! Order ID: ${orderData.orderId}`);
+          dispatch(resetCheckout());
+          router.push(`/order-success?orderId=${orderData.orderId}`);
+          return;
+        }
+
         alert("Order placed successfully with Cash on Delivery.");
         dispatch(resetCheckout());
-        const orderId = orderData?.data?.orderId || orderData?.orderId;
+        const orderId = orderData?.orderId || orderData?.data?.orderId;
         router.push(
           orderId ? `/order-success?orderId=${orderId}` : "/order-success"
         );
@@ -172,12 +204,13 @@ const PaymentPage = () => {
       return;
     }
 
-    // Razorpay
+    // ✅ Razorpay Order with IdempotencyKey
     const razorpayLoaded = await loadRazorpayScript();
     if (!razorpayLoaded)
       return alert(
         "Failed to load Razorpay payment SDK. Please refresh and try again."
       );
+
     try {
       const razorpayOrder = await createRazorpayOrder(paymentAmount).unwrap();
       const options = {
@@ -204,10 +237,20 @@ const PaymentPage = () => {
                 },
                 fromCart: type === "cart_purchase",
               },
+              idempotencyKey: currentIdempotencyKey, // ✅ Pass idempotencyKey
             }).unwrap();
+
+            // ✅ Handle duplicate order response
+            if (orderData.isExisting) {
+              alert(`Order already processed! Order ID: ${orderData.orderId}`);
+              dispatch(resetCheckout());
+              router.push(`/order-success?orderId=${orderData.orderId}`);
+              return;
+            }
+
             alert("Payment successful and order placed!");
             dispatch(resetCheckout());
-            const orderId = orderData?.data?.orderId || orderData?.orderId;
+            const orderId = orderData?.orderId || orderData?.data?.orderId;
             router.push(
               orderId ? `/order-success?orderId=${orderId}` : "/order-success"
             );
@@ -288,6 +331,14 @@ const PaymentPage = () => {
           <p className="text-3xl font-bold text-blue-600">
             ₹{displayAmount.toFixed(2)}
           </p>
+
+          {/* ✅ Show IdempotencyKey for debugging (remove in production) */}
+          {process.env.NODE_ENV === "development" && (
+            <p className="text-xs text-gray-400 mt-1">
+              Session: {currentIdempotencyKey.slice(-8)}
+            </p>
+          )}
+
           <div className="mt-2 text-sm">
             {verifying && (
               <p className="text-blue-500 flex items-center justify-center gap-1">
@@ -351,9 +402,9 @@ const PaymentPage = () => {
         <div className="p-6 border-t">
           <button
             onClick={handlePayment}
-            disabled={!selectedMethod || placingOrder}
+            disabled={!selectedMethod || placingOrder || !currentIdempotencyKey}
             className={`w-full py-3 px-6 rounded-lg font-semibold text-lg transition-colors ${
-              !selectedMethod || placingOrder
+              !selectedMethod || placingOrder || !currentIdempotencyKey
                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                 : selectedMethod === "cod"
                 ? "bg-green-600 hover:bg-green-700 text-white"

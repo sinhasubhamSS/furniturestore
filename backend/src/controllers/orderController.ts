@@ -16,15 +16,24 @@ export const placeOrder = catchAsync(
       // Throwing AppError lets your error middleware format the error
       throw new AppError("Unauthorized", 401);
     }
+    const idempotencyKey = req.headers["idempotency-key"] as string;
+    if (idempotencyKey && typeof idempotencyKey !== "string") {
+      throw new AppError("Invalid idempotency key format", 400);
+    }
 
-    const order = await orderService.placeOrder(userId, req.body);
+    const order = await orderService.placeOrder(
+      userId,
+      req.body,
+      idempotencyKey
+    );
 
     // Use ApiResponse for consistent, structured success output
     return res.status(201).json(
       new ApiResponse(
         201,
         {
-          orderId: order._id,
+          orderId: order.orderId,
+          idempotencyKey: order.idempotencyKey,
           payment: order.paymentSnapshot,
           items: order.orderItemsSnapshot,
           totalAmount: order.totalAmount,
