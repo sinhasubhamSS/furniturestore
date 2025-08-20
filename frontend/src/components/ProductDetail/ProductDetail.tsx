@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useGetProductBySlugQuery } from "@/redux/services/user/publicProductApi";
-import { useDispatch } from "react-redux";
-import { AppDispatch } from "@/redux/store";
+import { useDispatch, useSelector } from "react-redux"; // ✅ Add useSelector
+import { AppDispatch, RootState } from "@/redux/store"; // ✅ Add RootState
 import {
   setQuantity,
   resetProductState,
@@ -17,9 +17,7 @@ import QuantitySelector from "./QuantitySelector";
 import StockStatus from "./StockStatus";
 import ActionButtons from "./ActionButtons";
 import ProductInfo from "./ProductInfo";
-import ReviewsSection from "../reviews/ReviewList";
-
-// ✅ Fix imports - Use ReviewsSection instead of separate components
+import ReviewsSection from "../reviews/ReviewSection";
 
 interface Props {
   slug: string;
@@ -28,6 +26,9 @@ interface Props {
 const ProductDetail = ({ slug }: Props) => {
   const dispatch = useDispatch<AppDispatch>();
   const { data: product, isLoading, error } = useGetProductBySlugQuery(slug);
+
+  // ✅ Direct Redux selector for user
+  const user = useSelector((state: RootState) => state.user.activeUser);
 
   useEffect(() => {
     if (product) {
@@ -96,8 +97,11 @@ const ProductDetail = ({ slug }: Props) => {
         </div>
       </div>
 
-      {/* ✅ Complete Reviews Section */}
-      <ReviewsSection productId={product._id} />
+      {/* ✅ Reviews Section with Direct Redux User */}
+      <ReviewsSection
+        productId={product._id}
+        currentUserId={user?._id || "guest"} // ✅ Direct selector usage
+      />
     </div>
   );
 };

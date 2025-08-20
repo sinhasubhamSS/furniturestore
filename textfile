@@ -4,4 +4,17 @@ Deadlock Handling	Transaction timeout, error logs	Avoid stuck orders
 Logging	Per-event log with context	Debug, audit, analysis
 Extra Validation	Cross-check DB for every entity	Data integrity, security
 Restock on Cancel	Transactional cancel support	Inventory accuracy
-Rate Limiting	API limit per-user	Bot/abuse protection
+Rate Limiting	API limit per-user	Bot/abuse 
+
+
+components/reviews/
+├── StarRating.tsx           ✅ Perfect
+├── QuickRating.tsx          ✅ Perfect  
+├── PostReviewModal.tsx      ⚠️ Add edit support
+├── ReviewCard.tsx           ✅ Extract from ReviewsSection
+├── ReviewActions.tsx        ⭐ New - Edit/Delete buttons
+├── SortSelector.tsx         ⭐ New - Extract from ReviewsSection
+├── ReviewFilter.tsx         ⭐ New - Rating filter
+├── ReviewsPagination.tsx    ⭐ New - Extract from ReviewsSection
+├── NoReviewsPlaceholder.tsx ⭐ New - Extract from ReviewsSection
+└── ReviewsSection.tsx       ⚠️ Clean up after extractions

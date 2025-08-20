@@ -151,23 +151,37 @@ export class ReviewService {
   }
 
   // 5. Get Product Reviews
+  // src/services/reviewService.ts में getProductReviews method को update करें:
   static async getProductReviews(
     productId: string,
     page: number = 1,
-    limit: number = 10
+    limit: number = 10,
+    sortBy: string = "createdAt",
+    sortOrder: string = "desc",
+    rating?: number
   ) {
     try {
-      const skip = (page - 1) * limit; // ✅ Fixed multiplication
+      const skip = (page - 1) * limit;
+
+      // ✅ Build match conditions
+      const matchConditions: any = { productId };
+      if (rating) {
+        matchConditions.rating = rating;
+      }
+
+      // ✅ Build sort conditions
+      const sortConditions: any = {};
+      sortConditions[sortBy] = sortOrder === "asc" ? 1 : -1;
 
       const [reviews, total] = await Promise.all([
-        Review.find({ productId })
+        Review.find(matchConditions)
           .populate("userId", "name avatar")
           .populate("productId", "name slug title")
-          .sort({ createdAt: -1 })
+          .sort(sortConditions)
           .skip(skip)
           .limit(limit),
 
-        Review.countDocuments({ productId }),
+        Review.countDocuments(matchConditions),
       ]);
 
       return {

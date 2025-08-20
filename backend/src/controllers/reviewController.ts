@@ -59,6 +59,7 @@ class ReviewController {
   );
 
   // Get product reviews with pagination and filters
+  // ReviewController में getProductReviews method को update करें:
   getProductReviews = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
       const { productId } = req.params;
@@ -67,13 +68,22 @@ class ReviewController {
         throw new AppError("Product ID is required", 400);
       }
 
-      // Validate and parse query parameters
-      const queryData = reviewQuerySchema.parse(req.query);
+      // ✅ Extract query parameters with defaults
+      const {
+        page = 1,
+        limit = 10,
+        sortBy = "createdAt",
+        sortOrder = "desc",
+        rating,
+      } = req.query;
 
       const result = await ReviewService.getProductReviews(
         productId,
-        queryData.page,
-        queryData.limit
+        parseInt(page as string),
+        parseInt(limit as string),
+        sortBy as string,
+        sortOrder as string,
+        rating ? parseInt(rating as string) : undefined
       );
 
       res
