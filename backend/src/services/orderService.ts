@@ -42,9 +42,12 @@ class OrderService {
       }
 
       // Check variant stock
-      if (selectedVariant.stock < item.quantity) {
+      const availableStock =
+        selectedVariant.stock - (selectedVariant.reservedStock || 0);
+
+      if (availableStock < item.quantity) {
         throw new AppError(
-          `Insufficient stock for ${product.name} (${selectedVariant.color}, ${selectedVariant.size})`,
+          `Insufficient stock for ${product.name} (${selectedVariant.color}, ${selectedVariant.size}). Available: ${availableStock}`,
           400
         );
       }
@@ -69,13 +72,10 @@ class OrderService {
         size: selectedVariant.size,
         sku: selectedVariant.sku,
       });
-
-      // ✅ FIXED: Update variant stock only
-      selectedVariant.stock -= item.quantity;
-
-      // ✅ REMOVED: Don't update product.stock since it's not in schema anymore
-      // Virtual field will calculate totalStock automatically
-
+      if (!selectedVariant.reservedStock) {
+        selectedVariant.reservedStock = 0; // Initialize if undefined
+      }
+      selectedVariant.reservedStock += item.quantity;
       await product.save({ session });
     }
 
@@ -171,6 +171,70 @@ class OrderService {
   // }
 
   //remove when webhook implemmeted and uncomment above one after hosting implement webhook
+
+  // ✅ 1. Payment successful होने पर stock confirm करने के लिए
+  private async confirmReservation(
+    orderId: string,
+    session?: mongoose.ClientSession
+  ) {
+    const order = await Order.findById(orderId).session(session || null);
+    if (!order) return;
+
+    for (const item of order.orderItemsSnapshot) {
+      const product = await Product.findById(item.productId).session(
+        session || null
+      );
+      if (product && item.variantId) {
+        const variant = product.variants.find(
+          (v: IVariant) => v._id?.toString() === item.variantId?.toString()
+        );
+
+        if (variant) {
+          // Reserved stock को actual stock से minus करो
+          variant.stock -= item.quantity;
+          variant.reservedStock = Math.max(
+            0,
+            (variant.reservedStock || 0) - item.quantity
+          );
+
+          await product.save({ session: session || undefined });
+          console.log(`✅ Confirmed: ${item.quantity} units of ${variant.sku}`);
+        }
+      }
+    }
+  }
+
+  // ✅ 2. Order cancel/fail होने पर reserved stock release करने के लिए
+  private async releaseReservation(
+    orderId: string,
+    session?: mongoose.ClientSession
+  ) {
+    const order = await Order.findById(orderId).session(session || null);
+    if (!order) return;
+
+    for (const item of order.orderItemsSnapshot) {
+      const product = await Product.findById(item.productId).session(
+        session || null
+      );
+      if (product && item.variantId) {
+        const variant = product.variants.find(
+          (v: IVariant) => v._id?.toString() === item.variantId?.toString()
+        );
+
+        if (variant) {
+          // Reserved stock को release करो (actual stock unchanged)
+          variant.reservedStock = Math.max(
+            0,
+            (variant.reservedStock || 0) - item.quantity
+          );
+
+          await product.save({ session: session || undefined });
+          console.log(`✅ Released: ${item.quantity} units of ${variant.sku}`);
+        }
+      }
+    }
+  }
+
   async placeOrder(
     userId: string,
     orderData: PlaceOrderRequest,
@@ -189,9 +253,9 @@ class OrderService {
     }
 
     const session = await mongoose.startSession(); // Create DB session
-    try {
-      let createdOrder: any;
+    let createdOrder: any; // ✅ Move outside try block for catch access
 
+    try {
       await session.withTransaction(async () => {
         let { items, shippingAddress, payment, fromCart } = orderData;
 
@@ -211,13 +275,13 @@ class OrderService {
         if (!items || items.length === 0)
           throw new AppError("No order items provided.", 400);
 
-        // Build items snapshot (will decrement stock, all atomic inside this session)
+        // Build items snapshot (RESERVES stock, doesn't decrement yet)
         const { orderItemsSnapshot, totalAmount } = await this.buildOrderItems(
           items,
           session
         );
 
-        // Payment verification as before (do outside transaction if it's all third-party/async)
+        // Payment verification as before
         let paymentStatus: "pending" | "paid" = "pending";
         let paymentMethod: "COD" | "RAZORPAY" = payment.method as
           | "COD"
@@ -247,9 +311,8 @@ class OrderService {
         }
 
         const generatedOrderId = await generateStandardOrderId();
-        console.log("🔄 Generated OrderID manually:", generatedOrderId);
 
-        // ✅ CONCEPT 2: Order.create with idempotencyKey (OrderID auto-generated via pre-save hook)
+        // ✅ Create order
         const [newOrder] = await Order.create(
           [
             {
@@ -267,13 +330,32 @@ class OrderService {
                 razorpaySignature: payment.razorpaySignature || null, // ✅ Add signature
               },
               totalAmount,
-              status: "pending",
-              // orderId will be auto-generated by pre-save hook
+              status: OrderStatus.Pending, // ✅ Use enum instead of string
             },
           ],
           { session }
         );
         createdOrder = newOrder;
+
+        // ✅ Handle reservation based on payment status
+        if (paymentMethod === "COD" || paymentStatus === "paid") {
+          // COD या successful Razorpay के लिए immediately confirm करो
+          await this.confirmReservation(
+            (newOrder._id as mongoose.Types.ObjectId).toString(),
+            session
+          );
+          newOrder.status = OrderStatus.Confirmed; // ✅ Use enum
+          await newOrder.save({ session });
+
+          console.log(
+            `✅ Order ${newOrder.orderId} confirmed and stock decremented`
+          );
+        } else {
+          // Pending payments के लिए सिर्फ reserve रखो
+          console.log(
+            `✅ Order ${newOrder.orderId} created with reserved stock`
+          );
+        }
 
         // Clear user's cart if needed (also with session!)
         if (fromCart) {
@@ -288,6 +370,18 @@ class OrderService {
       // Transaction auto-commits if all succeeded
       return createdOrder;
     } catch (error: any) {
+      // ✅ Error handling with stock release
+      if (createdOrder && createdOrder._id) {
+        try {
+          await this.releaseReservation(createdOrder._id.toString());
+          console.log(
+            `⚠️ Released reserved stock for failed order ${createdOrder.orderId}`
+          );
+        } catch (releaseError) {
+          console.error("Error releasing reservation:", releaseError);
+        }
+      }
+
       // ✅ Handle race condition for idempotencyKey
       if (error.code === 11000 && error.message.includes("idempotencyKey")) {
         const existingOrder = await Order.findOne({
@@ -305,38 +399,38 @@ class OrderService {
     }
   }
 
-  async handleRazorpayWebhook(data: {
-    razorpayOrderId: string;
-    razorpayPaymentId: string;
-    razorpaySignature: string;
-  }) {
-    const { razorpayOrderId, razorpayPaymentId } = data;
+  // async handleRazorpayWebhook(data: {
+  //   razorpayOrderId: string;
+  //   razorpayPaymentId: string;
+  //   razorpaySignature: string;
+  // }) {
+  //   const { razorpayOrderId, razorpayPaymentId } = data;
 
-    // Order find karo razorpay order ID se
-    const order = await Order.findOne({
-      "paymentSnapshot.razorpayOrderId": razorpayOrderId,
-    });
+  //   // Order find karo razorpay order ID se
+  //   const order = await Order.findOne({
+  //     "paymentSnapshot.razorpayOrderId": razorpayOrderId,
+  //   });
 
-    if (!order) {
-      throw new AppError("Order not found for given Razorpay Order ID", 404);
-    }
+  //   if (!order) {
+  //     throw new AppError("Order not found for given Razorpay Order ID", 404);
+  //   }
 
-    // Check if order already confirmed to avoid duplicate processing
-    if (order.status === OrderStatus.Confirmed) {
-      console.log(`Order ${order._id} already confirmed`);
-      return order;
-    }
+  //   // Check if order already confirmed to avoid duplicate processing
+  //   if (order.status === OrderStatus.Confirmed) {
+  //     console.log(`Order ${order._id} already confirmed`);
+  //     return order;
+  //   }
 
-    // Update payment details and status
-    order.paymentSnapshot.status = "paid";
-    order.paymentSnapshot.razorpayPaymentId = razorpayPaymentId;
-    order.status = OrderStatus.Confirmed;
+  //   // Update payment details and status
+  //   order.paymentSnapshot.status = "paid";
+  //   order.paymentSnapshot.razorpayPaymentId = razorpayPaymentId;
+  //   order.status = OrderStatus.Confirmed;
 
-    await order.save();
+  //   await order.save();
 
-    console.log(`✅ Order ${order._id} confirmed via webhook`);
-    return order;
-  }
+  //   console.log(`✅ Order ${order._id} confirmed via webhook`);
+  //   return order;
+  // }
 
   // ✅ Get all orders for user with simplified structure
   async getMyOrders(userId: string) {
@@ -372,68 +466,39 @@ class OrderService {
     }));
   }
   async cancelOrder(userId: string, orderId: string) {
-    // 1. Find order with userId and orderId
-    const order = await Order.findOne({ user: userId, _id: orderId }); // Fixed underscore
+    const order = await Order.findOne({ user: userId, _id: orderId });
     if (!order) throw new AppError("Order not found", 404);
 
-    // 2. Check if order is already cancelled
-    if (order.status === "cancelled") {
+    if (order.status === OrderStatus.Cancelled) {
       throw new AppError("Order is already cancelled", 400);
     }
 
-    // 3. Check if cancellation is within allowed time window (12 hours)
     const now = new Date();
     const orderCreatedAt = order.placedAt;
     const hoursSinceOrder =
-      (now.getTime() - orderCreatedAt.getTime()) / (1000 * 60 * 60); // Fixed multiplication
+      (now.getTime() - orderCreatedAt.getTime()) / (1000 * 60 * 60);
 
     if (hoursSinceOrder > 12) {
       throw new AppError("Order cannot be cancelled after 12 hours", 400);
     }
 
-    // 4. Update order status to 'cancelled'
-    order.status = OrderStatus.Cancelled;
-    await order.save();
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        order.status = OrderStatus.Cancelled;
+        await order.save({ session });
 
-    // 5. ✅ FIXED: Restore variant stock (not product stock)
-    for (const item of order.orderItemsSnapshot) {
-      const product = await Product.findById(item.productId);
-      if (product && item.variantId) {
-        // Find the specific variant that was ordered
-        const variant = product.variants.find(
-          (v: IVariant) => v._id?.toString() === item.variantId?.toString()
-        );
-
-        if (variant) {
-          // Restore variant stock
-          variant.stock += item.quantity;
-          await product.save();
-
-          console.log(
-            `✅ Restored ${item.quantity} units to variant ${variant.sku}`
-          );
-        } else {
-          console.warn(`⚠️ Variant not found for item: ${item.name}`);
-        }
-      } else if (product) {
-        // ✅ Fallback: If no variantId stored in order, restore to first variant
-        const firstVariant = product.variants[0];
-        if (firstVariant) {
-          firstVariant.stock += item.quantity;
-          await product.save();
-
-          console.log(
-            `✅ Restored ${item.quantity} units to first variant (fallback)`
-          );
-        }
-      }
+        // ✅ NEW: Use releaseReservation instead of manual stock restoration
+        await this.releaseReservation(orderId, session);
+      });
+    } finally {
+      await session.endSession();
     }
 
-    // 6. Return success response
     return {
       success: true,
       message: "Order cancelled successfully",
-      orderId: order._id, // Fixed underscore
+      orderId: order._id,
     };
   }
 
@@ -450,8 +515,28 @@ class OrderService {
       );
     }
 
-    order.status = newStatus;
-    await order.save();
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        order.status = newStatus;
+        await order.save({ session });
+
+        // ✅ NEW: Handle stock based on status change
+        if (
+          newStatus === OrderStatus.Confirmed &&
+          order.paymentSnapshot.status === "paid"
+        ) {
+          await this.confirmReservation(orderId, session);
+        } else if (
+          newStatus === OrderStatus.Cancelled ||
+          newStatus === OrderStatus.Failed
+        ) {
+          await this.releaseReservation(orderId, session);
+        }
+      });
+    } finally {
+      await session.endSession();
+    }
 
     return order;
   }

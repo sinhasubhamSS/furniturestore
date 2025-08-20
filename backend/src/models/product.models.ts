@@ -19,7 +19,7 @@ export interface IVariant extends Document {
   discountValidUntil?: Date;
 
   stock: number;
-
+  reservedStock: number;
   images: {
     url: string;
     public_id: string;
@@ -44,7 +44,7 @@ const variantSchema = new Schema<IVariant>({
   discountValidUntil: { type: Date },
 
   stock: { type: Number, required: true, default: 0 },
-
+  reservedStock: { type: Number, default: 0 },
   images: [
     {
       url: { type: String, required: true },
@@ -255,21 +255,21 @@ productSchema.pre("save", function (next) {
 });
 
 // Virtual fields
-productSchema.virtual("totalStock").get(function (this: IProduct) {
-  return this.variants.reduce((sum, v) => sum + v.stock, 0);
-});
+// productSchema.virtual("totalStock").get(function (this: IProduct) {
+//   return this.variants.reduce((sum, v) => sum + v.stock, 0);
+// });
 
-productSchema.virtual("inStock").get(function (this: IProduct) {
-  return this.variants.some((v) => v.stock > 0);
-});
+// productSchema.virtual("inStock").get(function (this: IProduct) {
+//   return this.variants.some((v) => v.stock > 0);
+// });
 
-productSchema.virtual("hasAnyDiscount").get(function (this: IProduct) {
-  return this.variants.some((v) => v.hasDiscount);
-});
+// productSchema.virtual("hasAnyDiscount").get(function (this: IProduct) {
+//   return this.variants.some((v) => v.hasDiscount);
+// });
 
-productSchema.virtual("totalSavings").get(function (this: IProduct) {
-  return this.variants.reduce((sum, v) => sum + (v.savings ?? 0), 0);
-});
+// productSchema.virtual("totalSavings").get(function (this: IProduct) {
+//   return this.variants.reduce((sum, v) => sum + (v.savings ?? 0), 0);
+// });
 
 // Indexes for performance
 productSchema.index({ slug: 1 }, { unique: true });

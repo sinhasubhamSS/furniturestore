@@ -12,7 +12,7 @@ router.get('/products/:productId/reviews', ReviewController.getProductReviews);
 router.get('/reviews/:reviewId', ReviewController.getReviewById);
 
 // Protected Routes (Authentication Required)
-router.post('/products/:productId/reviews', authVerify, ReviewController.createReview);
+router.post('/products/:productId/createreview', authVerify, ReviewController.createReview);
 router.put('/reviews/:reviewId', authVerify, ReviewController.updateReview);
 router.delete('/reviews/:reviewId', authVerify, ReviewController.deleteReview);
 

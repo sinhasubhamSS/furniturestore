@@ -2,10 +2,10 @@
 import { z } from "zod";
 
 // Remove the ObjectId preprocessing - keep it simple
-const productIdSchema = z
-  .string()
-  .min(1, "Product ID is required")
-  .regex(/^[0-9a-fA-F]{24}$/, "Invalid product ID format");
+// const productIdSchema = z
+//   .string()
+//   .min(1, "Product ID is required")
+//   .regex(/^[0-9a-fA-F]{24}$/, "Invalid product ID format");
 
 // Image schema for reviews
 const reviewImageSchema = z.object({

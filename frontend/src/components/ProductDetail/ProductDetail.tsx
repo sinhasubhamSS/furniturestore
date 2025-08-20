@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useGetProductBySlugQuery } from "@/redux/services/user/publicProductApi";
 import { useDispatch } from "react-redux";
-import {  AppDispatch } from "@/redux/store";
+import { AppDispatch } from "@/redux/store";
 import {
   setQuantity,
   resetProductState,
@@ -17,6 +17,9 @@ import QuantitySelector from "./QuantitySelector";
 import StockStatus from "./StockStatus";
 import ActionButtons from "./ActionButtons";
 import ProductInfo from "./ProductInfo";
+import ReviewsSection from "../reviews/ReviewList";
+
+// ✅ Fix imports - Use ReviewsSection instead of separate components
 
 interface Props {
   slug: string;
@@ -68,21 +71,21 @@ const ProductDetail = ({ slug }: Props) => {
 
   return (
     <div className="max-w-[1440px] mx-auto px-2 md:px-4 py-6">
-      <div className="flex flex-col lg:flex-row gap-3 lg:gap-4"> {/* Responsive gap: small on mobile, minimal on desktop */}
+      {/* Product Details Section */}
+      <div className="flex flex-col lg:flex-row gap-3 lg:gap-4">
         {/* Left Column - Image + Buttons */}
-        <div className="w-full lg:w-1/2 flex flex-col gap-2 lg:gap-3"> {/* Internal spacing between image and buttons */}
+        <div className="w-full lg:w-1/2 flex flex-col gap-2 lg:gap-3">
           <ImageGallery />
-          {/* Action Buttons - Aligned with image container start */}
-          <div className="ml-0 lg:ml-[72px] max-w-full lg:max-w-[480px] w-full"> {/* Responsive margin: no margin on mobile, aligned on desktop */}
+          <div className="ml-0 lg:ml-[72px] max-w-full lg:max-w-[480px] w-full">
             <ActionButtons productId={product._id} />
           </div>
         </div>
-        
+
         {/* Right Column - Product Info */}
-        <div className="w-full lg:w-1/2 mt-4 lg:mt-0"> {/* Add margin-top on mobile, remove on desktop */}
+        <div className="w-full lg:w-1/2 mt-4 lg:mt-0">
           <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-100">
             <ProductHeader product={product} />
-            <ProductPrice  variants={product.variants} />
+            <ProductPrice variants={product.variants} />
             <div className="py-4 space-y-4">
               <VariantSelector variants={product.variants} />
               <QuantitySelector />
@@ -92,6 +95,9 @@ const ProductDetail = ({ slug }: Props) => {
           <ProductInfo product={product} />
         </div>
       </div>
+
+      {/* ✅ Complete Reviews Section */}
+      <ReviewsSection productId={product._id} />
     </div>
   );
 };

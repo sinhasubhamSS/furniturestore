@@ -75,7 +75,7 @@ const reviewSchema = new Schema<IReview>(
     content: {
       type: String,
       required: false, // ✅ Optional
-      minlength: 1, // ✅ If provided, minimum 1 char (not 10)
+   
       maxlength: 1000,
       trim: true,
       default: "", // ✅ Default empty
