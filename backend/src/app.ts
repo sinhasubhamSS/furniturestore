@@ -24,6 +24,7 @@ import dashboardRoutes from "./routes/adminRoutes";
 import { errorMiddleware } from "./middlewares/errorMiddleware";
 import reviewRoutes from "./routes/reviewRoutes";
 import newsletterRoutes from "./routes/footer/newsLetterRoutes";
+import interactiveFaqRoutes from "./routes/footer/interactiveFaqRoutes";
 app.use("/api/user", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
@@ -41,6 +42,7 @@ app.use("/api", reviewRoutes);
 
 app.use("/api/support", supportTicketRoutes);
 app.use("/api/newsletter", newsletterRoutes);
+app.use("/api/interactive-faq", interactiveFaqRoutes);
 
 app.use(errorMiddleware);
 export default app;
