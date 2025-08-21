@@ -1,0 +1,99 @@
+"use client";
+
+import React, { useState, FormEvent, ChangeEvent } from "react";
+import type { NewsletterFormData } from "@/types/footer";
+
+const Newsletter: React.FC = () => {
+  const [formData, setFormData] = useState<NewsletterFormData>({ email: "" });
+  const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    setError(""); // Clear error on input change
+  };
+
+  const handleSubscribe = async (
+    e: FormEvent<HTMLFormElement>
+  ): Promise<void> => {
+    e.preventDefault();
+    if (!formData.email) {
+      setError("Email is required");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // API call will be added later
+      // const response = await fetch('/api/newsletter/subscribe', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify(formData)
+      // });
+
+      // Temporary simulation
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setIsSubscribed(true);
+      setFormData({ email: "" });
+    } catch (err) {
+      setError("Subscription failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-[--color-accent] text-[--text-light] py-8">
+      <div className="container mx-auto px-4">
+        <div className="flex flex-col lg:flex-row items-center justify-between space-y-4 lg:space-y-0">
+          <div>
+            <h3 className="text-2xl font-bold mb-2">Get Exclusive Offers!</h3>
+            <p className="text-[--color-primary] text-sm">
+              Subscribe to get special offers, free giveaways, and deals
+              delivered to your inbox.
+            </p>
+          </div>
+
+          <div className="w-full lg:w-auto lg:min-w-[400px]">
+            {!isSubscribed ? (
+              <form onSubmit={handleSubscribe} className="space-y-2">
+                <div className="flex space-x-2">
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder="Enter your email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="flex-1 px-4 py-3 rounded-lg border-none outline-none text-[--text-dark] bg-[--color-primary]"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="bg-[--color-secondary] text-[--text-dark] px-6 py-3 rounded-lg font-medium hover:bg-[--color-hover-card] transition-colors disabled:opacity-50"
+                  >
+                    {loading ? "Subscribing..." : "Subscribe"}
+                  </button>
+                </div>
+                {error && <p className="text-red-300 text-sm">{error}</p>}
+              </form>
+            ) : (
+              <div className="text-center py-3">
+                <span className="text-[--color-primary] text-lg">
+                  ✅ Successfully subscribed!
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Newsletter;
