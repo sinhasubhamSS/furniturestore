@@ -1,35 +1,57 @@
 import { Request, Response } from "express";
+import { z } from "zod";
 import { AppError } from "../../utils/AppError";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { catchAsync } from "../../utils/catchAsync";
 import { NewsletterService } from "../../services/footer/newsLetter.Service";
-import { newsletterPreferencesSchema, newsletterSubscribeSchema, newsletterUnsubscribeSchema } from "../../validations/footer/newsLetter.validation";
+import {
+  newsletterPreferencesSchema,
+  newsletterSubscribeSchema,
+  newsletterUnsubscribeSchema,
+} from "../../validations/footer/newsLetter.validation";
 
 const newsletterService = new NewsletterService();
 
 export class NewsletterController {
   // Subscribe to newsletter
   subscribe = catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const validatedData = newsletterSubscribeSchema.parse(req.body);
+    try {
+      const validatedData = newsletterSubscribeSchema.parse(req.body);
+      const result = await newsletterService.subscribe(validatedData);
+      console.log("hi",result);
 
-    const result = await newsletterService.subscribe(validatedData);
+      const message = result.isReactivated
+        ? "Welcome back! Your subscription has been reactivated"
+        : "Subscription successful! Please check your email to verify";
 
-    const message = result.isReactivated
-      ? "Welcome back! Your subscription has been reactivated"
-      : "Subscription successful! Please check your email to verify";
+      res.status(201).json(
+        new ApiResponse(
+          201,
+          {
+            email: result.subscriber.email,
+            preferences: result.subscriber.preferences,
+            isVerified: result.subscriber.isVerified,
+            isReactivated: result.isReactivated,
+          },
+          message
+        )
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const formattedErrors = error.issues.map((issue) => ({
+          field: issue.path.join("."),
+          message: issue.message,
+        }));
 
-    res.status(201).json(
-      new ApiResponse(
-        201,
-        {
-          email: result.subscriber.email,
-          preferences: result.subscriber.preferences,
-          isVerified: result.subscriber.isVerified,
-          isReactivated: result.isReactivated,
-        },
-        message
-      )
-    );
+        throw new AppError(
+          `Validation failed: ${formattedErrors
+            .map((e) => `${e.field}: ${e.message}`)
+            .join(", ")}`,
+          400
+        );
+      }
+      throw error;
+    }
   });
 
   // Verify email subscription
@@ -59,42 +81,74 @@ export class NewsletterController {
   // Unsubscribe from newsletter
   unsubscribe = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
-      const validatedData = newsletterUnsubscribeSchema.parse(req.body);
+      try {
+        const validatedData = newsletterUnsubscribeSchema.parse(req.body);
+        const subscriber = await newsletterService.unsubscribe(validatedData);
 
-      const subscriber = await newsletterService.unsubscribe(validatedData);
+        res.status(200).json(
+          new ApiResponse(
+            200,
+            {
+              email: subscriber.email,
+              unsubscribedAt: subscriber.unsubscribedAt,
+            },
+            "Successfully unsubscribed from newsletter"
+          )
+        );
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          const formattedErrors = error.issues.map((issue) => ({
+            field: issue.path.join("."),
+            message: issue.message,
+          }));
 
-      res.status(200).json(
-        new ApiResponse(
-          200,
-          {
-            email: subscriber.email,
-            unsubscribedAt: subscriber.unsubscribedAt,
-          },
-          "Successfully unsubscribed from newsletter"
-        )
-      );
+          throw new AppError(
+            `Validation failed: ${formattedErrors
+              .map((e) => `${e.field}: ${e.message}`)
+              .join(", ")}`,
+            400
+          );
+        }
+        throw error;
+      }
     }
   );
 
   // Update newsletter preferences
   updatePreferences = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
-      const validatedData = newsletterPreferencesSchema.parse(req.body);
+      try {
+        const validatedData = newsletterPreferencesSchema.parse(req.body);
+        const subscriber = await newsletterService.updatePreferences(
+          validatedData
+        );
 
-      const subscriber = await newsletterService.updatePreferences(
-        validatedData
-      );
+        res.status(200).json(
+          new ApiResponse(
+            200,
+            {
+              email: subscriber.email,
+              preferences: subscriber.preferences,
+            },
+            "Newsletter preferences updated successfully"
+          )
+        );
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          const formattedErrors = error.issues.map((issue) => ({
+            field: issue.path.join("."),
+            message: issue.message,
+          }));
 
-      res.status(200).json(
-        new ApiResponse(
-          200,
-          {
-            email: subscriber.email,
-            preferences: subscriber.preferences,
-          },
-          "Newsletter preferences updated successfully"
-        )
-      );
+          throw new AppError(
+            `Validation failed: ${formattedErrors
+              .map((e) => `${e.field}: ${e.message}`)
+              .join(", ")}`,
+            400
+          );
+        }
+        throw error;
+      }
     }
   );
 
@@ -206,10 +260,39 @@ export class NewsletterController {
         .json(
           new ApiResponse(
             200,
-            { subscribers },
+            { subscribers, count: subscribers.length },
             "Search results fetched successfully"
           )
         );
+    }
+  );
+
+  // Send newsletter to all subscribers (Admin)
+  sendNewsletter = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const { subject, content, htmlContent } = req.body;
+
+      if (!subject || !content) {
+        throw new AppError("Subject and content are required", 400);
+      }
+
+      const result = await newsletterService.sendNewsletter(
+        subject,
+        content,
+        htmlContent
+      );
+
+      res.status(200).json(
+        new ApiResponse(
+          200,
+          {
+            totalSubscribers: result.total,
+            emailsSent: result.successful,
+            emailsFailed: result.failed,
+          },
+          `Newsletter sent successfully to ${result.successful} subscribers`
+        )
+      );
     }
   );
 }

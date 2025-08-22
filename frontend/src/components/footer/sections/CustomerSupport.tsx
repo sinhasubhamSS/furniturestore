@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from "react";
+import { useRouter } from 'next/navigation';
 
 interface SupportOption {
   id: string;
@@ -11,6 +12,7 @@ interface SupportOption {
 }
 
 const CustomerSupport: React.FC = () => {
+  const router = useRouter();
   const [showChatbot, setShowChatbot] = useState<boolean>(false);
 
   const handleWhatsAppClick = (): void => {
@@ -24,12 +26,14 @@ const CustomerSupport: React.FC = () => {
 
   const toggleChatbot = (): void => {
     setShowChatbot((prev) => !prev);
-    // Here you can integrate actual chatbot logic
-    console.log("Chatbot toggled:", !showChatbot);
+    // Future: Integrate actual chatbot
+    console.log("Chatbot coming soon...");
   };
 
-  const handleEmailSupport = (): void => {
-    window.location.href = "mailto:support@yourstore.com";
+  // ✅ New: Raise a Ticket instead of email
+  const handleRaiseTicket = (): void => {
+    router.push('/support/create-ticket'); // Navigate to ticket form
+    // Or open modal: setShowTicketModal(true)
   };
 
   const supportOptions: SupportOption[] = [
@@ -37,15 +41,15 @@ const CustomerSupport: React.FC = () => {
       id: "faq",
       name: "FAQs",
       icon: "❓",
-      action: () => window.open("/faq", "_self"),
+      action: () => router.push('/faq'),
       description: "Find answers to common questions",
     },
     {
-      id: "chatbot",
-      name: "Live Chat",
-      icon: "🤖",
-      action: toggleChatbot,
-      description: "Chat with our AI assistant",
+      id: "ticket", // ✅ Changed from "email" to "ticket"
+      name: "Raise a Ticket", // ✅ Updated name
+      icon: "🎫", // ✅ Updated icon
+      action: handleRaiseTicket, // ✅ New action
+      description: "Create a support ticket", // ✅ Updated description
     },
     {
       id: "whatsapp",
@@ -55,11 +59,11 @@ const CustomerSupport: React.FC = () => {
       description: "Get instant help on WhatsApp",
     },
     {
-      id: "email",
-      name: "Email Support",
-      icon: "📧",
-      action: handleEmailSupport,
-      description: "Send us an email",
+      id: "chatbot",
+      name: "Live Chat",
+      icon: "🤖",
+      action: toggleChatbot,
+      description: "Chat with our AI assistant (Coming Soon)",
     },
   ];
 
@@ -99,10 +103,10 @@ const CustomerSupport: React.FC = () => {
         </div>
       </div>
 
-      {/* Chatbot Indicator */}
+      {/* Future Chatbot Indicator */}
       {showChatbot && (
         <div className="bg-[--color-accent] text-[--text-light] p-3 rounded-lg text-sm">
-          🤖 Chatbot activated! How can I help you today?
+          🤖 Live Chat coming soon! For now, please raise a ticket or contact us on WhatsApp.
         </div>
       )}
     </div>

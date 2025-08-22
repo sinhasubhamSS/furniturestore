@@ -1,12 +1,14 @@
 import mongoose from "mongoose";
-import { InteractiveFAQ } from "../src/models/footer/interactiveFaq";
+import { InteractiveFAQ } from "../src/models/footer/interactiveFaq.models";
 import { homeDecorFAQs } from "../src/data/faqs/homeDecorFAQs";
 import dotenv from "dotenv";
 dotenv.config();
 async function seedInteractiveFAQDatabase() {
   try {
     // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI || "mongodb+srv://subhamsinhass344:subham123@cluster0.yp9tcvz.mongodb.net/suvidha"
+    await mongoose.connect(
+      process.env.MONGODB_URI ||
+        "mongodb+srv://subhamsinhass344:subham123@cluster0.yp9tcvz.mongodb.net/suvidha"
     );
     console.log("🔌 Connected to MongoDB");
 

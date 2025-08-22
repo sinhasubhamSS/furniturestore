@@ -9,10 +9,11 @@ export const supportTicketSchema = z.object({
 
   customerEmail: z.string().email("Invalid email format").toLowerCase().trim(),
 
-  customerPhone: z
+  customerPhone: z // Made optional
     .string()
     .regex(/^[+]?[0-9]{10,15}$/, "Invalid phone number")
-    .trim(),
+    .trim()
+    .optional(),
 
   subject: z
     .string()
@@ -20,10 +21,10 @@ export const supportTicketSchema = z.object({
     .max(500, "Subject too long")
     .trim(),
 
-  message: z
+  description: z // Changed from message
     .string()
-    .min(10, "Message must be at least 10 characters")
-    .max(2000, "Message too long")
+    .min(10, "Description must be at least 10 characters")
+    .max(2000, "Description too long")
     .trim(),
 
   category: z.enum([
@@ -35,10 +36,10 @@ export const supportTicketSchema = z.object({
     "general",
   ]),
 
-  // Optional fields
+  // Make all optional and more flexible
   orderId: z
     .string()
-    .regex(/^[A-Z]{2,4}[0-9]{4,8}$/, "Invalid order ID format")
+    .regex(/^[A-Za-z0-9-_]{4,20}$/, "Invalid order ID format")
     .optional(),
 
   productId: z
@@ -48,13 +49,3 @@ export const supportTicketSchema = z.object({
 });
 
 export type SupportTicketInput = z.infer<typeof supportTicketSchema>;
-
-// For API responses
-export const supportTicketResponseSchema = z.object({
-  success: z.boolean(),
-  ticketNumber: z.string().optional(),
-  message: z.string(),
-  error: z.string().optional(),
-});
-
-export type SupportTicketResponse = z.infer<typeof supportTicketResponseSchema>;

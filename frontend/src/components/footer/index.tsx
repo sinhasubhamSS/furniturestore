@@ -14,7 +14,7 @@ const Footer: React.FC<FooterProps> = ({ className = "" }) => {
       className={`bg-[--color-secondary] text-[--text-dark] mt-auto ${className}`}
     >
       {/* Newsletter Section - Full width background */}
-      <Newsletter />
+      <Newsletter source="website_footer" />
 
       {/* Main Footer Content - Full width background */}
       <div className="w-full bg-[--color-card] py-12">

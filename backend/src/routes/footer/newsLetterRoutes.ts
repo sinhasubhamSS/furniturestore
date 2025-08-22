@@ -1,7 +1,5 @@
 import express from "express";
 import { NewsletterController } from "../../controllers/footer/newsletterController";
-// Import your existing auth middleware when needed
-// import { protect, restrictTo } from '../../middleware/auth';
 
 const router = express.Router();
 const newsletterController = new NewsletterController();
@@ -23,5 +21,6 @@ router.get(
 );
 router.get("/admin/search", newsletterController.searchSubscribers);
 router.get("/admin/stats", newsletterController.getNewsletterStats);
+router.post("/admin/newsletter", newsletterController.sendNewsletter); // ✅ Added missing route
 
 export default router;

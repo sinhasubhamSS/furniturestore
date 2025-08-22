@@ -26,6 +26,8 @@ export interface StoreLocation {
 
 export interface NewsletterFormData {
   email: string;
+  preferences?: string[];
+  source?: string;
 }
 
 export interface ContactInfo {

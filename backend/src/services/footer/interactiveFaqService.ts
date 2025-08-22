@@ -1,4 +1,4 @@
-import { InteractiveFAQ } from "../../models/footer/interactiveFaq";
+import { InteractiveFAQ } from "../../models/footer/interactiveFaq.models";
 import { AppError } from "../../utils/AppError";
 
 // Define category type
