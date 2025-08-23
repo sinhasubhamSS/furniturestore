@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import type { StoreLocation } from "../../../types/footer";
+import type { StoreLocation } from "../../../types/footer/footer";
 import { storeLocations } from "../data/StoreLocation";
 
 const StoreLocator: React.FC = () => {

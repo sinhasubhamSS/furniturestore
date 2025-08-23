@@ -1,6 +1,6 @@
 import React from "react";
 import { socialLinks } from "../data/SocialLinks";
-import type { SocialLink } from "../../../types/footer";
+import type { SocialLink } from "../../../types/footer/footer";
 
 interface AppDownloadLink {
   name: string;

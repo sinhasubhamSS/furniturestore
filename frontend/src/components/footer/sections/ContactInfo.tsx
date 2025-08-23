@@ -1,5 +1,5 @@
 import React from "react";
-import type { ContactInfo as ContactInfoType } from "../../../types/footer";
+import type { ContactInfo as ContactInfoType } from "../../../types/footer/footer";
 
 const ContactInfo: React.FC = () => {
   const contactDetails: ContactInfoType = {

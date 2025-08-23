@@ -17,6 +17,7 @@ import cartRoutes from "./routes/cartRoutes";
 import wishlistRoute from "./routes/wishlistRoutes";
 import addressRoute from "./routes/addressRoutes";
 import orderRoute from "./routes/orderRoutes";
+import returnRoute from "./routes/returnRoutes";
 import paymentRoute from "./routes/paymentRoutes";
 import categoryRoute from "./routes/categoryRoutes";
 import supportTicketRoutes from "./routes/footer/supportTicketRoutes";
@@ -32,6 +33,7 @@ app.use("/api/wishlist", wishlistRoute);
 app.use("/api/address", addressRoute);
 app.use("/api/order", orderRoute);
 app.use("/api/payment", paymentRoute);
+app.use("/api/return", returnRoute);
 
 app.use("/api/category", categoryRoute);
 app.use("/api/admin", dashboardRoutes);

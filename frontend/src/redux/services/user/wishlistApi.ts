@@ -1,14 +1,15 @@
 // redux/services/user/wishlistApi.ts
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { axiosBaseQuery } from "@/redux/api/customBaseQuery";
-import { CartProduct } from "@/types/cart";
+import { CartResponse } from "@/types/cart";
+
 
 export const wishlistApi = createApi({
   reducerPath: "wishlistApi",
   baseQuery: axiosBaseQuery(),
   tagTypes: ["Wishlist"],
   endpoints: (builder) => ({
-    getWishlistWithProducts: builder.query<CartProduct[], void>({
+    getWishlistWithProducts: builder.query<CartResponse[], void>({
       query: () => ({
         url: "/wishlist/products",
         method: "GET",

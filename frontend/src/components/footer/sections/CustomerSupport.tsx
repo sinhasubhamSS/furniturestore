@@ -41,7 +41,7 @@ const CustomerSupport: React.FC = () => {
       id: "faq",
       name: "FAQs",
       icon: "❓",
-      action: () => router.push('/faq'),
+      action: () => router.push('/FAQs'),
       description: "Find answers to common questions",
     },
     {

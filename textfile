@@ -18,3 +18,8 @@ components/reviews/
 ├── ReviewsPagination.tsx    ⭐ New - Extract from ReviewsSection
 ├── NoReviewsPlaceholder.tsx ⭐ New - Extract from ReviewsSection
 └── ReviewsSection.tsx       ⚠️ Clean up after extractions
+─ pages/
+│   │   └── support/
+│   │       ├── create-ticket.tsx      📝 Create ticket page
+│   │       ├── my-tickets.tsx         📝 User tickets list
+│   │       └── [ticketId].tsx         📝 Single ticket page

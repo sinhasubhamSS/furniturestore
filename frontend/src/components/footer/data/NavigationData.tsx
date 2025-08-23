@@ -1,5 +1,4 @@
-import { NavigationSection } from "@/types/footer";
-
+import { NavigationSection } from "@/types/footer/footer";
 
 export const navigationData: NavigationSection[] = [
   {

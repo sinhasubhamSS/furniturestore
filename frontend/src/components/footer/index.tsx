@@ -6,7 +6,7 @@ import Newsletter from "./sections/NewsLetter"; // ✅ Fixed casing - Was NewsLe
 import CustomerSupport from "./sections/CustomerSupport";
 import ConnectWithUs from "./sections/ConnectWithUs";
 import StoreLocator from "./sections/StoreLocator";
-import type { FooterProps } from "../../types/footer";
+import type { FooterProps } from "../../types/footer/footer";
 
 const Footer: React.FC<FooterProps> = ({ className = "" }) => {
   return (

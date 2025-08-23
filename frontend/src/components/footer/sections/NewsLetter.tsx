@@ -2,7 +2,7 @@
 
 import React, { useState, FormEvent, ChangeEvent } from "react";
 
-import type { NewsletterFormData } from "@/types/footer";
+import type { NewsletterFormData } from "@/types/footer/footer";
 import axiosClient from "../../../../utils/axios";
 type NewsletterProps = {
   source: string; // ✅ Added prop type

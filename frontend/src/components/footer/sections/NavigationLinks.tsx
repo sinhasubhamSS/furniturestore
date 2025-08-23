@@ -1,6 +1,6 @@
 import React from "react";
 import { navigationData } from "../data/NavigationData";
-import type { NavigationSection, NavigationLink } from "@/types/footer";
+import type { NavigationSection, NavigationLink } from "@/types/footer/footer";
 
 const NavigationLinks: React.FC = () => {
   return (
