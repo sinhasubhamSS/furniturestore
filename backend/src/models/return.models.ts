@@ -5,7 +5,7 @@ export enum ReturnStatus {
   Requested = "requested", // User ne return request kiya
   Approved = "approved", // Admin ne approve kiya
   Rejected = "rejected", // Admin ne reject kiya
-  PickedUp = "picked_up", // Courier ne pickup kiya
+  PickedUp = "picked_up", // Courier ne pickup kiyaQ
   Received = "received", // Warehouse me receive hua
   Processed = "processed", // Refund process complete
 }
@@ -111,8 +111,8 @@ const returnSchema = new Schema<ReturnDocument>(
 );
 
 // ✅ Indexes for better performance
-returnSchema.index({ returnId: 1 });
-returnSchema.index({ orderId: 1 });
+
+
 returnSchema.index({ user: 1, requestedAt: -1 }); // User's recent returns
 returnSchema.index({ status: 1, requestedAt: -1 }); // Admin filter by status
 

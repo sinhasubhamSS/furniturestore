@@ -234,7 +234,8 @@ export class ReturnController {
     async (req: AuthRequest, res: Response): Promise<void> => {
       const { orderId } = req.params;
       const userId = req.userId;
-
+      console.log(orderId);
+      console.log(userId);
       if (!userId) {
         throw new AppError("Authentication required", 401);
       }

@@ -33,7 +33,7 @@ app.use("/api/wishlist", wishlistRoute);
 app.use("/api/address", addressRoute);
 app.use("/api/order", orderRoute);
 app.use("/api/payment", paymentRoute);
-app.use("/api/return", returnRoute);
+app.use("/api/returns", returnRoute);
 
 app.use("/api/category", categoryRoute);
 app.use("/api/admin", dashboardRoutes);

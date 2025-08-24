@@ -65,7 +65,10 @@ export const orderApi = createApi({
         url: `/order/myorders`,
         method: "GET",
       }),
-      transformResponse: (response: any) => response.data,
+      transformResponse: (response: any) => {
+        console.log("📦 Response Data:", response.data); // sirf response.data
+        return response.data;
+      },
       providesTags: ["Orders"],
     }),
 
