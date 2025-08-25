@@ -1,0 +1,19 @@
+
+[
+  {
+    "pincode": "834001",
+    "city": "Ranchi",
+    "district": "Ranchi",
+    "zone": "Zone1",
+    "deliveryCharge": 0,
+    "deliveryDays": 1
+  },
+  {
+    "pincode": "834002",
+    "city": "Ranchi", 
+    "district": "Ranchi",
+    "zone": "Zone1",
+    "deliveryCharge": 0,
+    "deliveryDays": 1
+  }
+]

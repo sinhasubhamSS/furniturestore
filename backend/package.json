@@ -6,7 +6,8 @@
     "dev": "ts-node-dev --respawn src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "seed:interactive-faq": "ts-node scripts/seedInteractiveFAQ.ts"
+    "seed:interactive-faq": "ts-node scripts/seedInteractiveFAQ.ts",
+   "seed": "ts-node scripts/seed-delivery-zones.ts"
   },
   "keywords": [],
   "author": "",

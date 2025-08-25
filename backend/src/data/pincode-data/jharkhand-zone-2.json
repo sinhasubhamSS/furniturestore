@@ -1,0 +1,18 @@
+[
+  {
+    "pincode": "826001",
+    "city": "Dhanbad",
+    "district": "Dhanbad", 
+    "zone": "Zone2",
+    "deliveryCharge": 50,
+    "deliveryDays": 2
+  },
+  {
+    "pincode": "831001",
+    "city": "Jamshedpur",
+    "district": "East Singhbhum",
+    "zone": "Zone2", 
+    "deliveryCharge": 50,
+    "deliveryDays": 2
+  }
+]
