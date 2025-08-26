@@ -1,5 +1,6 @@
 export interface PlaceOrderItem {
   productId: string;
+  variantId?: string;
   quantity: number;
 }
 
@@ -25,7 +26,11 @@ export interface PlaceOrderPayment {
   razorpayPaymentId?: string;
   razorpaySignature?: string;
 }
-
+export interface DeliveryCalculationRequest {
+  pincode: string;
+  weight: number;
+  orderValue?: number;
+}
 export interface PlaceOrderRequest {
   items: PlaceOrderItem[];
   shippingAddress: PlaceOrderAddress;

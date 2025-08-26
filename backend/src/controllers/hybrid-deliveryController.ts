@@ -1,9 +1,10 @@
-// src/controllers/delivery.controller.ts
+// src/controllers/delivery.controller.ts - ✅ UPDATED WITH UTILITY
 import { Request, Response, NextFunction } from "express";
 import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 import { HybridDeliveryService } from "../services/hybrid-deliveryService";
 import { DeliveryResult } from "../types/deliverytypes";
+import { DeliveryCalculator } from "../utils/DeliveryCalculator/DeliveryCalculator";
 
 export class DeliveryController {
   // ========================================
@@ -33,7 +34,7 @@ export class DeliveryController {
   );
 
   /**
-   * ✅ CORE: Calculate delivery cost with weight
+   * ✅ CORE: Calculate delivery cost with weight - UPDATED WITH UTILITY
    * POST /api/delivery/calculate
    */
   static calculateDeliveryCost = catchAsync(
@@ -44,40 +45,32 @@ export class DeliveryController {
         return next(new AppError("Pincode and weight are required", 400));
       }
 
-      const result = await HybridDeliveryService.checkDeliverability(pincode);
+      const deliveryInfo = await HybridDeliveryService.checkDeliverability(
+        pincode
+      );
 
       // Early return if not serviceable
-      if (!result.isServiceable) {
+      if (!deliveryInfo.isServiceable) {
         return res.status(200).json({
           success: false,
-          data: result,
+          data: deliveryInfo,
         });
       }
 
-      // Calculate final charges
-      let totalCharge = result.deliveryCharge;
-
-      // Extra weight charges
-      if (weight > result.maxWeight) {
-        const extraWeight = weight - result.maxWeight;
-        totalCharge += Math.ceil(extraWeight) * 20; // ₹20 per extra kg
-      }
-
-      // Free delivery discount
-      if (orderValue && orderValue >= 100000) {
-        totalCharge = Math.max(0, totalCharge - 50); // ₹50 off
-      }
+      // ✅ USE SHARED UTILITY - No more duplicate logic
+      const charges = DeliveryCalculator.calculateCharges(
+        deliveryInfo,
+        weight,
+        orderValue || 0
+      );
 
       res.status(200).json({
         success: true,
         data: {
-          ...result,
+          ...deliveryInfo,
           weight: weight,
           orderValue: orderValue || 0,
-          originalCharge: result.deliveryCharge,
-          finalCharge: totalCharge,
-          discount: orderValue >= 100000 ? 50 : 0,
-          freeDeliveryEligible: orderValue >= 100000,
+          ...charges, // Spread calculated charges
         },
       });
     }
@@ -142,4 +135,6 @@ export class DeliveryController {
       });
     }
   );
+
+  
 }

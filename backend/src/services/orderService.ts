@@ -1,92 +1,21 @@
+// src/services/orderService.ts
 import Product, { IVariant } from "../models/product.models";
 import {
   generateStandardOrderId,
   Order,
   OrderStatus,
 } from "../models/order.models";
-import { Return } from "../models/return.models"; // ✅ Missing import
+import { Return } from "../models/return.models";
 import { PlaceOrderRequest } from "../types/orderservicetypes";
 import { Cart } from "../models/cart.model";
 import { paymentService } from "./paymentService";
 import { AppError } from "../utils/AppError";
-import mongoose, { Types } from "mongoose"; // ✅ Add Types import
+import mongoose, { Types } from "mongoose";
+import { HybridDeliveryService } from "./hybrid-deliveryService";
+import { DeliveryCalculator } from "../utils/DeliveryCalculator/DeliveryCalculator";
 
 class OrderService {
-  // Helper to process product items
-  private async buildOrderItems(
-    items: { productId: string; quantity: number; variantId?: string }[],
-    session: mongoose.ClientSession
-  ) {
-    const orderItemsSnapshot = [];
-    let totalAmount = 0;
-
-    for (const item of items) {
-      const product = await Product.findById(item.productId).session(session);
-      if (!product) {
-        throw new AppError(`Product not found: ${item.productId}`, 404);
-      }
-
-      // ✅ FIXED: Select variant logic with proper typing
-      let selectedVariant;
-      if (item.variantId) {
-        selectedVariant = product.variants.find(
-          (v: IVariant) => v._id?.toString() === item.variantId
-        );
-      } else {
-        selectedVariant = product.variants[0]; // Use first variant as default
-      }
-
-      if (!selectedVariant) {
-        throw new AppError(
-          `Variant not found for product: ${product.name}`,
-          400
-        );
-      }
-
-      // Check variant stock
-      const availableStock =
-        selectedVariant.stock - (selectedVariant.reservedStock || 0);
-
-      if (availableStock < item.quantity) {
-        throw new AppError(
-          `Insufficient stock for ${product.name} (${selectedVariant.color}, ${selectedVariant.size}). Available: ${availableStock}`,
-          400
-        );
-      }
-      
-      const finalPrice =
-        selectedVariant.hasDiscount && selectedVariant.discountedPrice > 0
-          ? selectedVariant.discountedPrice // discounted price (includes GST)
-          : selectedVariant.price;
-      
-      // Use variant price
-      const itemTotal = finalPrice * item.quantity;
-      totalAmount += itemTotal;
-
-      orderItemsSnapshot.push({
-        productId: product._id,
-        variantId: selectedVariant._id,
-        name: product.name,
-        image: selectedVariant.images?.[0]?.url || "",
-        quantity: item.quantity,
-        price: finalPrice, // ✅ Only final price
-        hasDiscount: selectedVariant.hasDiscount,
-        discountPercent: selectedVariant.discountPercent || 0,
-        color: selectedVariant.color,
-        size: selectedVariant.size,
-        sku: selectedVariant.sku,
-      });
-      
-      if (!selectedVariant.reservedStock) {
-        selectedVariant.reservedStock = 0; // Initialize if undefined
-      }
-      selectedVariant.reservedStock += item.quantity;
-      await product.save({ session });
-    }
-
-    return { orderItemsSnapshot, totalAmount };
-  }
-
+  // Order status transition rules
   private allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
     [OrderStatus.Pending]: [
       OrderStatus.Confirmed,
@@ -106,7 +35,125 @@ class OrderService {
     [OrderStatus.Failed]: [],
   };
 
-  // ✅ 1. Payment successful होने पर stock confirm करने के लिए
+  /**
+   * Build order items snapshot with weight tracking and stock reservation
+   */
+  private async buildOrderItems(
+    items: { productId: string; quantity: number; variantId?: string }[],
+    session: mongoose.ClientSession
+  ) {
+    const orderItemsSnapshot = [];
+    let totalAmount = 0;
+    let totalWeight = 0;
+
+    for (const item of items) {
+      const product = await Product.findById(item.productId).session(session);
+      if (!product) {
+        throw new AppError(`Product not found: ${item.productId}`, 404);
+      }
+
+      let selectedVariant;
+      if (item.variantId) {
+        selectedVariant = product.variants.find(
+          (v: IVariant) => v._id?.toString() === item.variantId
+        );
+      } else {
+        selectedVariant = product.variants[0];
+      }
+
+      if (!selectedVariant) {
+        throw new AppError(
+          `Variant not found for product: ${product.name}`,
+          400
+        );
+      }
+
+      const availableStock =
+        selectedVariant.stock - (selectedVariant.reservedStock || 0);
+
+      if (availableStock < item.quantity) {
+        throw new AppError(
+          `Insufficient stock for ${product.name} (${selectedVariant.color}, ${selectedVariant.size}). Available: ${availableStock}`,
+          400
+        );
+      }
+
+      const finalPrice =
+        selectedVariant.hasDiscount && selectedVariant.discountedPrice > 0
+          ? selectedVariant.discountedPrice
+          : selectedVariant.price;
+
+      const itemTotal = finalPrice * item.quantity;
+      totalAmount += itemTotal;
+
+      // ✅ SAFE: Get weight from product measurements with optional chaining
+      const productWeight = product.measurements?.weight ?? 1; // Default 1kg
+      totalWeight += productWeight * item.quantity;
+
+      orderItemsSnapshot.push({
+        productId: product._id,
+        variantId: selectedVariant._id,
+        name: product.name,
+        image: selectedVariant.images?.[0]?.url || "",
+        quantity: item.quantity,
+        price: finalPrice,
+        hasDiscount: selectedVariant.hasDiscount,
+        discountPercent: selectedVariant.discountPercent || 0,
+        color: selectedVariant.color,
+        size: selectedVariant.size,
+        sku: selectedVariant.sku,
+        weight: productWeight, // Individual item weight
+      });
+
+      // Reserve stock
+      if (!selectedVariant.reservedStock) {
+        selectedVariant.reservedStock = 0;
+      }
+      selectedVariant.reservedStock += item.quantity;
+      await product.save({ session });
+    }
+
+    return { orderItemsSnapshot, totalAmount, totalWeight };
+  }
+
+  /**
+   * Calculate delivery charges based on pincode, weight, and order value
+   */
+  private async calculateDeliveryCharges(
+    pincode: string,
+    weight: number,
+    orderValue: number
+  ) {
+    const deliveryInfo = await HybridDeliveryService.checkDeliverability(
+      pincode
+    );
+
+    if (!deliveryInfo.isServiceable) {
+      throw new AppError(
+        `Delivery not available for pincode ${pincode}. ${deliveryInfo.message}`,
+        400
+      );
+    }
+
+    // ✅ USE SHARED UTILITY - Same logic as controller
+    const charges = DeliveryCalculator.calculateCharges(
+      deliveryInfo,
+      weight,
+      orderValue
+    );
+
+    return {
+      zone: deliveryInfo.zone,
+      estimatedDays: deliveryInfo.deliveryDays,
+      courierPartner: deliveryInfo.courierPartner,
+      codAvailable: deliveryInfo.codAvailable,
+      ...charges, // Spread calculated charges
+    };
+  }
+
+  /**
+   * Confirm stock reservation - convert reserved stock to actual stock deduction
+   */
   private async confirmReservation(
     orderId: string,
     session?: mongoose.ClientSession
@@ -124,7 +171,7 @@ class OrderService {
         );
 
         if (variant) {
-          // Reserved stock को actual stock से minus करो
+          // Deduct from actual stock and reduce reserved stock
           variant.stock -= item.quantity;
           variant.reservedStock = Math.max(
             0,
@@ -138,7 +185,9 @@ class OrderService {
     }
   }
 
-  // ✅ 2. Order cancel/fail होने पर reserved stock release करने के लिए
+  /**
+   * Release stock reservation - return reserved stock back to available
+   */
   private async releaseReservation(
     orderId: string,
     session?: mongoose.ClientSession
@@ -156,7 +205,7 @@ class OrderService {
         );
 
         if (variant) {
-          // Reserved stock को release करो (actual stock unchanged)
+          // Only reduce reserved stock (don't touch actual stock)
           variant.reservedStock = Math.max(
             0,
             (variant.reservedStock || 0) - item.quantity
@@ -169,12 +218,15 @@ class OrderService {
     }
   }
 
+  /**
+   * Place new order with complete delivery integration
+   */
   async placeOrder(
     userId: string,
     orderData: PlaceOrderRequest,
     idempotencyKey?: string
   ) {
-    // ✅ CONCEPT 1: Check for existing order with same idempotencyKey
+    // Check for existing order with same idempotencyKey
     if (idempotencyKey) {
       const existingOrder = await Order.findOne({
         user: userId,
@@ -182,18 +234,18 @@ class OrderService {
       });
 
       if (existingOrder) {
-        return existingOrder; // Return existing order
+        return existingOrder;
       }
     }
 
-    const session = await mongoose.startSession(); // Create DB session
-    let createdOrder: any; // ✅ Move outside try block for catch access
+    const session = await mongoose.startSession();
+    let createdOrder: any;
 
     try {
       await session.withTransaction(async () => {
         let { items, shippingAddress, payment, fromCart } = orderData;
 
-        // If fromCart, fetch items from cart inside transaction (with session)
+        // If ordering from cart, fetch cart items
         if ((!items || items.length === 0) && fromCart) {
           const cart = await Cart.findOne({ user: userId }).session(session);
           if (!cart || cart.items.length === 0)
@@ -209,19 +261,45 @@ class OrderService {
         if (!items || items.length === 0)
           throw new AppError("No order items provided.", 400);
 
-        // Build items snapshot (RESERVES stock, doesn't decrement yet)
-        const { orderItemsSnapshot, totalAmount } = await this.buildOrderItems(
-          items,
-          session
+        // ✅ STEP 1: Validate delivery availability
+        const deliveryCheck = await HybridDeliveryService.checkDeliverability(
+          shippingAddress.pincode
         );
 
-        // Payment verification as before
+        if (!deliveryCheck.isServiceable) {
+          throw new AppError(
+            `Delivery not available for pincode ${shippingAddress.pincode}. ${deliveryCheck.message}`,
+            400
+          );
+        }
+
+        // ✅ STEP 2: Build order items and calculate weight
+        const { orderItemsSnapshot, totalAmount, totalWeight } =
+          await this.buildOrderItems(items, session);
+
+        // ✅ STEP 3: Calculate delivery charges
+        const deliveryCharges = await this.calculateDeliveryCharges(
+          shippingAddress.pincode,
+          totalWeight,
+          totalAmount
+        );
+
+        // ✅ STEP 4: Process payment
         let paymentStatus: "pending" | "paid" = "pending";
         let paymentMethod: "COD" | "RAZORPAY" = payment.method as
           | "COD"
           | "RAZORPAY";
         let provider = payment.method === "COD" ? "CASH" : "RAZORPAY";
 
+        // Check COD availability
+        if (payment.method === "COD" && !deliveryCharges.codAvailable) {
+          throw new AppError(
+            "COD is not available for this delivery location. Please use online payment.",
+            400
+          );
+        }
+
+        // Verify Razorpay payment
         if (payment.method === "RAZORPAY") {
           if (
             !payment.razorpayOrderId ||
@@ -245,53 +323,69 @@ class OrderService {
         }
 
         const generatedOrderId = await generateStandardOrderId();
+        const finalTotalAmount = totalAmount + deliveryCharges.finalCharge;
 
-        // ✅ Create order
+        // ✅ STEP 5: Create order with clean delivery snapshot
         const [newOrder] = await Order.create(
           [
             {
               user: userId,
               orderId: generatedOrderId,
-              idempotencyKey, // ✅ Add idempotencyKey
+              idempotencyKey,
               orderItemsSnapshot,
+
+              // Complete shipping address (single source)
               shippingAddressSnapshot: shippingAddress,
+
+              // ✅ CLEAN: Only delivery-specific data (no address duplication)
+              deliverySnapshot: {
+                zone: deliveryCharges.zone,
+                deliveryCharge: deliveryCharges.finalCharge,
+                originalDeliveryCharge: deliveryCharges.originalCharge,
+                weightSurcharge: deliveryCharges.weightSurcharge,
+                discount: deliveryCharges.discount,
+                estimatedDays: deliveryCharges.estimatedDays,
+                courierPartner: deliveryCharges.courierPartner,
+                codAvailable: deliveryCharges.codAvailable,
+                totalWeight: totalWeight,
+              },
+
               paymentSnapshot: {
                 method: paymentMethod,
                 status: paymentStatus,
                 provider,
                 razorpayOrderId: payment.razorpayOrderId || null,
                 razorpayPaymentId: payment.razorpayPaymentId || null,
-                razorpaySignature: payment.razorpaySignature || null, // ✅ Add signature
+                razorpaySignature: payment.razorpaySignature || null,
               },
-              totalAmount,
-              status: OrderStatus.Pending, // ✅ Use enum instead of string
+              totalAmount: finalTotalAmount,
+              status: OrderStatus.Pending,
             },
           ],
           { session }
         );
+
         createdOrder = newOrder;
 
-        // ✅ Handle reservation based on payment status
+        // ✅ STEP 6: Handle stock confirmation based on payment
         if (paymentMethod === "COD" || paymentStatus === "paid") {
-          // COD या successful Razorpay के लिए immediately confirm करो
           await this.confirmReservation(
             (newOrder._id as mongoose.Types.ObjectId).toString(),
             session
           );
-          newOrder.status = OrderStatus.Confirmed; // ✅ Use enum
+          newOrder.status = OrderStatus.Confirmed;
           await newOrder.save({ session });
 
           console.log(
             `✅ Order ${newOrder.orderId} confirmed and stock decremented`
           );
         } else {
-          // Pending payments के लिए सिर्फ reserve रखो
           console.log(
             `✅ Order ${newOrder.orderId} created with reserved stock`
           );
         }
 
-        // Clear user's cart if needed (also with session!)
+        // ✅ STEP 7: Clear cart if order placed from cart
         if (fromCart) {
           await Cart.findOneAndUpdate(
             { user: userId },
@@ -301,10 +395,9 @@ class OrderService {
         }
       });
 
-      // Transaction auto-commits if all succeeded
       return createdOrder;
     } catch (error: any) {
-      // ✅ Error handling with stock release
+      // Release stock reservation on error
       if (createdOrder && createdOrder._id) {
         try {
           await this.releaseReservation(createdOrder._id.toString());
@@ -316,7 +409,7 @@ class OrderService {
         }
       }
 
-      // ✅ Handle race condition for idempotencyKey
+      // Handle duplicate idempotency key
       if (error.code === 11000 && error.message.includes("idempotencyKey")) {
         const existingOrder = await Order.findOne({
           user: userId,
@@ -328,34 +421,32 @@ class OrderService {
       }
       throw error;
     } finally {
-      // Ensure session is closed even if error thrown
       await session.endSession();
     }
   }
 
-  // ✅ Fixed getMyOrders method with proper return
+  /**
+   * Get user's orders with delivery information
+   */
   async getMyOrders(userId: string) {
     const orders = await Order.find({ user: userId })
       .sort({ createdAt: -1 })
       .select("-__v");
 
-    // ✅ Get all return requests for user's orders in one query
-    const orderIds = orders.map(order => order.orderId);
+    const orderIds = orders.map((order) => order.orderId);
     const activeReturns = await Return.find({
       orderId: { $in: orderIds },
       user: new Types.ObjectId(userId),
-      // Only active returns (not cancelled or completed)
-      status: { $nin: ['cancelled'] }
-    }).select('orderId status returnId requestedAt');
+      status: { $nin: ["cancelled"] },
+    }).select("orderId status returnId requestedAt");
 
-    // ✅ Create lookup map for faster access
     const returnStatusMap = new Map();
-    activeReturns.forEach(returnDoc => {
+    activeReturns.forEach((returnDoc) => {
       returnStatusMap.set(returnDoc.orderId, {
         hasActiveReturn: true,
         returnStatus: returnDoc.status,
         returnId: returnDoc.returnId,
-        returnRequestedAt: returnDoc.requestedAt
+        returnRequestedAt: returnDoc.requestedAt,
       });
     });
 
@@ -364,10 +455,23 @@ class OrderService {
       placedAt: order.placedAt,
       totalAmount: order.totalAmount,
       status: order.status,
-
-      // ✅ Add return information
       hasActiveReturn: returnStatusMap.has(order.orderId),
       returnInfo: returnStatusMap.get(order.orderId) || null,
+
+      // ✅ CLEAN: Combine delivery info from separate sources
+      deliveryInfo: {
+        // Address data from shipping snapshot
+        pincode: order.shippingAddressSnapshot.pincode,
+        city: order.shippingAddressSnapshot.city,
+
+        // Delivery data from delivery snapshot
+        zone: order.deliverySnapshot?.zone,
+        estimatedDays: order.deliverySnapshot?.estimatedDays,
+        deliveryCharge: order.deliverySnapshot?.deliveryCharge,
+        courierPartner: order.deliverySnapshot?.courierPartner,
+        trackingId: order.deliverySnapshot?.trackingId,
+        totalWeight: order.deliverySnapshot?.totalWeight,
+      },
 
       productPreview: {
         images: order.orderItemsSnapshot?.[0]?.image || null,
@@ -387,8 +491,11 @@ class OrderService {
 
       paymentStatus: order.paymentSnapshot?.status || "unpaid",
     }));
-  } // ✅ Added missing closing brace
+  }
 
+  /**
+   * Cancel order within 12 hours
+   */
   async cancelOrder(userId: string, orderId: string) {
     const order = await Order.findOne({ user: userId, _id: orderId });
     if (!order) throw new AppError("Order not found", 404);
@@ -412,7 +519,7 @@ class OrderService {
         order.status = OrderStatus.Cancelled;
         await order.save({ session });
 
-        // ✅ NEW: Use releaseReservation instead of manual stock restoration
+        // Release reserved stock
         await this.releaseReservation(orderId, session);
       });
     } finally {
@@ -426,7 +533,18 @@ class OrderService {
     };
   }
 
-  async updateOrderStatus(orderId: string, newStatus: OrderStatus) {
+  /**
+   * Update order status with delivery tracking
+   */
+  async updateOrderStatus(
+    orderId: string,
+    newStatus: OrderStatus,
+    trackingInfo?: {
+      trackingId?: string;
+      courierPartner?: string;
+      estimatedDelivery?: Date;
+    }
+  ) {
     const order = await Order.findById(orderId);
     if (!order) throw new AppError("Order not found", 404);
 
@@ -443,9 +561,25 @@ class OrderService {
     try {
       await session.withTransaction(async () => {
         order.status = newStatus;
+
+        // ✅ Add delivery tracking info when shipped
+        if (newStatus === OrderStatus.Shipped && trackingInfo) {
+          if (order.deliverySnapshot) {
+            order.deliverySnapshot.trackingId = trackingInfo.trackingId;
+            if (trackingInfo.courierPartner) {
+              order.deliverySnapshot.courierPartner =
+                trackingInfo.courierPartner;
+            }
+            if (trackingInfo.estimatedDelivery) {
+              order.deliverySnapshot.estimatedDelivery =
+                trackingInfo.estimatedDelivery;
+            }
+          }
+        }
+
         await order.save({ session });
 
-        // ✅ NEW: Handle stock based on status change
+        // Handle stock based on status change
         if (
           newStatus === OrderStatus.Confirmed &&
           order.paymentSnapshot.status === "paid"

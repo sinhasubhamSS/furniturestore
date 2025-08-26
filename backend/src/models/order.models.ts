@@ -36,6 +36,7 @@ export interface OrderItemSnapshot {
   color?: string;
   size?: string;
   sku?: string;
+  weight: number;
 }
 
 // Shipping Address snapshot interface
@@ -50,7 +51,20 @@ export interface ShippingAddressSnapshot {
   pincode: string;
   country: string;
 }
-
+export interface DeliverySnapshot {
+  zone: "Zone1" | "Zone2" | "Zone3";
+  deliveryCharge: number;
+  originalDeliveryCharge: number;
+  weightSurcharge: number;
+  discount: number;
+  estimatedDays: number;
+  courierPartner: string;
+  codAvailable: boolean;
+  totalWeight: number;
+  // ✅ NO pincode, city, state - these come from shipping address
+  trackingId?: string;
+  estimatedDelivery?: Date;
+}
 // Payment Snapshot interface
 export interface PaymentSnapshot {
   method?: PaymentMethod;
@@ -91,6 +105,7 @@ export interface OrderDocument extends Document {
   user: Types.ObjectId;
   orderItemsSnapshot: OrderItemSnapshot[];
   shippingAddressSnapshot: ShippingAddressSnapshot;
+  deliverySnapshot: DeliverySnapshot;
   paymentSnapshot: PaymentSnapshot;
   status: OrderStatus;
   totalAmount: number;
