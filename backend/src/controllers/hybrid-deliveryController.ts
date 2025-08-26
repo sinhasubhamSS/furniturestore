@@ -3,20 +3,27 @@ import { Request, Response, NextFunction } from "express";
 import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 import { HybridDeliveryService } from "../services/hybrid-deliveryService";
-import { DeliveryZone } from "../models/deliveryzone.models";
+import { DeliveryResult } from "../types/deliverytypes";
 
 export class DeliveryController {
-  // ✅ Check single pincode delivery
+  // ========================================
+  // 👤 USER ENDPOINTS - Customer core needs
+  // ========================================
+
+  /**
+   * ✅ CORE: Check pincode delivery
+   * POST /api/delivery/check
+   */
   static checkDelivery = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
       const { pincode } = req.body;
 
-      // Basic validation
       if (!pincode) {
         return next(new AppError("Pincode is required", 400));
       }
 
-      const result = await HybridDeliveryService.checkDeliverability(pincode);
+      const result: DeliveryResult =
+        await HybridDeliveryService.checkDeliverability(pincode);
 
       res.status(200).json({
         success: true,
@@ -25,37 +32,61 @@ export class DeliveryController {
     }
   );
 
-  // ✅ Check multiple pincodes delivery
-  static checkBulkDelivery = catchAsync(
+  /**
+   * ✅ CORE: Calculate delivery cost with weight
+   * POST /api/delivery/calculate
+   */
+  static calculateDeliveryCost = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
-      const { pincodes } = req.body;
+      const { pincode, weight, orderValue } = req.body;
 
-      if (!pincodes || !Array.isArray(pincodes) || pincodes.length === 0) {
-        return next(new AppError("Pincodes array is required", 400));
+      if (!pincode || !weight) {
+        return next(new AppError("Pincode and weight are required", 400));
       }
 
-      if (pincodes.length > 10) {
-        return next(
-          new AppError("Maximum 10 pincodes allowed per request", 400)
-        );
+      const result = await HybridDeliveryService.checkDeliverability(pincode);
+
+      // Early return if not serviceable
+      if (!result.isServiceable) {
+        return res.status(200).json({
+          success: false,
+          data: result,
+        });
       }
 
-      const results = await HybridDeliveryService.getBulkDeliverability(
-        pincodes
-      );
+      // Calculate final charges
+      let totalCharge = result.deliveryCharge;
+
+      // Extra weight charges
+      if (weight > result.maxWeight) {
+        const extraWeight = weight - result.maxWeight;
+        totalCharge += Math.ceil(extraWeight) * 20; // ₹20 per extra kg
+      }
+
+      // Free delivery discount
+      if (orderValue && orderValue >= 100000) {
+        totalCharge = Math.max(0, totalCharge - 50); // ₹50 off
+      }
 
       res.status(200).json({
         success: true,
         data: {
-          total: results.length,
-          serviceable: results.filter((r) => r.isServiceable).length,
-          results: results,
+          ...result,
+          weight: weight,
+          orderValue: orderValue || 0,
+          originalCharge: result.deliveryCharge,
+          finalCharge: totalCharge,
+          discount: orderValue >= 100000 ? 50 : 0,
+          freeDeliveryEligible: orderValue >= 100000,
         },
       });
     }
   );
 
-  // ✅ Get all serviceable zones info
+  /**
+   * ✅ INFO: Show delivery zones to customers
+   * GET /api/delivery/zones
+   */
   static getServiceableZones = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
       const zones = await HybridDeliveryService.getServiceableZones();
@@ -70,82 +101,45 @@ export class DeliveryController {
     }
   );
 
-  // ✅ Get delivery charges for specific zone
-  static getZoneCharges = catchAsync(
+  // ========================================
+  // 🔐 ADMIN ENDPOINTS - Simple management
+  // ========================================
+
+  /**
+   * ✅ ADMIN: View all zones
+   * GET /api/admin/delivery/zones
+   */
+  static getAllZones = catchAsync(
     async (req: Request, res: Response, next: NextFunction) => {
-      const { zone } = req.params;
-
-      if (!zone) {
-        return next(new AppError("Zone parameter is required", 400));
-      }
-
-      const zoneInfo = await DeliveryZone.findOne({
-        zone: zone.toUpperCase(),
-        isServiceable: true,
-      });
-
-      if (!zoneInfo) {
-        return next(new AppError("Zone not found or not serviceable", 404));
-      }
+      const zones = await HybridDeliveryService.getAllZones();
 
       res.status(200).json({
         success: true,
         data: {
-          zone: zoneInfo.zone,
-          deliveryCharge: zoneInfo.deliveryCharge,
-          deliveryDays: zoneInfo.deliveryDays,
-          codAvailable: zoneInfo.codAvailable,
-          maxWeight: zoneInfo.maxWeight,
-          courierPartner: zoneInfo.courierPartner,
+          total: zones.length,
+          zones: zones,
         },
       });
     }
   );
 
-  // ✅ Calculate delivery cost for order
-  //   static calculateDeliveryCost = catchAsync(
-  //     async (req: Request, res: Response, next: NextFunction) => {
-  //       const { pincode, weight, orderValue } = req.body;
+  /**
+   * ✅ ADMIN: Enable/disable zone
+   * PATCH /api/admin/delivery/zones/:pincode/toggle
+   */
+  static toggleZone = catchAsync(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const { pincode } = req.params;
 
-  //       if (!pincode || !weight) {
-  //         return next(new AppError("Pincode and weight are required", 400));
-  //       }
+      const updatedZone = await HybridDeliveryService.toggleZone(pincode);
 
-  //       const deliveryInfo = await HybridDeliveryService.checkDeliverability(
-  //         pincode
-  //       );
-
-  //       if (!deliveryInfo.isServiceable) {
-  //         return res.status(200).json({
-  //           success: true,
-  //           data: deliveryInfo,
-  //         });
-  //       }
-
-  //       // Calculate total delivery cost with weight consideration
-  //       let totalCharge = deliveryInfo.deliveryCharge;
-
-  //       // Extra charge for heavy items
-  //       if (weight > deliveryInfo.maxWeight) {
-  //         const extraWeight = weight - deliveryInfo.maxWeight;
-  //         totalCharge += Math.ceil(extraWeight) * 20; // ₹20 per extra kg
-  //       }
-
-  //       // Free delivery on high order value
-  //       if (orderValue && orderValue >= 1000) {
-  //         totalCharge = Math.max(0, totalCharge - 50); // ₹50 discount
-  //       }
-
-  //       res.status(200).json({
-  //         success: true,
-  //         data: {
-  //           ...deliveryInfo,
-  //           originalCharge: deliveryInfo.deliveryCharge,
-  //           finalCharge: totalCharge,
-  //           weightSurcharge: totalCharge - deliveryInfo.deliveryCharge,
-  //           freeDeliveryEligible: orderValue >= 1000,
-  //         },
-  //       });
-  //     }
-  //   );
+      res.status(200).json({
+        success: true,
+        data: updatedZone,
+        message: `Zone ${
+          updatedZone.isServiceable ? "enabled" : "disabled"
+        } successfully`,
+      });
+    }
+  );
 }

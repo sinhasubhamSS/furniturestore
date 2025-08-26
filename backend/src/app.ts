@@ -26,6 +26,7 @@ import { errorMiddleware } from "./middlewares/errorMiddleware";
 import reviewRoutes from "./routes/reviewRoutes";
 import newsletterRoutes from "./routes/footer/newsLetterRoutes";
 import interactiveFaqRoutes from "./routes/footer/interactiveFaqRoutes";
+import deliveryRoutes from "./routes/deliverRoutes";
 app.use("/api/user", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
@@ -39,6 +40,8 @@ app.use("/api/category", categoryRoute);
 app.use("/api/admin", dashboardRoutes);
 //reviews
 app.use("/api", reviewRoutes);
+//delivery
+app.use("/api/delivery", deliveryRoutes);
 
 //customer support
 
