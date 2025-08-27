@@ -1,20 +1,27 @@
-// src/types/order.ts
-
+// src/shared/types/order.ts
 import { Address } from "./address";
 
 export interface Order {
   _id: string;
   orderId?: string;
   idempotencyKey?: string;
-  placedAt: string; // Example: "2025-07-31T05:53:53.664Z"
-  paymentStatus: "paid" | "unpaid"; // Adjust as needed
-  status: "pending" | "shipped" | "delivered" | "cancelled"; // Add more statuses as per your logic
+  placedAt: string;
+  paymentStatus: "paid" | "unpaid";
+  status:
+    | "pending"
+    | "confirmed"
+    | "shipped"
+    | "out_for_delivery"
+    | "delivered"
+    | "cancelled"
+    | "refunded"
+    | "failed";
   totalAmount: number;
 
   productPreview: {
     name: string;
     quantity: number;
-    images: string; // Changed to array
+    images: string | null;
   };
 
   shippingSummary: {
@@ -23,27 +30,40 @@ export interface Order {
     state: string;
     pincode: string;
   };
+
+  deliveryInfo?: {
+    zone: string;
+    estimatedDays: number;
+    deliveryCharge: number;
+    courierPartner: string;
+    trackingId?: string;
+    totalWeight?: number;
+  };
 }
 
-export type PlaceOrderRequest = {
+export interface PlaceOrderRequest {
   items: {
     productId: string;
-    variantId: string;
+    variantId?: string;
     quantity: number;
   }[];
   shippingAddress: Address;
   payment: {
     method: "COD" | "RAZORPAY";
+    status?: "pending" | "paid" | string;
+    transactionId?: string;
+    provider?: string;
+    paidAt?: Date;
     razorpayOrderId?: string;
     razorpayPaymentId?: string;
     razorpaySignature?: string;
   };
   fromCart?: boolean;
   idempotencyKey?: string;
-};
+}
 
-export type RazorpayOrderResponse = {
+export interface RazorpayOrderResponse {
   orderId: string;
   amount: number;
   currency: string;
-};
+}

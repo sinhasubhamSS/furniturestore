@@ -18,6 +18,7 @@ import StockStatus from "./StockStatus";
 import ActionButtons from "./ActionButtons";
 import ProductInfo from "./ProductInfo";
 import ReviewsSection from "../reviews/ReviewSection";
+import PincodeChecker from "./PincodeChecker";
 
 interface Props {
   slug: string;
@@ -92,6 +93,12 @@ const ProductDetail = ({ slug }: Props) => {
               <QuantitySelector />
             </div>
             <StockStatus />
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <h3 className="text-sm font-medium text-gray-900 mb-3">
+                📍 Check Delivery Availability
+              </h3>
+              <PincodeChecker />
+            </div>
           </div>
           <ProductInfo product={product} />
         </div>

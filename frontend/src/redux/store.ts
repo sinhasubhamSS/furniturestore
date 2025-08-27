@@ -1,5 +1,6 @@
 import { configureStore, combineReducers } from "@reduxjs/toolkit";
 import userReducer from "./slices/userSlice";
+import cartReducer from "./slices/cartSlice";
 import {
   persistStore,
   persistReducer,
@@ -24,10 +25,12 @@ import { adminDashboardApi } from "./services/admin/adminDashboard";
 import productDetailReducer from "./slices/ProductDetailSlice";
 import { reviewsApi } from "./services/user/reviewApi";
 import { returnApi } from "./services/user/returnApi";
+import { deliveryApi } from "./services/user/deliveryApi";
 const rootReducer = combineReducers({
   user: userReducer,
   checkout: checkoutReducer,
   productDetail: productDetailReducer,
+  cart: cartReducer,
   [adminProductApi.reducerPath]: adminProductApi.reducer,
   [adminCategoryApi.reducerPath]: adminCategoryApi.reducer,
   [userProductApi.reducerPath]: userProductApi.reducer, // ✅ ADD HERE
@@ -38,6 +41,7 @@ const rootReducer = combineReducers({
   [adminDashboardApi.reducerPath]: adminDashboardApi.reducer,
   [reviewsApi.reducerPath]: reviewsApi.reducer,
   [returnApi.reducerPath]: returnApi.reducer,
+  [deliveryApi.reducerPath]: deliveryApi.reducer,
 });
 
 const persistConfig = {
@@ -65,7 +69,8 @@ export const store = configureStore({
       wishlistApi.middleware,
       adminDashboardApi.middleware,
       reviewsApi.middleware,
-      returnApi.middleware
+      returnApi.middleware,
+      deliveryApi.middleware
     ),
 });
 
