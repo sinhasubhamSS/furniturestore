@@ -24,7 +24,7 @@ export const userProductApi = createApi({
         method: "GET",
       }),
       transformResponse: (res: { data: UserProductResponse }) => {
-        console.log("📦 Backend response:", res); // 👈 Add this
+        console.log("📦 Backend response:", res.data); // 👈 Add this
         return res.data;
       },
       providesTags: ["UserProducts"],

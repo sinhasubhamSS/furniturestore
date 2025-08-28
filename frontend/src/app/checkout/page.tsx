@@ -13,7 +13,7 @@ import CheckoutSummary, {
 } from "@/components/checkout/CheckoutSummary";
 import AddressSection from "@/components/checkout/AddressSection";
 import { RootState } from "@/redux/store";
-import { updateQuantity } from "@/redux/slices/checkoutSlice"; // ✅ New action
+import { updateQuantity } from "@/redux/slices/checkoutSlice";
 
 export default function CheckoutPage() {
   const dispatch = useDispatch();
@@ -25,6 +25,7 @@ export default function CheckoutPage() {
   );
 
   const [addressSelected, setAddressSelected] = useState(!!selectedAddress);
+  const [deliveryAvailable, setDeliveryAvailable] = useState(false); // ✅ Add this state
 
   // ✅ Get product data for direct purchases
   const productId =
@@ -119,15 +120,27 @@ export default function CheckoutPage() {
     }
   };
 
-  // ✅ Handle Proceed to Payment
+  // ✅ Enhanced proceed to payment validation
   const handleProceedToPayment = () => {
     if (!addressSelected) {
       alert("Please select a delivery address");
       return;
     }
 
-    // ✅ Navigate to payment (no URL params needed!)
+    if (!deliveryAvailable) {
+      alert(
+        "Selected address is not deliverable. Please choose a different address."
+      );
+      return;
+    }
+
     router.push("/checkout/payment");
+  };
+
+  // ✅ Handle address selection with delivery info
+  const handleAddressSelection = (deliverable: boolean) => {
+    setAddressSelected(!!selectedAddress);
+    setDeliveryAvailable(deliverable);
   };
 
   // Sync addressSelected with Redux address
@@ -241,7 +254,7 @@ export default function CheckoutPage() {
         <div className="grid lg:grid-cols-[2fr_1fr] gap-8">
           {/* Address Selection */}
           <div>
-            <AddressSection onSelectionChange={setAddressSelected} />
+            <AddressSection onSelectionChange={handleAddressSelection} />
           </div>
 
           {/* Summary and Proceed Button */}
@@ -253,16 +266,21 @@ export default function CheckoutPage() {
               onQuantityChange={handleQuantityChange}
             />
 
+            {/* ✅ Enhanced button with delivery validation */}
             <button
               className={`mt-6 w-full rounded-lg py-3 font-semibold text-white transition-colors ${
-                addressSelected
+                addressSelected && deliveryAvailable
                   ? "bg-blue-600 hover:bg-blue-700"
                   : "bg-gray-300 cursor-not-allowed"
               }`}
-              onClick={handleProceedToPayment} // ✅ Updated handler
-              disabled={!addressSelected}
+              onClick={handleProceedToPayment}
+              disabled={!addressSelected || !deliveryAvailable}
             >
-              Proceed to Payment
+              {!addressSelected
+                ? "Select Address"
+                : !deliveryAvailable
+                ? "Delivery Not Available"
+                : "Proceed to Payment"}
             </button>
           </div>
         </div>

@@ -5,7 +5,7 @@ import Image from "next/image";
 
 type Props = {
   product: DisplayProduct;
-  variantId: string; // ✅ Added variant ID
+  variantId: string;
   quantity: number;
   onRemove: () => void;
   onQuantityChange: (qty: number) => void;
@@ -23,20 +23,20 @@ const ProductCartItem = ({
 
   if (!selectedVariant) {
     console.error(`Variant ${variantId} not found for product ${product._id}`);
-    return null; // Or show error state
+    return null;
   }
 
-  // ✅ Use variant's data
+  // ✅ Use correct property names matching your schema
   const displayPrice = selectedVariant.hasDiscount
-    ? selectedVariant.discountedPrice
-    : selectedVariant.basePrice;
+    ? selectedVariant.discountedPrice || 0
+    : selectedVariant.price || 0;
 
   return (
     <div className="flex flex-col sm:flex-row gap-6 bg-[--color-card] p-6 rounded-xl shadow-md border border-[--color-border] transition-shadow hover:shadow-lg">
       {/* Product Image */}
       <div className="w-28 h-28 rounded-lg overflow-hidden bg-white flex items-center justify-center border">
         <Image
-          src={selectedVariant.images[0]?.url || "/placeholder.jpg"}
+          src={selectedVariant.images?.[0]?.url || "/placeholder.jpg"}
           alt={product.name}
           width={112}
           height={112}
@@ -76,13 +76,13 @@ const ProductCartItem = ({
             <span className="text-[--color-accent] font-bold text-base">
               ₹{displayPrice.toFixed(2)}
             </span>
-            {selectedVariant.hasDiscount && (
+            {selectedVariant.hasDiscount && selectedVariant.price && (
               <>
                 <span className="text-sm line-through text-gray-500">
-                  ₹{selectedVariant.basePrice.toFixed(2)}
+                  ₹{selectedVariant.price.toFixed(2)}
                 </span>
                 <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                  {selectedVariant.discountPercent}% OFF
+                  {selectedVariant.discountPercent || 0}% OFF
                 </span>
               </>
             )}
@@ -100,13 +100,13 @@ const ProductCartItem = ({
               id={`qty-${product._id}-${variantId}`}
               type="number"
               min={1}
-              max={selectedVariant.stock} // ✅ Use variant stock
+              max={selectedVariant.stock || 999}
               value={quantity}
               onChange={(e) => onQuantityChange(Number(e.target.value))}
               className="w-16 px-2 py-1 border border-[--color-border] rounded text-center bg-white focus:ring-2 focus:ring-[--color-accent] focus:outline-none transition"
             />
             <span className="text-xs text-gray-500">
-              (Stock: {selectedVariant.stock})
+              (Stock: {selectedVariant.stock || 0})
             </span>
           </div>
         </div>
@@ -116,7 +116,3 @@ const ProductCartItem = ({
 };
 
 export default ProductCartItem;
-
-
-
-
