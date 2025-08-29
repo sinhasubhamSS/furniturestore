@@ -7,16 +7,16 @@ import {
   useGetAddressesQuery,
   useCreateAddressMutation,
 } from "@/redux/services/user/addressApi";
+import { useCheckDeliveryMutation } from "@/redux/services/user/deliveryApi";
 import { setSelectedAddress } from "@/redux/slices/checkoutSlice";
 import { RootState } from "@/redux/store";
-import { Address } from "@/types/address"; // ✅ Import your Address type
+import { Address } from "@/types/address";
 import Input from "@/components/ui/Input";
-import { useCheckDeliveryMutation } from "@/redux/services/user/deliveryApi";
 
 const AddressSection = ({
   onSelectionChange,
 }: {
-  onSelectionChange: (deliverable: boolean) => void;
+  onSelectionChange: (deliverable: boolean, deliveryData?: any) => void; // ✅ UPDATE THIS
 }) => {
   const { data: addresses = [], isLoading } = useGetAddressesQuery();
   const [createAddress] = useCreateAddressMutation();
@@ -32,11 +32,16 @@ const AddressSection = ({
     checking: boolean;
     deliverable: boolean | null;
     message: string;
-  }>({ checking: false, deliverable: null, message: "" });
+    deliveryData: any | null; // ✅ ADD THIS
+  }>({
+    checking: false,
+    deliverable: null,
+    message: "",
+    deliveryData: null, // ✅ ADD THIS
+  });
 
   const dispatch = useDispatch();
 
-  // ✅ Use your existing Address type (Partial for form)
   const {
     register,
     handleSubmit,
@@ -58,18 +63,26 @@ const AddressSection = ({
     },
   });
 
-  // ✅ Watch pincode properly
   const watchedPincode = watch("pincode");
 
-  // ✅ Delivery check function
-  const checkPincodeDelivery = async (pincode: string): Promise<boolean> => {
-    if (!pincode || pincode.length !== 6) return false;
+  // ✅ UPDATE DELIVERY CHECK FUNCTION
+  const checkPincodeDelivery = async (
+    pincode: string
+  ): Promise<{ deliverable: boolean; data?: any }> => {
+    if (!pincode || pincode.length !== 6) return { deliverable: false };
 
-    setDeliveryStatus({ checking: true, deliverable: null, message: "" });
+    setDeliveryStatus((prev) => ({
+      ...prev,
+      checking: true,
+      deliverable: null,
+      message: "",
+      deliveryData: null,
+    }));
 
     try {
       const result = await checkDelivery({ pincode }).unwrap();
       const isDeliverable = result.success && result.data?.isServiceable;
+      const deliveryData = result.data || null;
 
       setDeliveryStatus({
         checking: false,
@@ -77,24 +90,27 @@ const AddressSection = ({
         message: isDeliverable
           ? "Delivery available"
           : result.data?.message || "Not serviceable",
+        deliveryData: deliveryData, // ✅ STORE DELIVERY DATA
       });
 
-      return isDeliverable;
+      return { deliverable: isDeliverable, data: deliveryData };
     } catch (error) {
       setDeliveryStatus({
         checking: false,
         deliverable: false,
         message: "Unable to check delivery",
+        deliveryData: null,
       });
-      return false;
+      return { deliverable: false };
     }
   };
 
   // ✅ Watch pincode changes with debounce
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(async () => {
       if (watchedPincode && /^\d{6}$/.test(watchedPincode)) {
-        checkPincodeDelivery(watchedPincode);
+        const result = await checkPincodeDelivery(watchedPincode);
+        // Don't call onSelectionChange here for form input
       }
     }, 800);
 
@@ -106,12 +122,13 @@ const AddressSection = ({
     if (selectedFromRedux?._id) {
       setSelectedId(selectedFromRedux._id);
       if (selectedFromRedux.pincode) {
-        checkPincodeDelivery(selectedFromRedux.pincode).then(onSelectionChange);
+        checkPincodeDelivery(selectedFromRedux.pincode).then((result) => {
+          onSelectionChange(result.deliverable, result.data); // ✅ PASS DELIVERY DATA
+        });
       }
     }
   }, [selectedFromRedux]);
 
-  // ✅ Form submission handler
   const onSubmit = async (data: Partial<Address>) => {
     if (!deliveryStatus.deliverable) {
       alert(
@@ -128,7 +145,7 @@ const AddressSection = ({
       if (res._id) {
         setSelectedId(res._id);
         dispatch(setSelectedAddress(res));
-        onSelectionChange(true);
+        onSelectionChange(true, deliveryStatus.deliveryData); // ✅ PASS DELIVERY DATA
       }
     } catch (err) {
       console.error("Failed to create address", err);
@@ -146,64 +163,78 @@ const AddressSection = ({
         <p className="text-gray-500 text-sm">Loading addresses...</p>
       ) : addresses.length > 0 ? (
         <div className="space-y-3 mb-6">
-          {addresses.map(
-            (
-              addr: Address // ✅ Proper Address type
-            ) => (
-              <label
-                key={addr._id}
-                className={`flex items-start gap-3 cursor-pointer p-4 border rounded-lg transition-colors ${
-                  selectedId === addr._id
-                    ? "border-blue-500 bg-blue-50"
-                    : "hover:bg-gray-50 border-gray-200"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="address"
-                  checked={selectedId === addr._id}
-                  onChange={async () => {
-                    setSelectedId(addr._id);
-                    dispatch(setSelectedAddress(addr));
-                    const deliverable = await checkPincodeDelivery(
-                      addr.pincode
-                    );
-                    onSelectionChange(deliverable);
-                  }}
-                  className="mt-1 accent-blue-600 scale-125"
-                />
-                <div className="flex-1">
-                  <p className="text-base font-medium">{addr.fullName}</p>
-                  <p className="text-sm text-gray-600 leading-snug">
-                    {addr.addressLine1}
-                    {addr.addressLine2 && `, ${addr.addressLine2}`}, {addr.city}
-                    , {addr.state} - {addr.pincode}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">📱 {addr.mobile}</p>
+          {addresses.map((addr: Address) => (
+            <label
+              key={addr._id}
+              className={`flex items-start gap-3 cursor-pointer p-4 border rounded-lg transition-colors ${
+                selectedId === addr._id
+                  ? "border-blue-500 bg-blue-50"
+                  : "hover:bg-gray-50 border-gray-200"
+              }`}
+            >
+              <input
+                type="radio"
+                name="address"
+                checked={selectedId === addr._id}
+                onChange={async () => {
+                  setSelectedId(addr._id);
+                  dispatch(setSelectedAddress(addr));
+                  const result = await checkPincodeDelivery(addr.pincode);
+                  onSelectionChange(result.deliverable, result.data); // ✅ PASS DELIVERY DATA
+                }}
+                className="mt-1 accent-blue-600 scale-125"
+              />
+              <div className="flex-1">
+                <p className="text-base font-medium">{addr.fullName}</p>
+                <p className="text-sm text-gray-600 leading-snug">
+                  {addr.addressLine1}
+                  {addr.addressLine2 && `, ${addr.addressLine2}`}, {addr.city},{" "}
+                  {addr.state} - {addr.pincode}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">📱 {addr.mobile}</p>
 
-                  {/* Delivery Status */}
-                  {selectedId === addr._id && (
-                    <div className="mt-2">
-                      {deliveryStatus.checking ? (
-                        <span className="text-sm text-blue-600 flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                          Checking delivery...
-                        </span>
-                      ) : deliveryStatus.deliverable === true ? (
-                        <span className="text-sm text-green-600 font-semibold">
+                {/* ✅ ENHANCED DELIVERY STATUS */}
+                {selectedId === addr._id && (
+                  <div className="mt-2">
+                    {deliveryStatus.checking ? (
+                      <span className="text-sm text-blue-600 flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        Checking delivery...
+                      </span>
+                    ) : deliveryStatus.deliverable === true ? (
+                      <div className="text-sm bg-green-50 border border-green-200 rounded p-2">
+                        <div className="text-green-700 font-semibold">
                           ✅ Deliverable
-                        </span>
-                      ) : deliveryStatus.deliverable === false ? (
-                        <span className="text-sm text-red-600 font-semibold">
+                        </div>
+                        {deliveryStatus.deliveryData && (
+                          <div className="text-green-600 text-xs mt-1">
+                            Charge: ₹
+                            {deliveryStatus.deliveryData.deliveryCharge ||
+                              deliveryStatus.deliveryData.finalCharge ||
+                              0}{" "}
+                            • Days: {deliveryStatus.deliveryData.deliveryDays} •
+                            COD:{" "}
+                            {deliveryStatus.deliveryData.codAvailable
+                              ? "Yes"
+                              : "No"}
+                          </div>
+                        )}
+                      </div>
+                    ) : deliveryStatus.deliverable === false ? (
+                      <div className="text-sm bg-red-50 border border-red-200 rounded p-2">
+                        <div className="text-red-700 font-semibold">
                           ❌ Not Deliverable
-                        </span>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-              </label>
-            )
-          )}
+                        </div>
+                        <div className="text-red-600 text-xs mt-1">
+                          {deliveryStatus.message}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            </label>
+          ))}
         </div>
       ) : (
         <p className="text-red-600 text-sm mb-6">
@@ -302,7 +333,7 @@ const AddressSection = ({
                   error={errors.pincode?.message}
                 />
 
-                {/* Real-time Delivery Status */}
+                {/* ✅ ENHANCED REAL-TIME DELIVERY STATUS */}
                 {watchedPincode && watchedPincode.length === 6 && (
                   <div className="mt-2">
                     {deliveryStatus.checking ? (
@@ -312,15 +343,29 @@ const AddressSection = ({
                       </div>
                     ) : deliveryStatus.deliverable === true ? (
                       <div className="text-sm bg-green-50 border border-green-200 rounded p-2 text-green-700">
-                        ✅ <strong>Delivery Available</strong>
+                        <div className="font-semibold">
+                          ✅ Delivery Available
+                        </div>
+                        {deliveryStatus.deliveryData && (
+                          <div className="text-xs mt-1">
+                            Charge: ₹
+                            {deliveryStatus.deliveryData.deliveryCharge ||
+                              deliveryStatus.deliveryData.finalCharge ||
+                              0}{" "}
+                            | Days: {deliveryStatus.deliveryData.deliveryDays} |
+                            COD:{" "}
+                            {deliveryStatus.deliveryData.codAvailable
+                              ? "Available"
+                              : "Not Available"}
+                          </div>
+                        )}
                       </div>
                     ) : deliveryStatus.deliverable === false ? (
                       <div className="text-sm bg-red-50 border border-red-200 rounded p-2 text-red-700">
-                        ❌ <strong>Not Deliverable</strong>
-                        <br />
-                        <span className="text-xs">
+                        <div className="font-semibold">❌ Not Deliverable</div>
+                        <div className="text-xs mt-1">
                           {deliveryStatus.message}
-                        </span>
+                        </div>
                       </div>
                     ) : null}
                   </div>

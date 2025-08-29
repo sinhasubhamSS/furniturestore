@@ -1,6 +1,7 @@
 import { configureStore, combineReducers } from "@reduxjs/toolkit";
 import userReducer from "./slices/userSlice";
 import cartReducer from "./slices/cartSlice";
+import checkoutReducer from "./slices/checkoutSlice"; // ✅ Import checkout reducer
 import {
   persistStore,
   persistReducer,
@@ -15,9 +16,8 @@ import storage from "redux-persist/lib/storage";
 
 import { adminProductApi } from "@/redux/services/admin/adminProductapi";
 import { adminCategoryApi } from "./services/admin/adminCategoryapi";
-import { userProductApi } from "@/redux/services/user/publicProductApi"; // ✅ IMPORT
+import { userProductApi } from "@/redux/services/user/publicProductApi";
 import { addressApi } from "./services/user/addressApi";
-import checkoutReducer from "./slices/checkoutSlice";
 import { orderApi } from "./services/user/orderApi";
 import { cartApi } from "./services/user/cartApi";
 import { wishlistApi } from "./services/user/wishlistApi";
@@ -26,6 +26,7 @@ import productDetailReducer from "./slices/ProductDetailSlice";
 import { reviewsApi } from "./services/user/reviewApi";
 import { returnApi } from "./services/user/returnApi";
 import { deliveryApi } from "./services/user/deliveryApi";
+
 const rootReducer = combineReducers({
   user: userReducer,
   checkout: checkoutReducer,
@@ -33,7 +34,7 @@ const rootReducer = combineReducers({
   cart: cartReducer,
   [adminProductApi.reducerPath]: adminProductApi.reducer,
   [adminCategoryApi.reducerPath]: adminCategoryApi.reducer,
-  [userProductApi.reducerPath]: userProductApi.reducer, // ✅ ADD HERE
+  [userProductApi.reducerPath]: userProductApi.reducer,
   [addressApi.reducerPath]: addressApi.reducer,
   [orderApi.reducerPath]: orderApi.reducer,
   [cartApi.reducerPath]: cartApi.reducer,
@@ -44,10 +45,11 @@ const rootReducer = combineReducers({
   [deliveryApi.reducerPath]: deliveryApi.reducer,
 });
 
+// ✅ Updated persist config to include checkout
 const persistConfig = {
   key: "root",
   storage,
-  whitelist: ["user"],
+  whitelist: ["user", "checkout"], // ✅ Add checkout to whitelist
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
@@ -62,7 +64,7 @@ export const store = configureStore({
     }).concat(
       adminProductApi.middleware,
       adminCategoryApi.middleware,
-      userProductApi.middleware, // ✅ ADD HERE
+      userProductApi.middleware,
       addressApi.middleware,
       orderApi.middleware,
       cartApi.middleware,
