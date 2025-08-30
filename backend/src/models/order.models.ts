@@ -61,7 +61,10 @@ export interface DeliverySnapshot {
   courierPartner: string;
   codAvailable: boolean;
   totalWeight: number;
-  // ✅ NO pincode, city, state - these come from shipping address
+  packagingFee?: number;
+  codHandlingFee?: number;
+  advancePaymentAmount?: number;
+  remainingAmount?: number;
   trackingId?: string;
   estimatedDelivery?: Date;
 }
@@ -72,6 +75,10 @@ export interface PaymentSnapshot {
   transactionId?: string;
   provider?: string;
   paidAt?: Date;
+  isAdvancePayment?: boolean;
+  advancePercentage?: number;
+  advanceAmount?: number;
+  remainingAmount?: number;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   razorpaySignature?: string; // For verification
@@ -109,6 +116,12 @@ export interface OrderDocument extends Document {
   paymentSnapshot: PaymentSnapshot;
   status: OrderStatus;
   totalAmount: number;
+  packagingFee: number;
+  codHandlingFee: number;
+  isAdvancePayment: boolean;
+  advancePaymentAmount: number;
+  remainingAmount: number;
+
   trackingInfo?: {
     trackingNumber?: string;
     courierPartner?: string;
@@ -161,19 +174,52 @@ const orderSchema = new Schema<OrderDocument>(
       pincode: { type: String, required: true },
       country: { type: String, required: true },
     },
+    deliverySnapshot: {
+      zone: { type: String, enum: ["Zone1", "Zone2", "Zone3"] },
+      deliveryCharge: { type: Number, required: true },
+      originalDeliveryCharge: Number,
+      weightSurcharge: { type: Number, default: 0 },
+      discount: { type: Number, default: 0 },
+      estimatedDays: Number,
+      courierPartner: String,
+      codAvailable: { type: Boolean, default: true },
+      totalWeight: Number,
+
+      // ✅ New fee fields in snapshot
+      packagingFee: { type: Number, default: 29 },
+      codHandlingFee: { type: Number, default: 0 },
+      advancePaymentAmount: { type: Number, default: 0 },
+      remainingAmount: { type: Number, default: 0 },
+
+      // Tracking fields
+      trackingId: String,
+      estimatedDelivery: Date,
+    },
 
     paymentSnapshot: {
       method: {
         type: String,
         enum: Object.values(PaymentMethod),
       },
-      status: String,
+      status: {
+        type: String,
+        enum: ["pending", "paid", "partial", "failed"],
+        default: "pending",
+      },
       transactionId: String,
       provider: String,
       paidAt: Date,
+
+      // Razorpay fields
       razorpayOrderId: String,
       razorpayPaymentId: String,
       razorpaySignature: String,
+
+      // ✅ New advance payment fields
+      isAdvancePayment: { type: Boolean, default: false },
+      advancePercentage: { type: Number, default: 0 },
+      advanceAmount: { type: Number, default: 0 },
+      remainingAmount: { type: Number, default: 0 },
     },
 
     status: {
@@ -190,6 +236,11 @@ const orderSchema = new Schema<OrderDocument>(
       estimatedDelivery: Date,
       actualDelivery: Date,
     },
+    packagingFee: { type: Number, default: 29 },
+    codHandlingFee: { type: Number, default: 0 },
+    isAdvancePayment: { type: Boolean, default: false },
+    advancePaymentAmount: { type: Number, default: 0 },
+    remainingAmount: { type: Number, default: 0 },
   },
 
   { timestamps: true }

@@ -19,28 +19,53 @@ export default function CheckoutPage() {
   const dispatch = useDispatch();
   const router = useRouter();
 
-  const { items, type, selectedAddress } = useSelector(
+  // ✅ ALL HOOKS AT TOP LEVEL - No conditionals!
+  const { items, type, selectedAddress, isRehydrated } = useSelector(
     (state: RootState) => state.checkout
   );
 
-  const [addressSelected, setAddressSelected] = useState(!!selectedAddress);
-  const [deliveryAvailable, setDeliveryAvailable] = useState(false);
-  const [deliveryInfo, setDeliveryInfo] = useState<any>(null); // ✅ ADD THIS
+  const [deliveryAvailable, setDeliveryAvailable] = useState(true);
+  const [deliveryInfo, setDeliveryInfo] = useState<any>(null);
 
   const productId =
     type === "direct_purchase" && items.length > 0 ? items[0].productId : null;
+
+  // ✅ Always call these hooks - use skip parameter for conditional logic
   const { data: product, isLoading: productLoading } = useGetProductByIDQuery(
     productId || "",
-    { skip: !productId }
+    { skip: !productId || !isRehydrated }
   );
 
   const { data: cartData, isLoading: cartLoading } = useGetCartQuery(
     undefined,
-    { skip: type !== "cart_purchase" }
+    { skip: type !== "cart_purchase" || !isRehydrated }
   );
 
   const [updateQty] = useUpdateQuantityMutation();
 
+  // ✅ All useEffect hooks should be at top level
+  useEffect(() => {
+    if (!isRehydrated) return;
+
+    if (!type || items.length === 0) {
+      console.warn("No checkout data found, redirecting...");
+      router.push("/cart");
+    }
+  }, [type, items, router, isRehydrated]);
+
+  // ✅ Now conditional rendering AFTER all hooks
+  if (!isRehydrated || cartLoading || productLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading checkout...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ Rest of component logic
   let checkoutItems: CheckoutItem[] = [];
   let total = 0;
 
@@ -58,7 +83,6 @@ export default function CheckoutPage() {
           quantity: item.quantity,
         },
       ];
-      // ✅ USE PROPER PRICING LOGIC
       const price = selectedVariant.hasDiscount
         ? selectedVariant.discountedPrice ?? 0
         : selectedVariant.price ?? 0;
@@ -71,7 +95,6 @@ export default function CheckoutPage() {
       quantity,
     }));
 
-    // ✅ CALCULATE PROPER TOTAL
     total = checkoutItems.reduce((sum, item) => {
       const variant = item.product.variants?.find(
         (v) => v._id === item.variantId
@@ -114,7 +137,7 @@ export default function CheckoutPage() {
   };
 
   const handleProceedToPayment = () => {
-    if (!addressSelected) {
+    if (!selectedAddress) {
       alert("Please select a delivery address");
       return;
     }
@@ -129,40 +152,13 @@ export default function CheckoutPage() {
     router.push("/checkout/payment");
   };
 
-  // ✅ UPDATE THIS FUNCTION TO RECEIVE DELIVERY INFO
   const handleAddressSelection = (deliverable: boolean, deliveryData?: any) => {
-    setAddressSelected(!!selectedAddress);
     setDeliveryAvailable(deliverable);
-    setDeliveryInfo(deliveryData); // ✅ STORE DELIVERY INFO
+    setDeliveryInfo(deliveryData);
   };
 
-  // ✅ CALCULATE DELIVERY CHARGE
   const deliveryCharge =
     deliveryInfo?.finalCharge || deliveryInfo?.deliveryCharge || 0;
-
-  useEffect(() => {
-    setAddressSelected(!!selectedAddress);
-  }, [selectedAddress]);
-
-  useEffect(() => {
-    if (!type || items.length === 0) {
-      console.warn("No checkout data found, redirecting...");
-      router.push("/cart");
-    }
-  }, [type, items, router]);
-
-  if (cartLoading || productLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading checkout...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ... existing error handling code remains same ...
 
   if (checkoutItems.length === 0) {
     return (
@@ -202,28 +198,27 @@ export default function CheckoutPage() {
           </div>
 
           <div className="sticky top-10 self-start bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-            {/* ✅ PASS DELIVERY INFO TO CHECKOUT SUMMARY */}
             <CheckoutSummary
               items={checkoutItems}
               total={total}
               allowQuantityEdit={true}
               onQuantityChange={handleQuantityChange}
-              deliveryCharge={deliveryCharge} // ✅ PASS DELIVERY CHARGE
-              deliveryInfo={deliveryInfo} // ✅ PASS DELIVERY INFO
+              deliveryCharge={deliveryCharge}
+              deliveryInfo={deliveryInfo}
               deliveryAvailable={deliveryAvailable}
-              hasSelectedAddress={selectedAddress !== null}
+              hasSelectedAddress={!!selectedAddress}
             />
 
             <button
               className={`mt-6 w-full rounded-lg py-3 font-semibold text-white transition-colors ${
-                addressSelected && deliveryAvailable
+                selectedAddress && deliveryAvailable
                   ? "bg-blue-600 hover:bg-blue-700"
                   : "bg-gray-300 cursor-not-allowed"
               }`}
               onClick={handleProceedToPayment}
-              disabled={!addressSelected || !deliveryAvailable}
+              disabled={!selectedAddress || !deliveryAvailable}
             >
-              {!addressSelected
+              {!selectedAddress
                 ? "Select Address"
                 : !deliveryAvailable
                 ? "Delivery Not Available"

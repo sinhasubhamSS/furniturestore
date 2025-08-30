@@ -6,7 +6,10 @@ import {
   OrderStatus,
 } from "../models/order.models";
 import { Return } from "../models/return.models";
-import { PlaceOrderRequest } from "../types/orderservicetypes";
+import {
+  PlaceOrderPayment,
+  PlaceOrderRequest,
+} from "../types/orderservicetypes";
 import { Cart } from "../models/cart.model";
 import { paymentService } from "./paymentService";
 import { AppError } from "../utils/AppError";
@@ -218,15 +221,56 @@ class OrderService {
     }
   }
 
-  /**
-   * Place new order with complete delivery integration
-   */
+  private calculateSecureOrderFees(
+    orderValue: number,
+    deliveryCharges: any,
+    payment: PlaceOrderPayment // ✅ Using your existing type
+  ) {
+    const packagingFee = 29;
+
+    // ✅ Changed to ₹15,000 for advance eligibility
+    const isEligibleForAdvance = orderValue >= 15000;
+    const isAdvancePayment = payment.isAdvance === true;
+
+    if (isAdvancePayment && !isEligibleForAdvance) {
+      throw new AppError(
+        `Advance payment requires minimum order of ₹15,000. Current: ₹${orderValue}`,
+        400
+      );
+    }
+
+    const codHandlingFee =
+      payment.method === "COD" && !isAdvancePayment ? 99 : 0;
+
+    const advanceAmount = isAdvancePayment ? Math.round(orderValue * 0.1) : 0;
+    const remainingAmount = isAdvancePayment
+      ? orderValue + packagingFee + deliveryCharges.finalCharge - advanceAmount
+      : 0;
+
+    const finalPayableAmount = isAdvancePayment
+      ? advanceAmount + packagingFee + deliveryCharges.finalCharge
+      : orderValue +
+        packagingFee +
+        deliveryCharges.finalCharge +
+        codHandlingFee;
+
+    return {
+      packagingFee,
+      codHandlingFee,
+      advanceAmount,
+      remainingAmount,
+      finalPayableAmount,
+      isAdvancePayment,
+      isEligibleForAdvance,
+    };
+  }
+
   async placeOrder(
     userId: string,
     orderData: PlaceOrderRequest,
     idempotencyKey?: string
   ) {
-    // Check for existing order with same idempotencyKey
+    // ✅ Check for existing order with same idempotencyKey
     if (idempotencyKey) {
       const existingOrder = await Order.findOne({
         user: userId,
@@ -284,8 +328,15 @@ class OrderService {
           totalAmount
         );
 
-        // ✅ STEP 4: Process payment
-        let paymentStatus: "pending" | "paid" = "pending";
+        // ✅ STEP 4: Calculate fees with advance payment logic
+        const feeBreakdown = this.calculateSecureOrderFees(
+          totalAmount,
+          deliveryCharges,
+          payment
+        );
+
+        // ✅ STEP 5: Enhanced payment processing
+        let paymentStatus: "pending" | "paid" | "partial" = "pending";
         let paymentMethod: "COD" | "RAZORPAY" = payment.method as
           | "COD"
           | "RAZORPAY";
@@ -295,6 +346,14 @@ class OrderService {
         if (payment.method === "COD" && !deliveryCharges.codAvailable) {
           throw new AppError(
             "COD is not available for this delivery location. Please use online payment.",
+            400
+          );
+        }
+
+        // ✅ Validate advance payment constraints
+        if (feeBreakdown.isAdvancePayment && payment.method === "COD") {
+          throw new AppError(
+            "Advance payment cannot be COD. Please use online payment.",
             400
           );
         }
@@ -319,13 +378,13 @@ class OrderService {
           if (!verified)
             throw new AppError("Razorpay payment verification failed", 400);
 
-          paymentStatus = "paid";
+          // ✅ Set payment status based on advance payment
+          paymentStatus = feeBreakdown.isAdvancePayment ? "partial" : "paid";
         }
 
         const generatedOrderId = await generateStandardOrderId();
-        const finalTotalAmount = totalAmount + deliveryCharges.finalCharge;
 
-        // ✅ STEP 5: Create order with clean delivery snapshot
+        // ✅ STEP 6: Create order with enhanced fee tracking
         const [newOrder] = await Order.create(
           [
             {
@@ -337,7 +396,7 @@ class OrderService {
               // Complete shipping address (single source)
               shippingAddressSnapshot: shippingAddress,
 
-              // ✅ CLEAN: Only delivery-specific data (no address duplication)
+              // ✅ Enhanced delivery snapshot with all fees
               deliverySnapshot: {
                 zone: deliveryCharges.zone,
                 deliveryCharge: deliveryCharges.finalCharge,
@@ -348,17 +407,39 @@ class OrderService {
                 courierPartner: deliveryCharges.courierPartner,
                 codAvailable: deliveryCharges.codAvailable,
                 totalWeight: totalWeight,
+
+                // ✅ New fee fields
+                packagingFee: feeBreakdown.packagingFee,
+                codHandlingFee: feeBreakdown.codHandlingFee,
+                advancePaymentAmount: feeBreakdown.advanceAmount,
+                remainingAmount: feeBreakdown.remainingAmount,
               },
 
+              // ✅ Enhanced payment snapshot
               paymentSnapshot: {
                 method: paymentMethod,
                 status: paymentStatus,
                 provider,
+
+                // ✅ New advance payment fields
+                isAdvancePayment: feeBreakdown.isAdvancePayment,
+                advancePercentage: feeBreakdown.isAdvancePayment ? 10 : 0,
+                advanceAmount: feeBreakdown.advanceAmount,
+                remainingAmount: feeBreakdown.remainingAmount,
+
                 razorpayOrderId: payment.razorpayOrderId || null,
                 razorpayPaymentId: payment.razorpayPaymentId || null,
                 razorpaySignature: payment.razorpaySignature || null,
               },
-              totalAmount: finalTotalAmount,
+
+              // ✅ Top-level fee tracking fields
+              packagingFee: feeBreakdown.packagingFee,
+              codHandlingFee: feeBreakdown.codHandlingFee,
+              isAdvancePayment: feeBreakdown.isAdvancePayment,
+              advancePaymentAmount: feeBreakdown.advanceAmount,
+              remainingAmount: feeBreakdown.remainingAmount,
+
+              totalAmount: feeBreakdown.finalPayableAmount,
               status: OrderStatus.Pending,
             },
           ],
@@ -367,8 +448,12 @@ class OrderService {
 
         createdOrder = newOrder;
 
-        // ✅ STEP 6: Handle stock confirmation based on payment
-        if (paymentMethod === "COD" || paymentStatus === "paid") {
+        // ✅ STEP 7: Handle stock confirmation based on payment
+        if (
+          paymentMethod === "COD" ||
+          paymentStatus === "paid" ||
+          paymentStatus === "partial"
+        ) {
           await this.confirmReservation(
             (newOrder._id as mongoose.Types.ObjectId).toString(),
             session
@@ -385,7 +470,7 @@ class OrderService {
           );
         }
 
-        // ✅ STEP 7: Clear cart if order placed from cart
+        // ✅ STEP 8: Clear cart if order placed from cart
         if (fromCart) {
           await Cart.findOneAndUpdate(
             { user: userId },
