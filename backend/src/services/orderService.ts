@@ -188,9 +188,6 @@ class OrderService {
     }
   }
 
-  /**
-   * Release stock reservation - return reserved stock back to available
-   */
   private async releaseReservation(
     orderId: string,
     session?: mongoose.ClientSession
@@ -510,9 +507,6 @@ class OrderService {
     }
   }
 
-  /**
-   * Get user's orders with delivery information
-   */
   async getMyOrders(userId: string) {
     const orders = await Order.find({ user: userId })
       .sort({ createdAt: -1 })
@@ -578,9 +572,6 @@ class OrderService {
     }));
   }
 
-  /**
-   * Cancel order within 12 hours
-   */
   async cancelOrder(userId: string, orderId: string) {
     const order = await Order.findOne({ user: userId, _id: orderId });
     if (!order) throw new AppError("Order not found", 404);
@@ -618,9 +609,6 @@ class OrderService {
     };
   }
 
-  /**
-   * Update order status with delivery tracking
-   */
   async updateOrderStatus(
     orderId: string,
     newStatus: OrderStatus,
@@ -683,6 +671,45 @@ class OrderService {
 
     return order;
   }
+  //for dispaly
+  /**
+   * ✅ SIMPLE: Only pricing calculation for frontend display
+   */
+async calculateDisplayPricing(
+  items: { productId: string; quantity: number; variantId?: string }[],
+  pincode: string
+) {
+  // Validate pincode format
+  if (!pincode || !/^\d{6}$/.test(pincode)) {
+    throw new AppError("Valid 6-digit pincode is required", 400);
+  }
+
+  let subtotal = 0;
+  let totalWeight = 0;
+
+  // Calculate items (same logic as before)...
+
+  // Calculate delivery charges using pincode only
+  const deliveryCharges = await this.calculateDeliveryCharges(
+    pincode,    // Just pincode - sufficient!
+    totalWeight,
+    subtotal
+  );
+
+  return {
+    subtotal,
+    packagingFee: 29,
+    deliveryCharge: deliveryCharges.finalCharge,
+    checkoutTotal: subtotal + 29 + deliveryCharges.finalCharge,
+    codTotal: subtotal + 29 + deliveryCharges.finalCharge + 99,
+    deliveryInfo: {
+      codAvailable: deliveryCharges.codAvailable,
+      zone: deliveryCharges.zone,
+      estimatedDays: deliveryCharges.estimatedDays,
+    },
+  };
+}
+
 }
 
 export default OrderService;

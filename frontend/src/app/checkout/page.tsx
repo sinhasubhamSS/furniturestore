@@ -8,29 +8,36 @@ import {
   useUpdateQuantityMutation,
 } from "@/redux/services/user/cartApi";
 import { useGetProductByIDQuery } from "@/redux/services/user/publicProductApi";
+import { useGetCheckoutPricingMutation } from "@/redux/services/user/orderApi";
 import CheckoutSummary, {
   CheckoutItem,
 } from "@/components/checkout/CheckoutSummary";
 import AddressSection from "@/components/checkout/AddressSection";
 import { RootState } from "@/redux/store";
-import { updateQuantity } from "@/redux/slices/checkoutSlice";
+import {
+  updateQuantity,
+  updateFees,
+  setAdvanceEligibility,
+} from "@/redux/slices/checkoutSlice";
+import { CheckoutPricingResponse } from "@/types/order";
 
 export default function CheckoutPage() {
   const dispatch = useDispatch();
   const router = useRouter();
 
-  // ✅ ALL HOOKS AT TOP LEVEL - No conditionals!
   const { items, type, selectedAddress, isRehydrated } = useSelector(
     (state: RootState) => state.checkout
   );
 
   const [deliveryAvailable, setDeliveryAvailable] = useState(true);
   const [deliveryInfo, setDeliveryInfo] = useState<any>(null);
+  const [pricingData, setPricingData] =
+    useState<CheckoutPricingResponse | null>(null);
+  const [loadingPricing, setLoadingPricing] = useState(false);
 
   const productId =
     type === "direct_purchase" && items.length > 0 ? items[0].productId : null;
 
-  // ✅ Always call these hooks - use skip parameter for conditional logic
   const { data: product, isLoading: productLoading } = useGetProductByIDQuery(
     productId || "",
     { skip: !productId || !isRehydrated }
@@ -42,8 +49,64 @@ export default function CheckoutPage() {
   );
 
   const [updateQty] = useUpdateQuantityMutation();
+  const [getCheckoutPricing] = useGetCheckoutPricingMutation();
 
-  // ✅ All useEffect hooks should be at top level
+  // ✅ FIXED: Proper array mapping and API integration
+  useEffect(() => {
+    if (!isRehydrated || !selectedAddress?.pincode || items.length === 0)
+      return;
+
+    const fetchPricing = async () => {
+      setLoadingPricing(true);
+      try {
+        // ✅ FIXED: Correctly map array elements
+        const orderItems = items.map((item) => ({
+          productId: item.productId,
+          variantId: item.variantId || "",
+          quantity: item.quantity,
+        }));
+
+        const response = await getCheckoutPricing({
+          items: orderItems,
+          pincode: selectedAddress.pincode,
+        }).unwrap();
+
+        setPricingData(response);
+
+        // ✅ Update Redux state with backend fees
+        dispatch(
+          updateFees({
+            packagingFee: response.packagingFee,
+            deliveryCharge: response.deliveryCharge,
+            totalAmount: response.checkoutTotal,
+          })
+        );
+
+        // ✅ FIXED: Safe property access with proper type checking
+        if (response.advanceEligible) {
+          dispatch(
+            setAdvanceEligibility({
+              eligible: response.advanceEligible,
+              orderValue: response.subtotal,
+            })
+          );
+        }
+      } catch (error) {
+        console.error("Pricing fetch failed:", error);
+      } finally {
+        setLoadingPricing(false);
+      }
+    };
+
+    fetchPricing();
+  }, [
+    selectedAddress?.pincode,
+    items,
+    isRehydrated,
+    getCheckoutPricing,
+    dispatch,
+  ]);
+
   useEffect(() => {
     if (!isRehydrated) return;
 
@@ -53,7 +116,6 @@ export default function CheckoutPage() {
     }
   }, [type, items, router, isRehydrated]);
 
-  // ✅ Now conditional rendering AFTER all hooks
   if (!isRehydrated || cartLoading || productLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -65,9 +127,8 @@ export default function CheckoutPage() {
     );
   }
 
-  // ✅ Rest of component logic
   let checkoutItems: CheckoutItem[] = [];
-  let total = 0;
+  let subtotal = 0;
 
   if (type === "direct_purchase" && items.length > 0 && product) {
     const item = items[0];
@@ -86,7 +147,7 @@ export default function CheckoutPage() {
       const price = selectedVariant.hasDiscount
         ? selectedVariant.discountedPrice ?? 0
         : selectedVariant.price ?? 0;
-      total = price * item.quantity;
+      subtotal = price * item.quantity;
     }
   } else if (type === "cart_purchase" && cartData?.items?.length) {
     checkoutItems = cartData.items.map(({ product, variantId, quantity }) => ({
@@ -95,7 +156,7 @@ export default function CheckoutPage() {
       quantity,
     }));
 
-    total = checkoutItems.reduce((sum, item) => {
+    subtotal = checkoutItems.reduce((sum, item) => {
       const variant = item.product.variants?.find(
         (v) => v._id === item.variantId
       );
@@ -157,9 +218,6 @@ export default function CheckoutPage() {
     setDeliveryInfo(deliveryData);
   };
 
-  const deliveryCharge =
-    deliveryInfo?.finalCharge || deliveryInfo?.deliveryCharge || 0;
-
   if (checkoutItems.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -200,10 +258,11 @@ export default function CheckoutPage() {
           <div className="sticky top-10 self-start bg-white p-6 rounded-xl shadow-lg border border-gray-200">
             <CheckoutSummary
               items={checkoutItems}
-              total={total}
+              subtotal={subtotal}
               allowQuantityEdit={true}
               onQuantityChange={handleQuantityChange}
-              deliveryCharge={deliveryCharge}
+              pricingData={pricingData}
+              loadingPricing={loadingPricing}
               deliveryInfo={deliveryInfo}
               deliveryAvailable={deliveryAvailable}
               hasSelectedAddress={!!selectedAddress}
@@ -219,10 +278,14 @@ export default function CheckoutPage() {
               disabled={!selectedAddress || !deliveryAvailable}
             >
               {!selectedAddress
-                ? "Select Address"
+                ? "Select Address to View Charges"
                 : !deliveryAvailable
                 ? "Delivery Not Available"
-                : "Proceed to Payment"}
+                : loadingPricing
+                ? "Calculating Total..."
+                : `Proceed to Payment • ₹${
+                    pricingData?.checkoutTotal || subtotal
+                  }`}
             </button>
           </div>
         </div>

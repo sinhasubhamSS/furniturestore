@@ -111,3 +111,28 @@ export const updateOrderStatusController = catchAsync(
     );
   }
 );
+
+export const getCheckoutPricing = catchAsync(
+  async (req: AuthRequest, res: Response) => {
+    const { items, pincode } = req.body;
+
+    // Simple validation
+    if (!items?.length) {
+      throw new AppError("Items required", 400);
+    }
+    if (!pincode) {
+      throw new AppError("Pincode required", 400);
+    }
+
+    const pricingData = await orderService.calculateDisplayPricing(
+      items,
+      pincode
+    );
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, pricingData, "Pricing calculated successfully")
+      );
+  }
+);

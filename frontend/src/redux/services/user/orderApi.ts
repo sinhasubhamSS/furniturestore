@@ -1,21 +1,14 @@
 import { axiosBaseQuery } from "@/redux/api/customBaseQuery";
 import { createApi } from "@reduxjs/toolkit/query/react";
-import { Order, PlaceOrderRequest, RazorpayOrderResponse } from "@/types/order";
-
-// ✅ Add type for verification
-type VerifyAmountRequest = {
-  items: {
-    productId: string;
-    variantId: string;
-    quantity: number;
-  }[];
-};
-
-type VerifyAmountResponse = {
-  totalAmount: number;
-  verified: boolean;
-  itemCount: number;
-};
+import {
+  Order,
+  PlaceOrderRequest,
+  RazorpayOrderResponse,
+  CheckoutPricingRequest,
+  CheckoutPricingResponse,
+  VerifyAmountRequest,
+  VerifyAmountResponse,
+} from "@/types/order";
 
 export const orderApi = createApi({
   reducerPath: "orderApi",
@@ -24,7 +17,7 @@ export const orderApi = createApi({
   endpoints: (builder) => ({
     // Place order (COD or Razorpay)
     createOrder: builder.mutation<
-      any,
+      Order,
       { data: PlaceOrderRequest; idempotencyKey?: string }
     >({
       query: ({ data, idempotencyKey }) => ({
@@ -46,7 +39,20 @@ export const orderApi = createApi({
       transformResponse: (response: any) => response.data,
     }),
 
-    // ✅ NEW: Verify order amount before payment
+    // ✅ NEW: Checkout pricing
+    getCheckoutPricing: builder.mutation<
+      CheckoutPricingResponse,
+      CheckoutPricingRequest
+    >({
+      query: (data) => ({
+        url: `/order/checkout-pricing`,
+        method: "POST",
+        data,
+      }),
+      transformResponse: (response: any) => response.data,
+    }),
+
+    // Verify order amount before payment
     verifyOrderAmount: builder.mutation<
       VerifyAmountResponse,
       VerifyAmountRequest
@@ -65,10 +71,7 @@ export const orderApi = createApi({
         url: `/order/myorders`,
         method: "GET",
       }),
-      transformResponse: (response: any) => {
-        console.log("📦 Response Data:", response.data); // sirf response.data
-        return response.data;
-      },
+      transformResponse: (response: any) => response.data,
       providesTags: ["Orders"],
     }),
 
@@ -88,7 +91,8 @@ export const orderApi = createApi({
 export const {
   useCreateOrderMutation,
   useCreateRazorpayOrderMutation,
-  useVerifyOrderAmountMutation, // ✅ Export new hook
+  useGetCheckoutPricingMutation, // ✅ NEW
+  useVerifyOrderAmountMutation,
   useGetMyOrdersQuery,
   useCancelOrderMutation,
 } = orderApi;

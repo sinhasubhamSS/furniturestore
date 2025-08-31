@@ -1,24 +1,108 @@
 import { Address } from "./address";
 
-// ✅ Enhanced Order interface
+// ✅ BASE REUSABLE TYPES (Single Source of Truth)
+export interface OrderItem {
+  productId: string;
+  variantId?: string;
+  quantity: number;
+}
+
+export interface DeliveryInfo {
+  zone: string;
+  estimatedDays: number;
+  deliveryCharge: number;
+  courierPartner: string;
+  trackingId?: string;
+  totalWeight?: number;
+  pincode?: string;
+  city?: string;
+  codAvailable: boolean; // ✅ Added
+}
+
+export interface PaymentInfo {
+  method: PaymentMethod;
+  status?: PaymentStatus;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  razorpaySignature?: string;
+  transactionId?: string;
+  provider?: string;
+  paidAt?: Date;
+  isAdvance?: boolean;
+}
+
+export interface FeeBreakdown {
+  subtotal: number;
+  packagingFee: number;
+  deliveryCharge: number;
+  codHandlingFee: number;
+  advanceAmount: number;
+  remainingAmount: number;
+  totalAmount: number;
+  isEligibleForAdvance: boolean;
+}
+
+// ✅ UNION TYPES (Centralized)
+export type PaymentMethod = "COD" | "RAZORPAY" | "ADVANCE";
+export type PaymentStatus = "paid" | "unpaid" | "partial" | "pending";
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "shipped"
+  | "out_for_delivery"
+  | "delivered"
+  | "cancelled"
+  | "refunded"
+  | "failed";
+
+// ✅ REQUEST INTERFACES (Using Base Types)
+export interface PlaceOrderRequest {
+  items: OrderItem[];
+  shippingAddress: Address;
+  payment: PaymentInfo;
+  fromCart?: boolean;
+  idempotencyKey?: string;
+}
+
+export interface CheckoutPricingRequest {
+  items: OrderItem[];
+  pincode: string;
+}
+
+export interface VerifyAmountRequest {
+  items: OrderItem[];
+}
+
+// ✅ RESPONSE INTERFACES (Fixed with missing properties)
+export interface CheckoutPricingResponse extends FeeBreakdown {
+  codTotal: number;
+  checkoutTotal: number;
+  deliveryInfo: DeliveryInfo | null;
+  hasDeliveryCharges: boolean;
+  advanceEligible: boolean; // ✅ FIXED: Added missing property
+  advanceAmount: number;    // ✅ FIXED: Added missing property
+}
+
+export interface VerifyAmountResponse extends FeeBreakdown {
+  verified: boolean;
+  itemCount: number;
+  breakdown: {
+    baseAmount: number;
+    fees: number;
+    extraCharges: number;
+    advancePercentage: number;
+  };
+}
+
 export interface Order {
   _id: string;
   orderId?: string;
   idempotencyKey?: string;
   placedAt: string;
-  paymentStatus: "paid" | "unpaid" | "partial"; // ✅ Added "partial" for advance
-  status:
-    | "pending"
-    | "confirmed"
-    | "shipped"
-    | "out_for_delivery"
-    | "delivered"
-    | "cancelled"
-    | "refunded"
-    | "failed";
+  paymentStatus: PaymentStatus;
+  status: OrderStatus;
   totalAmount: number;
   
-  // ✅ NEW: Fee breakdown fields
   packagingFee?: number;
   codHandlingFee?: number;
   isAdvancePayment?: boolean;
@@ -38,135 +122,30 @@ export interface Order {
     pincode: string;
   };
 
-  deliveryInfo?: {
-    zone: string;
-    estimatedDays: number;
-    deliveryCharge: number;
-    courierPartner: string;
-    trackingId?: string;
-    totalWeight?: number;
-    pincode?: string; // ✅ Added for delivery details
-    city?: string;
-  };
-  
-  // ✅ NEW: Advanced payment info
-  paymentInfo?: {
-    method: "COD" | "RAZORPAY";
-    isAdvancePayment: boolean;
-    advancePercentage?: number;
-    razorpayOrderId?: string;
-    razorpayPaymentId?: string;
-  };
+  deliveryInfo?: DeliveryInfo;
+  paymentInfo?: PaymentInfo;
 }
 
-// ✅ Enhanced PlaceOrderRequest
-export interface PlaceOrderRequest {
-  items: {
-    productId: string;
-    variantId?: string;
-    quantity: number;
-  }[];
-  shippingAddress: Address;
-  payment: {
-    method: "COD" | "RAZORPAY";
-    status?: "pending" | "paid" | "partial" | string;
-    transactionId?: string;
-    provider?: string;
-    paidAt?: Date;
-    razorpayOrderId?: string;
-    razorpayPaymentId?: string;
-    razorpaySignature?: string;
-    isAdvance?: boolean; // ✅ Already added
-  };
-  fromCart?: boolean;
-  idempotencyKey?: string;
-}
-
-// ✅ Enhanced RazorpayOrderResponse with proper Razorpay fields
 export interface RazorpayOrderResponse {
-  // Your app fields
   orderId: string;
   amount: number;
   currency: string;
   
-  // ✅ Standard Razorpay response fields
-  id?: string;              // Razorpay internal order ID
-  entity?: string;          // "order"
-  amount_paid?: number;     // Amount paid so far
-  amount_due?: number;      // Remaining amount
-  status?: string;          // "created", "paid", etc.
-  attempts?: number;        // Payment attempts
-  receipt?: string;         // Merchant receipt ID
-  created_at?: number;      // Timestamp
-  notes?: Record<string, string>; // Custom notes
+  id?: string;
+  entity?: string;
+  amount_paid?: number;
+  amount_due?: number;
+  status?: string;
+  attempts?: number;
+  receipt?: string;
+  created_at?: number;
+  notes?: Record<string, string>;
 }
 
-// ✅ NEW: VerifyAmountResponse (for price verification)
-export interface VerifyAmountResponse {
-  totalAmount: number;
-  subtotal: number;
-  packagingFee: number;
-  deliveryCharge: number;
-  codHandlingFee: number;
-  advanceAmount?: number;
-  remainingAmount?: number;
-  isEligibleForAdvance: boolean;
-  breakdown: {
-    baseAmount: number;
-    fees: number;
-    extraCharges: number;
-    advancePercentage: number;
-  };
-  // ✅ Allow additional properties from backend
-  [key: string]: any;
-}
-
-// ✅ NEW: Order creation result
 export interface OrderCreationResponse {
   success: boolean;
   orderId: string;
   isExisting: boolean;
   message?: string;
   data?: Order;
-}
-
-// ✅ NEW: Payment method types for better type safety
-export type PaymentMethod = "COD" | "RAZORPAY" | "ADVANCE";
-
-// ✅ NEW: Order status for better tracking
-export type OrderStatus = 
-  | "pending"
-  | "confirmed" 
-  | "shipped"
-  | "out_for_delivery"
-  | "delivered"
-  | "cancelled"
-  | "refunded"
-  | "failed";
-
-// ✅ NEW: Payment status types
-export type PaymentStatus = "paid" | "unpaid" | "partial" | "pending";
-
-// ✅ NEW: Fee calculation request
-export interface FeeCalculationRequest {
-  items: {
-    productId: string;
-    variantId: string;
-    quantity: number;
-  }[];
-  shippingAddress?: Address;
-  paymentMethod?: PaymentMethod;
-  isAdvance?: boolean;
-}
-
-// ✅ NEW: Fee breakdown response
-export interface FeeBreakdown {
-  subtotal: number;
-  packagingFee: number;
-  deliveryCharge: number;
-  codHandlingFee: number;
-  advanceAmount: number;
-  remainingAmount: number;
-  totalAmount: number;
-  isEligibleForAdvance: boolean;
 }

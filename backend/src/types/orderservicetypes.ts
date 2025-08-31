@@ -1,10 +1,11 @@
-export interface PlaceOrderItem {
+// Base interfaces (ye zaroori hain)
+export interface BaseItem {
   productId: string;
   variantId?: string;
   quantity: number;
 }
 
-export interface PlaceOrderAddress {
+export interface BaseAddress {
   fullName: string;
   mobile: string;
   addressLine1: string;
@@ -16,32 +17,26 @@ export interface PlaceOrderAddress {
   country: string;
 }
 
-// ✅ Only this interface needs update - add isAdvance field
-export interface PlaceOrderPayment {
+export interface BasePayment {
   method: "COD" | "RAZORPAY";
-  status?: "pending" | "paid" | "partial" | string; // ✅ Added "partial" for advance
+  status?: "pending" | "paid" | "partial";
   transactionId?: string;
   provider?: string;
   paidAt?: Date;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   razorpaySignature?: string;
-  isAdvance?: boolean; // ✅ NEW: Flag for advance payment
+  isAdvance?: boolean;
 }
 
-export interface DeliveryCalculationRequest {
-  pincode: string;
-  weight: number;
-  orderValue?: number;
-}
+// Simple aliases (no extra complexity)
+export type PlaceOrderItem = BaseItem;
+export type PlaceOrderAddress = BaseAddress;
+export type PlaceOrderPayment = BasePayment;
 
 export interface PlaceOrderRequest {
   items: PlaceOrderItem[];
   shippingAddress: PlaceOrderAddress;
-  payment: PlaceOrderPayment; // ✅ Enhanced with isAdvance
-
-  /**
-   * Optional flag to indicate order is placed from cart context.
-   */
+  payment: PlaceOrderPayment;
   fromCart?: boolean;
 }

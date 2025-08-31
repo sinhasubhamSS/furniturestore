@@ -2,27 +2,22 @@ import razorpay from "../utils/razorpayinstace";
 import crypto from "crypto";
 import { AppError } from "../utils/AppError";
 import Product, { IVariant } from "../models/product.models";
-interface VerifyAmountItem {
-  productId: string;
-  variantId: string;
-  quantity: number;
-}
+import { PlaceOrderItem, PlaceOrderPayment } from "../types/orderservicetypes";
+
 class PaymentService {
   async createOrder(amountInRupees: number) {
     if (!amountInRupees || amountInRupees <= 0) {
       throw new AppError("Amount must be greater than 0", 400);
     }
 
-    const amountInPaise = Math.round(amountInRupees * 100); // round to nearest integer paise
-
+    const amountInPaise = Math.round(amountInRupees * 100);
     const options = {
-      amount: amountInPaise, // integer paise me
+      amount: amountInPaise,
       currency: "INR",
       receipt: `receipt_order_${Date.now()}`,
     };
-    console.log("📦 Razorpay create order options:", options);
-    const order = await razorpay.orders.create(options);
 
+    const order = await razorpay.orders.create(options);
     return {
       orderId: order.id,
       amount: order.amount,
@@ -52,78 +47,82 @@ class PaymentService {
       throw new AppError("Invalid payment signature", 400);
     }
 
-    // ✅ fetch actual payment info from Razorpay
     const paymentDetails = await razorpay.payments.fetch(razorpay_payment_id);
-
     return {
       verified: true,
-      method: paymentDetails.method?.toUpperCase(), // e.g. "UPI"
+      method: paymentDetails.method?.toUpperCase(),
     };
-  } //remove it when webhook is implemented
-
-  // verifySignatureAndGetDetails	Payment signature verification & payment info fetch	Payment verify karte waqt (e.g., order place time)
-  // verifyWebhookSignature	Webhook payload signature verification	Webhook endpoint par webhook verify karte waqt
-  // src/services/paymentService.ts
-  async verifyWebhookSignature(
-    payloadBody: string,
-    signature: string,
-    secret: string
-  ): Promise<boolean> {
-    if (!signature || !secret) {
-      throw new AppError("Missing webhook signature or secret", 400);
-    }
-
-    const generatedSignature = crypto
-      .createHmac("sha256", secret)
-      .update(payloadBody)
-      .digest("hex");
-
-    return generatedSignature === signature;
   }
 
-  // ✅ SIMPLE: Only verify amount
-  async verifyOrderAmount(items: VerifyAmountItem[]) {
+  // ✅ SIMPLE - Only verify payment amount, no address needed
+  async verifyPaymentAmount(items: PlaceOrderItem[], expectedTotal: number) {
+    // Step 1: Verify items and calculate amount
     if (!items || items.length === 0) {
       throw new AppError("No items provided for verification", 400);
     }
 
-    let totalAmount = 0;
+    let calculatedTotal = 0;
 
     for (const item of items) {
-      if (!item.productId || !item.variantId || item.quantity <= 0) {
+      if (!item.productId || item.quantity <= 0) {
         throw new AppError("Invalid item data", 400);
       }
 
       const product = await Product.findById(item.productId);
       if (!product) {
-        throw new AppError(`Product not found`, 404);
+        throw new AppError(`Product not found: ${item.productId}`, 404);
       }
 
-      const variant = product.variants.find(
-        (v: IVariant) => v._id?.toString() === item.variantId
-      );
-
-      if (!variant) {
-        throw new AppError(`Variant not found`, 404);
+      // Handle optional variantId
+      let selectedVariant;
+      if (item.variantId) {
+        selectedVariant = product.variants.find(
+          (v: IVariant) => v._id?.toString() === item.variantId
+        );
+      } else {
+        selectedVariant = product.variants[0];
       }
 
-      // Basic stock check
-      if (variant.stock < item.quantity) {
-        throw new AppError(`Insufficient stock`, 400);
+      if (!selectedVariant) {
+        throw new AppError(
+          `Variant not found for product: ${product.name}`,
+          404
+        );
       }
 
-      // Calculate price (same as OrderService)
+      // Stock validation
+      const availableStock =
+        selectedVariant.stock - (selectedVariant.reservedStock || 0);
+      if (availableStock < item.quantity) {
+        throw new AppError(
+          `Insufficient stock for ${product.name}. Available: ${availableStock}`,
+          400
+        );
+      }
+
+      // Price calculation
       const actualPrice =
-        variant.hasDiscount && variant.discountedPrice > 0
-          ? variant.discountedPrice
-          : variant.price;
+        selectedVariant.hasDiscount && selectedVariant.discountedPrice > 0
+          ? selectedVariant.discountedPrice
+          : selectedVariant.price;
 
-      totalAmount += actualPrice * item.quantity;
+      calculatedTotal += actualPrice * item.quantity;
+    }
+
+    // Step 2: Verify against expected amount
+    const verified = Math.abs(calculatedTotal - expectedTotal) <= 0.01;
+
+    if (!verified) {
+      throw new AppError(
+        `Amount mismatch. Expected: ₹${expectedTotal}, Calculated: ₹${calculatedTotal}`,
+        400
+      );
     }
 
     return {
-      totalAmount,
       verified: true,
+      calculatedTotal,
+      itemsVerified: items.length,
     };
   }
 }

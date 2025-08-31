@@ -78,37 +78,32 @@ export const verifyPayment = catchAsync(
   }
 );
 
-export const verifyOrderAmount = catchAsync(
+export const verifyPaymentAmount = catchAsync(
   async (req: Request, res: Response) => {
-    console.log("Reached verify order amount");
-    const { items } = req.body;
+    const { items, expectedTotal } = req.body;
 
-    console.log("📥 Verifying order amount for items:", items);
+    console.log("📥 Verifying payment amount:", {
+      itemsCount: items?.length,
+      expectedTotal,
+    });
 
+    // Simple validation
     if (!items || !Array.isArray(items) || items.length === 0) {
-      throw new AppError("Items array is required for verification", 400);
+      throw new AppError("Items array is required", 400);
     }
 
-    // Validate items structure
-    for (const item of items) {
-      if (
-        !item.productId ||
-        !item.variantId ||
-        typeof item.quantity !== "number" ||
-        item.quantity <= 0
-      ) {
-        throw new AppError(
-          "Each item must have valid productId, variantId, and quantity",
-          400
-        );
-      }
+    if (!expectedTotal || typeof expectedTotal !== "number") {
+      throw new AppError("Expected total amount is required", 400);
     }
 
-    const verificationResult = await paymentService.verifyOrderAmount(items);
+    const verificationResult = await paymentService.verifyPaymentAmount(
+      items,
+      expectedTotal
+    );
 
     console.log(
-      "✅ Order amount verification successful:",
-      verificationResult.totalAmount
+      "✅ Payment amount verified:",
+      verificationResult.calculatedTotal
     );
 
     return res
@@ -117,9 +112,8 @@ export const verifyOrderAmount = catchAsync(
         new ApiResponse(
           200,
           verificationResult,
-          "Order amount verified successfully"
+          "Payment amount verified successfully"
         )
       );
   }
 );
-
