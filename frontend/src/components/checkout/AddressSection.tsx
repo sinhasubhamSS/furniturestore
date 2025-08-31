@@ -7,20 +7,28 @@ import {
   useGetAddressesQuery,
   useCreateAddressMutation,
 } from "@/redux/services/user/addressApi";
-import { useCheckDeliveryMutation } from "@/redux/services/user/deliveryApi";
+import { useGetCheckoutPricingMutation } from "@/redux/services/user/orderApi";
 import { setSelectedAddress } from "@/redux/slices/checkoutSlice";
 import { RootState } from "@/redux/store";
 import { Address } from "@/types/address";
 import Input from "@/components/ui/Input";
 
+interface AddressSectionProps {
+  onSelectionChange: (deliverable: boolean, pricingData?: any) => void;
+  items: any[];
+  type?: string | null; //check hear type cannot be null it will wither cart or direct
+}
+
 const AddressSection = ({
   onSelectionChange,
-}: {
-  onSelectionChange: (deliverable: boolean, deliveryData?: any) => void; // ✅ UPDATE THIS
-}) => {
+  items,
+  type,
+}: AddressSectionProps) => {
   const { data: addresses = [], isLoading } = useGetAddressesQuery();
   const [createAddress] = useCreateAddressMutation();
-  const [checkDelivery] = useCheckDeliveryMutation();
+
+  // ✅ FIXED: Use only pricing API for delivery check
+  const [getCheckoutPricing] = useGetCheckoutPricingMutation();
 
   const selectedFromRedux = useSelector(
     (state: RootState) => state.checkout.selectedAddress
@@ -32,12 +40,12 @@ const AddressSection = ({
     checking: boolean;
     deliverable: boolean | null;
     message: string;
-    deliveryData: any | null; // ✅ ADD THIS
+    pricingData: any | null;
   }>({
     checking: false,
     deliverable: null,
     message: "",
-    deliveryData: null, // ✅ ADD THIS
+    pricingData: null,
   });
 
   const dispatch = useDispatch();
@@ -65,69 +73,91 @@ const AddressSection = ({
 
   const watchedPincode = watch("pincode");
 
-  // ✅ UPDATE DELIVERY CHECK FUNCTION
-  const checkPincodeDelivery = async (
-    pincode: string
-  ): Promise<{ deliverable: boolean; data?: any }> => {
+  // ✅ SYNC LOCAL STATE WITH REDUX
+  useEffect(() => {
+    if (selectedFromRedux?._id) {
+      setSelectedId(selectedFromRedux._id);
+    }
+  }, [selectedFromRedux]);
+
+  // ✅ UNIFIED: Single delivery + pricing check
+  const checkDeliveryAndPricing = async (
+    pincode: string,
+    orderItems?: any[]
+  ): Promise<{ deliverable: boolean; pricingData?: any }> => {
     if (!pincode || pincode.length !== 6) return { deliverable: false };
+    if (!orderItems?.length) return { deliverable: false };
 
     setDeliveryStatus((prev) => ({
       ...prev,
       checking: true,
       deliverable: null,
-      message: "",
-      deliveryData: null,
+      message: "Checking delivery and pricing...",
+      pricingData: null,
     }));
 
     try {
-      const result = await checkDelivery({ pincode }).unwrap();
-      const isDeliverable = result.success && result.data?.isServiceable;
-      const deliveryData = result.data || null;
+      const mappedItems = orderItems.map((item) => ({
+        productId: item.productId,
+        variantId: item.variantId || "",
+        quantity: item.quantity,
+      }));
+
+      const response = await getCheckoutPricing({
+        items: mappedItems,
+        pincode,
+      }).unwrap();
+
+      const isDeliverable = response.isServiceable !== false;
 
       setDeliveryStatus({
         checking: false,
         deliverable: isDeliverable,
         message: isDeliverable
           ? "Delivery available"
-          : result.data?.message || "Not serviceable",
-        deliveryData: deliveryData, // ✅ STORE DELIVERY DATA
+          : response.deliveryInfo?.message || "Delivery not available",
+        pricingData: response,
       });
 
-      return { deliverable: isDeliverable, data: deliveryData };
-    } catch (error) {
+      return { deliverable: isDeliverable, pricingData: response };
+    } catch (error: any) {
+      console.error("❌ [ADDRESS] Delivery check failed:", error);
+
       setDeliveryStatus({
         checking: false,
         deliverable: false,
-        message: "Unable to check delivery",
-        deliveryData: null,
+        message: "Unable to check delivery availability",
+        pricingData: null,
       });
+
       return { deliverable: false };
     }
   };
 
-  // ✅ Watch pincode changes with debounce
+  // ✅ DEBOUNCED: Watch pincode changes for form input
   useEffect(() => {
     const timeoutId = setTimeout(async () => {
-      if (watchedPincode && /^\d{6}$/.test(watchedPincode)) {
-        const result = await checkPincodeDelivery(watchedPincode);
+      if (watchedPincode && /^\d{6}$/.test(watchedPincode) && items.length) {
+        await checkDeliveryAndPricing(watchedPincode, items);
         // Don't call onSelectionChange here for form input
       }
     }, 800);
 
     return () => clearTimeout(timeoutId);
-  }, [watchedPincode]);
+  }, [watchedPincode, items]);
 
-  // ✅ Handle existing address selection
-  useEffect(() => {
-    if (selectedFromRedux?._id) {
-      setSelectedId(selectedFromRedux._id);
-      if (selectedFromRedux.pincode) {
-        checkPincodeDelivery(selectedFromRedux.pincode).then((result) => {
-          onSelectionChange(result.deliverable, result.data); // ✅ PASS DELIVERY DATA
-        });
-      }
+  // ✅ HANDLE ADDRESS SELECTION
+  const handleAddressSelection = async (address: Address) => {
+    setSelectedId(address._id);
+    dispatch(setSelectedAddress(address));
+
+    if (address.pincode && items.length) {
+      const result = await checkDeliveryAndPricing(address.pincode, items);
+      onSelectionChange(result.deliverable, result.pricingData);
+    } else {
+      onSelectionChange(false);
     }
-  }, [selectedFromRedux]);
+  };
 
   const onSubmit = async (data: Partial<Address>) => {
     if (!deliveryStatus.deliverable) {
@@ -145,7 +175,7 @@ const AddressSection = ({
       if (res._id) {
         setSelectedId(res._id);
         dispatch(setSelectedAddress(res));
-        onSelectionChange(true, deliveryStatus.deliveryData); // ✅ PASS DELIVERY DATA
+        onSelectionChange(true, deliveryStatus.pricingData);
       }
     } catch (err) {
       console.error("Failed to create address", err);
@@ -176,12 +206,7 @@ const AddressSection = ({
                 type="radio"
                 name="address"
                 checked={selectedId === addr._id}
-                onChange={async () => {
-                  setSelectedId(addr._id);
-                  dispatch(setSelectedAddress(addr));
-                  const result = await checkPincodeDelivery(addr.pincode);
-                  onSelectionChange(result.deliverable, result.data); // ✅ PASS DELIVERY DATA
-                }}
+                onChange={() => handleAddressSelection(addr)}
                 className="mt-1 accent-blue-600 scale-125"
               />
               <div className="flex-1">
@@ -199,22 +224,23 @@ const AddressSection = ({
                     {deliveryStatus.checking ? (
                       <span className="text-sm text-blue-600 flex items-center gap-2">
                         <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                        Checking delivery...
+                        Checking delivery and pricing...
                       </span>
                     ) : deliveryStatus.deliverable === true ? (
                       <div className="text-sm bg-green-50 border border-green-200 rounded p-2">
                         <div className="text-green-700 font-semibold">
                           ✅ Deliverable
                         </div>
-                        {deliveryStatus.deliveryData && (
+                        {deliveryStatus.pricingData && (
                           <div className="text-green-600 text-xs mt-1">
-                            Charge: ₹
-                            {deliveryStatus.deliveryData.deliveryCharge ||
-                              deliveryStatus.deliveryData.finalCharge ||
-                              0}{" "}
-                            • Days: {deliveryStatus.deliveryData.deliveryDays} •
-                            COD:{" "}
-                            {deliveryStatus.deliveryData.codAvailable
+                            Delivery: ₹
+                            {deliveryStatus.pricingData.deliveryCharge || 0} •
+                            Days:{" "}
+                            {deliveryStatus.pricingData.deliveryInfo
+                              ?.estimatedDays || 0}{" "}
+                            • COD:{" "}
+                            {deliveryStatus.pricingData.deliveryInfo
+                              ?.codAvailable
                               ? "Yes"
                               : "No"}
                           </div>
@@ -346,15 +372,16 @@ const AddressSection = ({
                         <div className="font-semibold">
                           ✅ Delivery Available
                         </div>
-                        {deliveryStatus.deliveryData && (
+                        {deliveryStatus.pricingData && (
                           <div className="text-xs mt-1">
-                            Charge: ₹
-                            {deliveryStatus.deliveryData.deliveryCharge ||
-                              deliveryStatus.deliveryData.finalCharge ||
-                              0}{" "}
-                            | Days: {deliveryStatus.deliveryData.deliveryDays} |
-                            COD:{" "}
-                            {deliveryStatus.deliveryData.codAvailable
+                            Delivery: ₹
+                            {deliveryStatus.pricingData.deliveryCharge || 0} |
+                            Days:{" "}
+                            {deliveryStatus.pricingData.deliveryInfo
+                              ?.estimatedDays || 0}{" "}
+                            | COD:{" "}
+                            {deliveryStatus.pricingData.deliveryInfo
+                              ?.codAvailable
                               ? "Available"
                               : "Not Available"}
                           </div>

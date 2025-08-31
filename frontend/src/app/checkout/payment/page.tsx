@@ -5,26 +5,47 @@ import { RootState } from "@/redux/store";
 import {
   useCreateOrderMutation,
   useCreateRazorpayOrderMutation,
-  useVerifyOrderAmountMutation,
+  useGetCheckoutPricingMutation,
 } from "@/redux/services/user/orderApi";
 import { resetCheckout } from "@/redux/slices/checkoutSlice";
 import { useRouter } from "next/navigation";
 import { useGetCartQuery } from "@/redux/services/user/cartApi";
 import { useGetProductByIDQuery } from "@/redux/services/user/publicProductApi";
 import { useState, useEffect, useMemo } from "react";
+import { OrderCreationResponse } from "@/types/order";
 
-// ✅ IdempotencyKey generator function
+// ✅ CLEAN: Only essential env config (NO HARDCODED VALUES)
+const APP_CONFIG = {
+  razorpayKeyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_key",
+  companyName: process.env.NEXT_PUBLIC_COMPANY_NAME || "SUVIDHA Store",
+  currency: process.env.NEXT_PUBLIC_CURRENCY || "INR",
+};
+
 const generateIdempotencyKey = () => {
   const timestamp = Date.now();
   const random = Math.random().toString(36).slice(2);
   return `order_${timestamp}_${random}`;
 };
 
+// ✅ SAFE HELPER FUNCTIONS
+const safeToFixed = (value: any, digits: number = 2): string => {
+  if (typeof value === "number" && !isNaN(value)) {
+    return value.toFixed(digits);
+  }
+  return (0).toFixed(digits);
+};
+
+const safeNumber = (value: any): number => {
+  if (typeof value === "number" && !isNaN(value)) {
+    return value;
+  }
+  return 0;
+};
+
 const PaymentPage = () => {
   const dispatch = useDispatch();
   const router = useRouter();
 
-  // ✅ ALL HOOKS AT TOP LEVEL
   const {
     items,
     type,
@@ -46,42 +67,32 @@ const PaymentPage = () => {
 
   const [createOrder, { isLoading: placingOrder }] = useCreateOrderMutation();
   const [createRazorpayOrder] = useCreateRazorpayOrderMutation();
-  const [verifyOrderAmount, { isLoading: verifying }] =
-    useVerifyOrderAmountMutation();
+  const [getCheckoutPricing] = useGetCheckoutPricingMutation();
 
-  // ✅ Enhanced local state for fees
   const [selectedMethod, setSelectedMethod] = useState<
     "ONLINE" | "ADVANCE" | "COD" | null
   >(null);
-  const [currentIdempotencyKey, setCurrentIdempotencyKey] = useState<string>("");
-  const [feeBreakdown, setFeeBreakdown] = useState({
-    subtotal: 0,
-    packagingFee: 29,
-    deliveryCharge: 0, // Will be calculated
-    codHandlingFee: 0,
-    advanceAmount: 0,
-    remainingAmount: 0,
-    totalAmount: 0,
-    isEligibleForAdvance: false
-  });
+  const [currentIdempotencyKey, setCurrentIdempotencyKey] =
+    useState<string>("");
+  const [pricingData, setPricingData] = useState<any>(null);
+  const [loadingPricing, setLoadingPricing] = useState(false);
 
-  // ✅ Generate idempotencyKey once per payment session
   useEffect(() => {
     if (!currentIdempotencyKey) {
       setCurrentIdempotencyKey(generateIdempotencyKey());
     }
   }, [currentIdempotencyKey]);
 
-  // ✅ Calculate base subtotal
+  // ✅ SAFE SUBTOTAL CALCULATION
   const subtotal = useMemo(() => {
     if (type === "direct_purchase" && items.length && product) {
       const item = items[0];
       const variant = product.variants?.find((v) => v._id === item.variantId);
       if (!variant) return 0;
       const price = variant.hasDiscount
-        ? variant.discountedPrice
-        : variant.price;
-      return (price || 0) * item.quantity;
+        ? safeNumber(variant.discountedPrice)
+        : safeNumber(variant.price);
+      return price * safeNumber(item.quantity);
     }
     if (type === "cart_purchase" && cartData?.items?.length) {
       return cartData.items.reduce((sum, item) => {
@@ -90,22 +101,23 @@ const PaymentPage = () => {
         );
         if (!variant) return sum;
         const price = variant.hasDiscount
-          ? variant.discountedPrice
-          : variant.price;
-        return sum + (price || 0) * item.quantity;
+          ? safeNumber(variant.discountedPrice)
+          : safeNumber(variant.price);
+        return sum + price * safeNumber(item.quantity);
       }, 0);
     }
     return 0;
   }, [type, items, product, cartData]);
 
-  // ✅ Prepare orderItems for backend
   const orderItems = useMemo(() => {
     if (type === "direct_purchase" && items.length) {
-      return items.map(({ productId, variantId, quantity }) => ({
-        productId,
-        variantId,
-        quantity,
-      }));
+      return [
+        {
+          productId: items[0].productId,
+          variantId: items[0].variantId,
+          quantity: items[0].quantity,
+        },
+      ];
     }
     if (type === "cart_purchase" && cartData?.items?.length) {
       return cartData.items.map((item) => ({
@@ -117,40 +129,74 @@ const PaymentPage = () => {
     return [];
   }, [type, items, cartData]);
 
-  // ✅ Calculate fees based on selected payment method
+  // ✅ BACKEND-DRIVEN: Fetch complete pricing (NO HARDCODED FALLBACKS)
   useEffect(() => {
-    if (!subtotal) return;
+    if (!shippingAddress?.pincode || !orderItems.length) return;
 
-    const isEligibleForAdvance = subtotal >= 15000; // ₹15,000+ for advance
-    const codFee = selectedMethod === "COD" ? 99 : 0;
-    const advanceAmount = selectedMethod === "ADVANCE" ? Math.round(subtotal * 0.1) : 0;
-    const remainingAmount = selectedMethod === "ADVANCE" ? subtotal - advanceAmount : 0;
-    
-    // Delivery charge would come from backend API (placeholder for now)
-    const deliveryCharge = 50; // This should come from backend based on address
+    const fetchPricing = async () => {
+      setLoadingPricing(true);
+      try {
+        const response = await getCheckoutPricing({
+          items: orderItems,
+          pincode: shippingAddress.pincode,
+        }).unwrap();
 
-    let totalAmount = 0;
-    if (selectedMethod === "ONLINE") {
-      totalAmount = subtotal + feeBreakdown.packagingFee + deliveryCharge;
-    } else if (selectedMethod === "ADVANCE") {
-      totalAmount = advanceAmount + feeBreakdown.packagingFee + deliveryCharge;
-    } else if (selectedMethod === "COD") {
-      totalAmount = subtotal + feeBreakdown.packagingFee + deliveryCharge + codFee;
+        // ✅ USE BACKEND DATA ONLY
+        const safePricingData = {
+          subtotal: safeNumber(response.subtotal),
+          packagingFee: safeNumber(response.packagingFee),
+          deliveryCharge: safeNumber(response.deliveryCharge),
+          codHandlingFee: safeNumber(response.codHandlingFee),
+          advanceEligible: Boolean(response.advanceEligible),
+          advanceAmount: safeNumber(response.advanceAmount),
+          remainingAmount: safeNumber(response.remainingAmount),
+          advancePercentage: safeNumber(response.advancePercentage || 10),
+          checkoutTotal: safeNumber(response.checkoutTotal),
+          codTotal: safeNumber(response.codTotal),
+          deliveryInfo: response.deliveryInfo || null,
+        };
+
+        setPricingData(safePricingData);
+        console.log("💰 [PAYMENT] Backend pricing:", safePricingData);
+      } catch (error) {
+        console.error("❌ [PAYMENT] Pricing fetch failed:", error);
+        alert("Failed to load pricing. Please refresh the page.");
+      } finally {
+        setLoadingPricing(false);
+      }
+    };
+
+    fetchPricing();
+  }, [shippingAddress?.pincode, orderItems, getCheckoutPricing]);
+
+  // ✅ BACKEND-DRIVEN CALCULATIONS (NO HARDCODED VALUES)
+  const calculateTotalAmount = useMemo(() => {
+    if (!pricingData) return 0;
+
+    const subtotalSafe = safeNumber(pricingData.subtotal);
+    const packagingFeeSafe = safeNumber(pricingData.packagingFee);
+    const deliveryChargeSafe = safeNumber(pricingData.deliveryCharge);
+    const baseAmount = subtotalSafe + packagingFeeSafe + deliveryChargeSafe;
+
+    switch (selectedMethod) {
+      case "ONLINE":
+        return baseAmount;
+      case "ADVANCE":
+        // ✅ ADVANCE: Pay advance amount + fees, rest on delivery
+        const advanceAmountSafe = safeNumber(pricingData.advanceAmount);
+        return advanceAmountSafe + packagingFeeSafe + deliveryChargeSafe;
+      case "COD":
+        const codFeeSafe = safeNumber(pricingData.codHandlingFee);
+        return baseAmount + codFeeSafe;
+      default:
+        return baseAmount;
     }
+  }, [pricingData, selectedMethod]);
 
-    setFeeBreakdown({
-      subtotal,
-      packagingFee: 29,
-      deliveryCharge,
-      codHandlingFee: codFee,
-      advanceAmount,
-      remainingAmount,
-      totalAmount,
-      isEligibleForAdvance
-    });
-  }, [subtotal, selectedMethod]);
+  const isAdvanceEligible = useMemo(() => {
+    return Boolean(pricingData?.advanceEligible);
+  }, [pricingData]);
 
-  // ✅ Razorpay loader
   const loadRazorpayScript = () =>
     new Promise<boolean>((resolve) => {
       if (document.getElementById("razorpay-sdk")) return resolve(true);
@@ -162,17 +208,19 @@ const PaymentPage = () => {
       document.body.appendChild(script);
     });
 
-  // ✅ MAIN Payment Handler
   const handlePayment = async () => {
     if (!selectedMethod) return alert("Please select a payment method.");
     if (!shippingAddress) return alert("Please select a shipping address.");
     if (!orderItems.length) return alert("No products to order.");
-    if (!currentIdempotencyKey) return alert("Payment session expired. Please refresh.");
+    if (!currentIdempotencyKey)
+      return alert("Payment session expired. Please refresh.");
+    if (!pricingData)
+      return alert("Pricing not loaded. Please wait or refresh.");
 
-    // ✅ Handle COD Order
+    // COD Order
     if (selectedMethod === "COD") {
       try {
-        const orderData = await createOrder({
+        const orderData: OrderCreationResponse = await createOrder({
           data: {
             items: orderItems,
             shippingAddress,
@@ -192,44 +240,48 @@ const PaymentPage = () => {
         alert("COD Order placed successfully!");
         dispatch(resetCheckout());
         const orderId = orderData?.orderId || orderData?.data?.orderId;
-        router.push(orderId ? `/order-success?orderId=${orderId}` : "/order-success");
+        router.push(
+          orderId ? `/order-success?orderId=${orderId}` : "/order-success"
+        );
       } catch (error: any) {
         alert(error?.data?.message || "Failed to place COD order.");
       }
       return;
     }
 
-    // ✅ Handle Online/Advance Payment (Both use Razorpay)
+    // Online/Advance Payment
     if (selectedMethod === "ONLINE" || selectedMethod === "ADVANCE") {
       const razorpayLoaded = await loadRazorpayScript();
       if (!razorpayLoaded) {
-        return alert("Failed to load payment system. Please refresh and try again.");
+        return alert(
+          "Failed to load payment system. Please refresh and try again."
+        );
       }
 
       try {
-        const paymentAmount = feeBreakdown.totalAmount;
+        const paymentAmount = calculateTotalAmount;
         const razorpayOrder = await createRazorpayOrder(paymentAmount).unwrap();
-        
+
         const options = {
-          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
+          key: APP_CONFIG.razorpayKeyId,
           amount: razorpayOrder.amount,
-          currency: razorpayOrder.currency,
-          name: "SUVIDHA Store",
-          description: selectedMethod === "ADVANCE" 
-            ? `Advance Payment (10%) - ${orderItems.length} items`
-            : `Online Payment - ${orderItems.length} items`,
+          currency: APP_CONFIG.currency,
+          name: APP_CONFIG.companyName,
+          description:
+            selectedMethod === "ADVANCE"
+              ? `Advance Payment (${pricingData.advancePercentage}%) - ${orderItems.length} items`
+              : `Online Payment - ${orderItems.length} items`,
           order_id: razorpayOrder.orderId,
 
-          // ✅ Payment success handler
           handler: async (response: any) => {
             try {
-              const orderData = await createOrder({
+              const orderData: OrderCreationResponse = await createOrder({
                 data: {
                   items: orderItems,
                   shippingAddress,
                   payment: {
                     method: "RAZORPAY" as const,
-                    isAdvance: selectedMethod === "ADVANCE", // ✅ Important flag
+                    isAdvance: selectedMethod === "ADVANCE",
                     razorpayOrderId: response.razorpay_order_id,
                     razorpayPaymentId: response.razorpay_payment_id,
                     razorpaySignature: response.razorpay_signature,
@@ -240,22 +292,32 @@ const PaymentPage = () => {
               }).unwrap();
 
               if (orderData.isExisting) {
-                alert(`Order already processed! Order ID: ${orderData.orderId}`);
+                alert(
+                  `Order already processed! Order ID: ${orderData.orderId}`
+                );
                 dispatch(resetCheckout());
                 router.push(`/order-success?orderId=${orderData.orderId}`);
                 return;
               }
 
-              const successMessage = selectedMethod === "ADVANCE"
-                ? `Advance payment successful! Remaining ₹${feeBreakdown.remainingAmount} will be collected on delivery.`
-                : "Payment successful and order placed!";
-              
+              const remainingAmount = safeNumber(pricingData.remainingAmount);
+              const successMessage =
+                selectedMethod === "ADVANCE"
+                  ? `Advance payment successful! Remaining ₹${safeToFixed(
+                      remainingAmount
+                    )} will be collected on delivery.`
+                  : "Payment successful and order placed!";
+
               alert(successMessage);
               dispatch(resetCheckout());
               const orderId = orderData?.orderId || orderData?.data?.orderId;
-              router.push(orderId ? `/order-success?orderId=${orderId}` : "/order-success");
+              router.push(
+                orderId ? `/order-success?orderId=${orderId}` : "/order-success"
+              );
             } catch (e: any) {
-              alert(e?.data?.message || "Failed to record order after payment.");
+              alert(
+                e?.data?.message || "Failed to record order after payment."
+              );
             }
           },
 
@@ -271,17 +333,28 @@ const PaymentPage = () => {
 
         const rzp = new (window as any).Razorpay(options);
         rzp.on("payment.failed", (response: any) =>
-          alert(`Payment failed: ${response.error.description || "Please try again"}`)
+          alert(
+            `Payment failed: ${
+              response.error.description || "Please try again"
+            }`
+          )
         );
         rzp.open();
       } catch (error: any) {
-        alert(error?.data?.message || "Failed to initiate payment. Please try again.");
+        alert(
+          error?.data?.message ||
+            "Failed to initiate payment. Please try again."
+        );
       }
     }
   };
 
-  // ✅ LOADING STATES
-  if ((type === "direct_purchase" && loadingProduct) || (type === "cart_purchase" && cartLoading)) {
+  // Loading States
+  if (
+    (type === "direct_purchase" && loadingProduct) ||
+    (type === "cart_purchase" && cartLoading) ||
+    loadingPricing
+  ) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
@@ -292,14 +365,18 @@ const PaymentPage = () => {
     );
   }
 
-  // ✅ NO ITEMS ERROR
+  // No Items Error
   if (!orderItems.length) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center bg-white p-8 rounded-xl shadow-lg">
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">No Items for Payment</h2>
-          <p className="text-gray-600 mb-6">Please add items to cart or select a product.</p>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">
+            No Items for Payment
+          </h2>
+          <p className="text-gray-600 mb-6">
+            Please add items to cart or select a product.
+          </p>
           <div className="flex gap-4 justify-center">
             <button
               onClick={() => router.push("/cart")}
@@ -319,24 +396,47 @@ const PaymentPage = () => {
     );
   }
 
-  // ✅ MAIN PAYMENT UI
+  // No Pricing Data Error
+  if (!pricingData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center bg-white p-8 rounded-xl shadow-lg">
+          <div className="text-orange-500 text-6xl mb-4">⏳</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">
+            Loading Pricing...
+          </h2>
+          <p className="text-gray-600 mb-6">
+            Please wait while we calculate your order total.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-xl shadow-lg border border-gray-200">
-          {/* ✅ Payment Header */}
+          {/* Payment Header */}
           <div className="p-6 border-b border-gray-200 text-center">
-            <h1 className="text-2xl font-bold mb-2 text-gray-800">Choose Payment Method</h1>
+            <h1 className="text-2xl font-bold mb-2 text-gray-800">
+              Choose Payment Method
+            </h1>
             <p className="text-gray-600 mb-4">
-              {orderItems.length === 1 ? product?.name || "Product" : `${orderItems.length} products`}
+              {orderItems.length === 1
+                ? product?.name || "Product"
+                : `${orderItems.length} products`}
             </p>
-           
+            <p className="text-lg font-semibold text-blue-600">
+              {/* ✅ SAFE: Using helper function */}
+              Order Total: ₹{safeToFixed(pricingData?.subtotal)}
+            </p>
           </div>
 
-          {/* ✅ Payment Options */}
+          {/* Payment Options */}
           <div className="p-6">
             <div className="space-y-4">
-              {/* ✅ Online Payment (Full Amount) */}
+              {/* Online Payment */}
               <label
                 className={`block p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
                   selectedMethod === "ONLINE"
@@ -357,13 +457,24 @@ const PaymentPage = () => {
                   <div className="flex-1">
                     <div className="flex justify-between items-center">
                       <div>
-                        <h4 className="font-semibold text-gray-800">Pay Online (Full Amount)</h4>
-                        <p className="text-sm text-gray-600 mt-1">Credit Card • UPI • Net Banking</p>
-                        <p className="text-xs text-green-600 mt-1">✅ Secure & No extra charges</p>
+                        <h4 className="font-semibold text-gray-800">
+                          Pay Online (Full Amount)
+                        </h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Credit Card • UPI • Net Banking
+                        </p>
+                        <p className="text-xs text-green-600 mt-1">
+                          ✅ Secure & No extra charges
+                        </p>
                       </div>
                       <div className="text-right">
                         <div className="text-xl font-bold text-blue-600">
-                          ₹{(subtotal + 29 + 50).toFixed(2)}
+                          {/* ✅ SAFE: Using backend data */}₹
+                          {safeToFixed(
+                            safeNumber(pricingData?.subtotal) +
+                              safeNumber(pricingData?.packagingFee) +
+                              safeNumber(pricingData?.deliveryCharge)
+                          )}
                         </div>
                         <div className="text-xs text-gray-500">Pay now</div>
                       </div>
@@ -375,8 +486,8 @@ const PaymentPage = () => {
                 </div>
               </label>
 
-              {/* ✅ Advance Payment (10%) - Only show for eligible orders */}
-              {feeBreakdown.isEligibleForAdvance && (
+              {/* ✅ FIXED: Advance Payment */}
+              {isAdvanceEligible && (
                 <label
                   className={`block p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
                     selectedMethod === "ADVANCE"
@@ -397,17 +508,38 @@ const PaymentPage = () => {
                     <div className="flex-1">
                       <div className="flex justify-between items-center">
                         <div>
-                          <h4 className="font-semibold text-gray-800">10% Advance Payment</h4>
-                          <p className="text-sm text-gray-600 mt-1">Pay 10% now, rest on delivery</p>
-                          <p className="text-xs text-green-600 mt-1">✅ Secure & 💰 Save ₹99 COD fee!</p>
+                          <h4 className="font-semibold text-gray-800">
+                            {/* ✅ FIXED: Show backend percentage */}
+                            {safeNumber(pricingData?.advancePercentage)}%
+                            Advance Payment
+                          </h4>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {/* ✅ FIXED: Show correct advance logic */}
+                            Pay ₹{safeToFixed(pricingData?.advanceAmount)} of
+                            product cost now
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Rest ₹{safeToFixed(pricingData?.remainingAmount)} +
+                            delivery charges on delivery
+                          </p>
+                          <p className="text-xs text-green-600 mt-1">
+                            ✅ Secure & 💰 Save ₹
+                            {safeToFixed(pricingData?.codHandlingFee)} COD fee!
+                          </p>
                         </div>
                         <div className="text-right">
                           <div className="text-xl font-bold text-green-600">
-                            ₹{Math.round(subtotal * 0.1) + 29 + 50}
+                            {/* ✅ FIXED: Show advance + fees */}₹
+                            {safeToFixed(
+                              safeNumber(pricingData?.advanceAmount) +
+                                safeNumber(pricingData?.packagingFee) +
+                                safeNumber(pricingData?.deliveryCharge)
+                            )}
                           </div>
                           <div className="text-xs text-gray-500">Pay now</div>
                           <div className="text-xs text-orange-600 mt-1">
-                            + ₹{subtotal - Math.round(subtotal * 0.1)} on delivery
+                            + ₹{safeToFixed(pricingData?.remainingAmount)} on
+                            delivery
                           </div>
                         </div>
                       </div>
@@ -419,7 +551,7 @@ const PaymentPage = () => {
                 </label>
               )}
 
-              {/* ✅ Cash on Delivery */}
+              {/* Cash on Delivery */}
               <label
                 className={`block p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
                   selectedMethod === "COD"
@@ -440,15 +572,30 @@ const PaymentPage = () => {
                   <div className="flex-1">
                     <div className="flex justify-between items-center">
                       <div>
-                        <h4 className="font-semibold text-gray-800">Cash on Delivery</h4>
-                        <p className="text-sm text-gray-600 mt-1">Pay when order arrives</p>
-                        <p className="text-xs text-orange-600 mt-1">+ ₹99 handling fee</p>
+                        <h4 className="font-semibold text-gray-800">
+                          Cash on Delivery
+                        </h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Pay when order arrives
+                        </p>
+                        <p className="text-xs text-orange-600 mt-1">
+                          + ₹{safeToFixed(pricingData?.codHandlingFee)} handling
+                          fee
+                        </p>
                       </div>
                       <div className="text-right">
                         <div className="text-xl font-bold text-orange-600">
-                          ₹{(subtotal + 29 + 50 + 99).toFixed(2)}
+                          {/* ✅ SAFE: Using backend data */}₹
+                          {safeToFixed(
+                            safeNumber(pricingData?.subtotal) +
+                              safeNumber(pricingData?.packagingFee) +
+                              safeNumber(pricingData?.deliveryCharge) +
+                              safeNumber(pricingData?.codHandlingFee)
+                          )}
                         </div>
-                        <div className="text-xs text-gray-500">Pay on delivery</div>
+                        <div className="text-xs text-gray-500">
+                          Pay on delivery
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -459,52 +606,63 @@ const PaymentPage = () => {
               </label>
             </div>
 
-            {/* ✅ Fee Breakdown for Selected Method */}
+            {/* ✅ SAFE: Price Breakdown */}
             {selectedMethod && (
               <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                <h5 className="font-semibold text-gray-800 mb-3">Price Breakdown:</h5>
+                <h5 className="font-semibold text-gray-800 mb-3">
+                  Price Breakdown:
+                </h5>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Product Total:</span>
-                    <span>₹{subtotal.toFixed(2)}</span>
+                    <span>₹{safeToFixed(pricingData?.subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Packaging Fee:</span>
-                    <span>₹29.00</span>
+                    <span>₹{safeToFixed(pricingData?.packagingFee)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Delivery Charges:</span>
-                    <span>₹50.00</span>
+                    <span>₹{safeToFixed(pricingData?.deliveryCharge)}</span>
                   </div>
                   {selectedMethod === "COD" && (
                     <div className="flex justify-between text-orange-600">
                       <span>COD Handling Fee:</span>
-                      <span>₹99.00</span>
+                      <span>₹{safeToFixed(pricingData?.codHandlingFee)}</span>
                     </div>
                   )}
                   {selectedMethod === "ADVANCE" && (
                     <>
                       <div className="flex justify-between text-green-600">
-                        <span>Advance (10%):</span>
-                        <span>₹{Math.round(subtotal * 0.1).toFixed(2)}</span>
+                        <span>
+                          Advance ({safeNumber(pricingData?.advancePercentage)}%
+                          of product):
+                        </span>
+                        <span>₹{safeToFixed(pricingData?.advanceAmount)}</span>
                       </div>
                       <div className="flex justify-between text-gray-600">
-                        <span>Remaining on delivery:</span>
-                        <span>₹{(subtotal - Math.round(subtotal * 0.1)).toFixed(2)}</span>
+                        <span>Remaining product amount:</span>
+                        <span>
+                          ₹{safeToFixed(pricingData?.remainingAmount)}
+                        </span>
                       </div>
                     </>
                   )}
                   <hr className="my-2" />
                   <div className="flex justify-between font-bold text-lg">
-                    <span>Total to Pay {selectedMethod === "ADVANCE" ? "Now" : ""}:</span>
-                    <span className="text-green-600">₹{feeBreakdown.totalAmount.toFixed(2)}</span>
+                    <span>
+                      Total to Pay {selectedMethod === "ADVANCE" ? "Now" : ""}:
+                    </span>
+                    <span className="text-green-600">
+                      ₹{safeToFixed(calculateTotalAmount)}
+                    </span>
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* ✅ Action Button */}
+          {/* Action Button */}
           <div className="p-6 border-t border-gray-200">
             <button
               onClick={handlePayment}
@@ -527,9 +685,9 @@ const PaymentPage = () => {
               ) : selectedMethod === "COD" ? (
                 `Place COD Order`
               ) : selectedMethod === "ADVANCE" ? (
-                `Pay Advance ₹${feeBreakdown.totalAmount.toFixed(2)}`
+                `Pay Advance ₹${safeToFixed(calculateTotalAmount)}`
               ) : selectedMethod === "ONLINE" ? (
-                `Pay ₹${feeBreakdown.totalAmount.toFixed(2)}`
+                `Pay ₹${safeToFixed(calculateTotalAmount)}`
               ) : (
                 "Select Payment Method"
               )}
@@ -539,7 +697,7 @@ const PaymentPage = () => {
               <p className="text-xs text-gray-500">
                 🔒 Your payment information is secure and encrypted
               </p>
-              {!feeBreakdown.isEligibleForAdvance && (
+              {!isAdvanceEligible && (
                 <p className="text-xs text-gray-400 mt-2">
                   💡 Advance payment available for orders ₹15,000+
                 </p>

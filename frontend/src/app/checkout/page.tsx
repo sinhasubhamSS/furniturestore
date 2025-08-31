@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useRouter } from "next/navigation";
 import {
@@ -9,13 +9,12 @@ import {
 } from "@/redux/services/user/cartApi";
 import { useGetProductByIDQuery } from "@/redux/services/user/publicProductApi";
 import { useGetCheckoutPricingMutation } from "@/redux/services/user/orderApi";
-import CheckoutSummary, {
-  CheckoutItem,
-} from "@/components/checkout/CheckoutSummary";
+import CheckoutSummary, { CheckoutItem } from "@/components/checkout/CheckoutSummary";
 import AddressSection from "@/components/checkout/AddressSection";
 import { RootState } from "@/redux/store";
 import {
   updateQuantity,
+  updateItemQuantity, // ✅ Add this import
   updateFees,
   setAdvanceEligibility,
 } from "@/redux/slices/checkoutSlice";
@@ -31,35 +30,82 @@ export default function CheckoutPage() {
 
   const [deliveryAvailable, setDeliveryAvailable] = useState(true);
   const [deliveryInfo, setDeliveryInfo] = useState<any>(null);
-  const [pricingData, setPricingData] =
-    useState<CheckoutPricingResponse | null>(null);
+  const [pricingData, setPricingData] = useState<CheckoutPricingResponse | undefined>(undefined);
   const [loadingPricing, setLoadingPricing] = useState(false);
 
-  const productId =
-    type === "direct_purchase" && items.length > 0 ? items[0].productId : null;
+  // ✅ Prevent double API calls
+  const quantityUpdateInProgress = useRef(false);
+
+  const productId = type === "direct_purchase" && items.length > 0 ? items[0].productId : null;
 
   const { data: product, isLoading: productLoading } = useGetProductByIDQuery(
     productId || "",
     { skip: !productId || !isRehydrated }
   );
 
-  const { data: cartData, isLoading: cartLoading } = useGetCartQuery(
-    undefined,
-    { skip: type !== "cart_purchase" || !isRehydrated }
-  );
+  const {
+    data: cartData,
+    isLoading: cartLoading,
+    refetch: refetchCart,
+  } = useGetCartQuery(undefined, {
+    skip: type !== "cart_purchase" || !isRehydrated,
+  });
 
   const [updateQty] = useUpdateQuantityMutation();
   const [getCheckoutPricing] = useGetCheckoutPricingMutation();
 
-  // ✅ FIXED: Proper array mapping and API integration
+  const subtotal = useMemo(() => {
+    if (type === "direct_purchase" && items.length && product) {
+      const item = items[0];
+      const variant = product.variants?.find((v) => v._id === item.variantId);
+      if (!variant) return 0;
+      const price = variant.hasDiscount ? variant.discountedPrice ?? 0 : variant.price ?? 0;
+      return price * item.quantity;
+    }
+
+    if (type === "cart_purchase" && cartData?.items?.length) {
+      return cartData.items.reduce((sum, item) => {
+        const variant = item.product.variants.find((v) => v._id === item.variantId);
+        if (!variant) return sum;
+        const price = variant.hasDiscount ? variant.discountedPrice ?? 0 : variant.price ?? 0;
+        return sum + price * item.quantity;
+      }, 0);
+    }
+
+    return 0;
+  }, [type, items, product, cartData]);
+
+  const checkoutItems: CheckoutItem[] = useMemo(() => {
+    if (type === "direct_purchase" && items.length > 0 && product) {
+      const item = items[0];
+      const selectedVariant = product.variants?.find((v) => v._id === item.variantId);
+
+      if (selectedVariant) {
+        return [{
+          product,
+          variantId: selectedVariant._id!,
+          quantity: item.quantity,
+        }];
+      }
+    } else if (type === "cart_purchase" && cartData?.items?.length) {
+      return cartData.items.map(({ product, variantId, quantity }) => ({
+        product,
+        variantId,
+        quantity,
+      }));
+    }
+    return [];
+  }, [type, items, product, cartData]);
+
+  // ✅ Pricing fetch
   useEffect(() => {
-    if (!isRehydrated || !selectedAddress?.pincode || items.length === 0)
+    if (!isRehydrated || !selectedAddress?.pincode || items.length === 0) {
       return;
+    }
 
     const fetchPricing = async () => {
       setLoadingPricing(true);
       try {
-        // ✅ FIXED: Correctly map array elements
         const orderItems = items.map((item) => ({
           productId: item.productId,
           variantId: item.variantId || "",
@@ -72,50 +118,120 @@ export default function CheckoutPage() {
         }).unwrap();
 
         setPricingData(response);
+        setDeliveryAvailable(response.isServiceable !== false);
+        setDeliveryInfo(response.deliveryInfo || null);
 
-        // ✅ Update Redux state with backend fees
-        dispatch(
-          updateFees({
+        // ✅ SECURE: Use backend values with validation
+        if (response.packagingFee !== undefined && response.deliveryCharge !== undefined) {
+          dispatch(updateFees({
             packagingFee: response.packagingFee,
             deliveryCharge: response.deliveryCharge,
             totalAmount: response.checkoutTotal,
-          })
-        );
-
-        // ✅ FIXED: Safe property access with proper type checking
-        if (response.advanceEligible) {
-          dispatch(
-            setAdvanceEligibility({
-              eligible: response.advanceEligible,
-              orderValue: response.subtotal,
-            })
-          );
+          }));
         }
-      } catch (error) {
-        console.error("Pricing fetch failed:", error);
+
+        if (response.advanceEligible) {
+          dispatch(setAdvanceEligibility({
+            eligible: response.advanceEligible,
+            orderValue: response.subtotal || subtotal,
+            percentage: response.advancePercentage,
+            advanceAmount: response.advanceAmount,
+            remainingAmount: response.remainingAmount,
+          }));
+        }
+      } catch (error: any) {
+        console.error("❌ [CHECKOUT] Pricing fetch failed:", error);
+        setPricingData(undefined);
+        setDeliveryAvailable(false);
       } finally {
         setLoadingPricing(false);
       }
     };
 
     fetchPricing();
-  }, [
-    selectedAddress?.pincode,
-    items,
-    isRehydrated,
-    getCheckoutPricing,
-    dispatch,
-  ]);
+  }, [selectedAddress?.pincode, items, cartData, isRehydrated, getCheckoutPricing, dispatch, subtotal]);
 
   useEffect(() => {
     if (!isRehydrated) return;
-
     if (!type || items.length === 0) {
       console.warn("No checkout data found, redirecting...");
       router.push("/cart");
     }
   }, [type, items, router, isRehydrated]);
 
+  // ✅ FIXED: Quantity update with immediate Redux update + API sync
+  const handleQuantityChange = async (index: number, newQuantity: number) => {
+    const item = checkoutItems[index];
+    if (!item) return;
+
+    const variant = item.product.variants?.find((v) => v._id === item.variantId);
+    if (!variant) return;
+
+    const clamped = Math.max(1, Math.min(newQuantity, variant.stock ?? 0));
+
+    // ✅ Prevent rapid successive calls
+    if (quantityUpdateInProgress.current) return;
+
+    try {
+      quantityUpdateInProgress.current = true;
+
+      if (type === "direct_purchase") {
+        dispatch(updateQuantity(clamped));
+      } else if (type === "cart_purchase") {
+        // ✅ 1. Update Redux immediately for instant UI response
+        dispatch(updateItemQuantity({
+          productId: item.product._id,
+          variantId: item.variantId,
+          quantity: clamped,
+        }));
+
+        // ✅ 2. Update backend
+        await updateQty({
+          productId: item.product._id,
+          variantId: item.variantId,
+          quantity: clamped,
+        }).unwrap();
+
+        // ✅ 3. Refetch cart to stay in sync
+        await refetchCart();
+      }
+    } catch (err: any) {
+      console.error("❌ [CHECKOUT] Failed to update quantity:", err);
+      
+      // ✅ Revert Redux state if API failed
+      if (type === "cart_purchase") {
+        await refetchCart(); // This restores correct state from backend
+      }
+      
+      alert("Failed to update cart quantity. Please try again.");
+    } finally {
+      quantityUpdateInProgress.current = false;
+    }
+  };
+
+  const handleProceedToPayment = () => {
+    if (!selectedAddress) {
+      alert("Please select a delivery address");
+      return;
+    }
+
+    if (!deliveryAvailable) {
+      alert("Selected address is not deliverable. Please choose a different address.");
+      return;
+    }
+
+    router.push("/checkout/payment");
+  };
+
+  const handleAddressSelection = (deliverable: boolean, pricingData?: CheckoutPricingResponse) => {
+    setDeliveryAvailable(deliverable);
+    if (pricingData) {
+      setPricingData(pricingData);
+      setDeliveryInfo(pricingData.deliveryInfo);
+    }
+  };
+
+  // Loading states
   if (!isRehydrated || cartLoading || productLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -127,108 +243,13 @@ export default function CheckoutPage() {
     );
   }
 
-  let checkoutItems: CheckoutItem[] = [];
-  let subtotal = 0;
-
-  if (type === "direct_purchase" && items.length > 0 && product) {
-    const item = items[0];
-    const selectedVariant = product.variants?.find(
-      (v) => v._id === item.variantId
-    );
-
-    if (selectedVariant) {
-      checkoutItems = [
-        {
-          product,
-          variantId: selectedVariant._id!,
-          quantity: item.quantity,
-        },
-      ];
-      const price = selectedVariant.hasDiscount
-        ? selectedVariant.discountedPrice ?? 0
-        : selectedVariant.price ?? 0;
-      subtotal = price * item.quantity;
-    }
-  } else if (type === "cart_purchase" && cartData?.items?.length) {
-    checkoutItems = cartData.items.map(({ product, variantId, quantity }) => ({
-      product,
-      variantId,
-      quantity,
-    }));
-
-    subtotal = checkoutItems.reduce((sum, item) => {
-      const variant = item.product.variants?.find(
-        (v) => v._id === item.variantId
-      );
-      if (variant) {
-        const price = variant.hasDiscount
-          ? variant.discountedPrice ?? 0
-          : variant.price ?? 0;
-        return sum + price * item.quantity;
-      }
-      return sum;
-    }, 0);
-  }
-
-  const handleQuantityChange = async (index: number, newQuantity: number) => {
-    const item = checkoutItems[index];
-    if (!item) return;
-
-    const variant = item.product.variants?.find(
-      (v) => v._id === item.variantId
-    );
-    if (!variant) return;
-
-    const clamped = Math.max(1, Math.min(newQuantity, variant.stock ?? 0));
-
-    if (type === "direct_purchase") {
-      dispatch(updateQuantity(clamped));
-    } else if (type === "cart_purchase") {
-      try {
-        await updateQty({
-          productId: item.product._id,
-          variantId: item.variantId,
-          quantity: clamped,
-        }).unwrap();
-      } catch (err) {
-        alert("Failed to update cart quantity. Please try again.");
-        console.error(err);
-      }
-    }
-  };
-
-  const handleProceedToPayment = () => {
-    if (!selectedAddress) {
-      alert("Please select a delivery address");
-      return;
-    }
-
-    if (!deliveryAvailable) {
-      alert(
-        "Selected address is not deliverable. Please choose a different address."
-      );
-      return;
-    }
-
-    router.push("/checkout/payment");
-  };
-
-  const handleAddressSelection = (deliverable: boolean, deliveryData?: any) => {
-    setDeliveryAvailable(deliverable);
-    setDeliveryInfo(deliveryData);
-  };
-
   if (checkoutItems.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center bg-white p-8 rounded-xl shadow-lg">
           <div className="text-gray-400 text-6xl mb-4">🛒</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">
-            Nothing to Checkout
-          </h2>
-          <p className="text-gray-600 mb-6">
-            Add some items to your cart to continue.
-          </p>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Nothing to Checkout</h2>
+          <p className="text-gray-600 mb-6">Add some items to your cart to continue.</p>
           <button
             onClick={() => router.push("/products")}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -252,10 +273,11 @@ export default function CheckoutPage() {
 
         <div className="grid lg:grid-cols-[2fr_1fr] gap-8">
           <div>
-            <AddressSection onSelectionChange={handleAddressSelection} />
+            <AddressSection onSelectionChange={handleAddressSelection} items={items} />
           </div>
 
           <div className="sticky top-10 self-start bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+            {/* ✅ NO FLICKER: Always render CheckoutSummary */}
             <CheckoutSummary
               items={checkoutItems}
               subtotal={subtotal}
@@ -283,9 +305,7 @@ export default function CheckoutPage() {
                 ? "Delivery Not Available"
                 : loadingPricing
                 ? "Calculating Total..."
-                : `Proceed to Payment • ₹${
-                    pricingData?.checkoutTotal || subtotal
-                  }`}
+                : `Proceed to Payment • ₹${pricingData?.checkoutTotal?.toFixed(2) || subtotal.toFixed(2)}`}
             </button>
           </div>
         </div>

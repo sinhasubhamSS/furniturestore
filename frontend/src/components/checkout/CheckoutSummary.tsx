@@ -1,5 +1,6 @@
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import React from "react";
 import { Product, DisplayProduct } from "@/types/Product";
 
 export type CheckoutItem = {
@@ -13,7 +14,6 @@ interface CheckoutSummaryProps {
   subtotal: number;
   allowQuantityEdit?: boolean;
   onQuantityChange?: (index: number, quantity: number) => void;
-  // ✅ NEW: Backend pricing data
   pricingData?: any;
   loadingPricing?: boolean;
   deliveryInfo?: any;
@@ -21,7 +21,8 @@ interface CheckoutSummaryProps {
   hasSelectedAddress?: boolean;
 }
 
-const CheckoutSummary = ({
+// ✅ React.memo prevents unnecessary re-renders
+const CheckoutSummary = React.memo(({
   items,
   subtotal,
   allowQuantityEdit = false,
@@ -34,35 +35,41 @@ const CheckoutSummary = ({
 }: CheckoutSummaryProps) => {
   const [showBreakdown, setShowBreakdown] = useState(false);
 
-  if (!items.length) {
-    return <p className="text-center text-gray-500">Your cart is empty</p>;
-  }
+  // ✅ SAFE: Helper function to prevent toFixed errors
+  const safeToFixed = (value: number | undefined | null, decimals: number = 2): string => {
+    if (typeof value !== "number" || value === null || value === undefined || isNaN(value)) {
+      return (0).toFixed(decimals);
+    }
+    return value.toFixed(decimals);
+  };
 
-  // ✅ Use backend data or fallback
-  const packagingFee = pricingData?.packagingFee || 29;
-  const deliveryCharge = pricingData?.deliveryCharge || 0;
-  const grandTotal = pricingData?.checkoutTotal || subtotal + packagingFee;
+  // ✅ Memoized values for performance
+  const { packagingFee, deliveryCharge, grandTotal } = useMemo(() => ({
+    packagingFee: pricingData?.packagingFee ?? 0,
+    deliveryCharge: pricingData?.deliveryCharge ?? 0,
+    grandTotal: pricingData?.checkoutTotal ?? subtotal,
+  }), [pricingData, subtotal]);
 
   const handleWhatsAppContact = () => {
     const message = encodeURIComponent(
-      `Hi! I need help with delivery to my location. My cart total is ₹${grandTotal.toFixed(
-        2
-      )}. Can you please check if delivery is possible?`
+      `Hi! I need help with delivery to my location. My cart total is ₹${safeToFixed(grandTotal)}. Can you please check if delivery is possible?`
     );
     const whatsappNumber = "919876543210";
     window.open(`https://wa.me/${whatsappNumber}?text=${message}`, "_blank");
   };
 
+  if (!items.length) {
+    return <p className="text-center text-gray-500">Your cart is empty</p>;
+  }
+
   return (
     <div className="max-w-xl mx-auto bg-white text-gray-900 p-6 rounded-xl shadow-lg border border-gray-200">
       <h2 className="text-2xl font-bold mb-6">Order Summary</h2>
 
-      {/* Items List */}
+      {/* Items List - Always visible */}
       <div className="space-y-4 max-h-80 overflow-auto mb-6">
         {items.map(({ product, variantId, quantity }, idx) => {
-          const selectedVariant = product.variants?.find(
-            (v) => v._id === variantId
-          );
+          const selectedVariant = product.variants?.find((v) => v._id === variantId);
           if (!selectedVariant) return null;
 
           const finalPrice = selectedVariant.hasDiscount
@@ -76,7 +83,7 @@ const CheckoutSummary = ({
               className="flex gap-4 items-start p-3 border border-gray-100 rounded-lg"
             >
               <Image
-                src={selectedVariant.images?.[0]?.url || "/placeholder.jpg"} // ✅ Proper optional chaining
+                src={selectedVariant.images?.[0]?.url || "/placeholder.jpg"}
                 alt={product.name}
                 width={80}
                 height={80}
@@ -93,10 +100,10 @@ const CheckoutSummary = ({
                   {selectedVariant.hasDiscount ? (
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-green-600 text-base">
-                        ₹{(selectedVariant.discountedPrice ?? 0).toFixed(2)}
+                        ₹{safeToFixed(selectedVariant.discountedPrice)}
                       </span>
                       <span className="text-sm line-through text-gray-500">
-                        ₹{(selectedVariant.price ?? 0).toFixed(2)}
+                        ₹{safeToFixed(selectedVariant.price)}
                       </span>
                       <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
                         {selectedVariant.discountPercent ?? 0}% OFF
@@ -104,13 +111,13 @@ const CheckoutSummary = ({
                     </div>
                   ) : (
                     <span className="font-semibold text-gray-900 text-base">
-                      ₹{(selectedVariant.price ?? 0).toFixed(2)}
+                      ₹{safeToFixed(selectedVariant.price)}
                     </span>
                   )}
 
                   {quantity > 1 && (
                     <p className="text-sm text-gray-600 mt-1">
-                      × {quantity} = ₹{itemTotal.toFixed(2)}
+                      × {quantity} = ₹{safeToFixed(itemTotal)}
                     </p>
                   )}
                 </div>
@@ -128,9 +135,7 @@ const CheckoutSummary = ({
                     >
                       −
                     </button>
-                    <span className="w-8 text-center font-medium">
-                      {quantity}
-                    </span>
+                    <span className="w-8 text-center font-medium">{quantity}</span>
                     <button
                       className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 flex items-center justify-center text-sm font-medium"
                       disabled={quantity >= (selectedVariant.stock ?? 0)}
@@ -146,13 +151,12 @@ const CheckoutSummary = ({
         })}
       </div>
 
-      {/* ✅ UPDATED: Backend-Driven Price Breakdown */}
+      {/* ✅ NO FLICKER: Price section always rendered */}
       <div className="border-t border-gray-200 pt-4">
         <div className="flex items-center justify-between mb-4">
-          <span className="text-lg font-semibold text-gray-900">
-            Total Amount:
-          </span>
+          <span className="text-lg font-semibold text-gray-900">Total Amount:</span>
           <div className="text-right">
+            {/* ✅ Show loading only in price area, not entire component */}
             {loadingPricing ? (
               <div className="flex items-center gap-2">
                 <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -160,7 +164,7 @@ const CheckoutSummary = ({
               </div>
             ) : (
               <div className="text-xl font-bold text-green-600">
-                ₹{grandTotal.toFixed(2)}
+                ₹{safeToFixed(grandTotal)}
               </div>
             )}
             <button
@@ -168,92 +172,79 @@ const CheckoutSummary = ({
               className="text-sm text-blue-600 hover:underline flex items-center gap-1"
             >
               {showBreakdown ? "Hide" : "Show"} breakdown
-              <span
-                className={`transform transition-transform ${
-                  showBreakdown ? "rotate-180" : ""
-                }`}
-              >
-                ▼
-              </span>
+              <span className={`transform transition-transform ${showBreakdown ? "rotate-180" : ""}`}>▼</span>
             </button>
           </div>
         </div>
 
-        {/* ✅ BACKEND-DRIVEN Detailed Breakdown */}
+        {/* ✅ Breakdown section */}
         {showBreakdown && (
           <div className="space-y-3 mb-4 bg-gray-50 rounded-lg p-4">
-            {/* Subtotal */}
             <div className="flex justify-between text-base">
               <span className="text-gray-700">
-                Item Subtotal ({items.length} item{items.length > 1 ? "s" : ""}
-                ):
+                Item Subtotal ({items.length} item{items.length > 1 ? "s" : ""}):
               </span>
-              <span className="font-medium">₹{subtotal.toFixed(2)}</span>
+              <span className="font-medium">₹{safeToFixed(subtotal)}</span>
             </div>
 
-            {/* ✅ Backend-driven Packaging Fee */}
             <div className="flex justify-between text-base">
               <span className="text-gray-700">Packaging Fee:</span>
               <span className="font-medium text-blue-600">
-                ₹{packagingFee.toFixed(2)}
+                {loadingPricing ? (
+                  <span className="flex items-center gap-1">
+                    <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    ...
+                  </span>
+                ) : (
+                  `₹${safeToFixed(packagingFee)}`
+                )}
               </span>
             </div>
 
-            {/* ✅ Backend-driven Delivery Section */}
             {!hasSelectedAddress ? (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-lg">📍</span>
-                  <span className="font-medium text-amber-800">
-                    Select delivery address
-                  </span>
+                  <span className="font-medium text-amber-800">Select delivery address</span>
                 </div>
                 <p className="text-amber-700 text-sm">
                   Please select your delivery address to see shipping charges.
                 </p>
               </div>
-            ) : loadingPricing ? (
-              <div className="flex justify-between text-base">
-                <span className="text-gray-700">Delivery:</span>
-                <span className="font-medium text-blue-600 flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                  Checking...
-                </span>
-              </div>
             ) : (
               <div className="flex justify-between text-base">
                 <span className="text-gray-700">
-                  Delivery
-                  {pricingData?.deliveryInfo?.estimatedDays
+                  Delivery{pricingData?.deliveryInfo?.estimatedDays
                     ? ` (${pricingData.deliveryInfo.estimatedDays} days)`
-                    : ""}
-                  :
+                    : ""}:
                 </span>
                 <span className="font-medium">
-                  {!deliveryAvailable ? (
-                    <span className="text-red-600 font-semibold">
-                      Not Available
+                  {loadingPricing ? (
+                    <span className="flex items-center gap-1">
+                      <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      Checking...
                     </span>
+                  ) : !deliveryAvailable ? (
+                    <span className="text-red-600 font-semibold">Not Available</span>
                   ) : deliveryCharge === 0 ? (
                     <span className="text-green-600 font-semibold">FREE</span>
                   ) : (
-                    `₹${deliveryCharge.toFixed(2)}`
+                    `₹${safeToFixed(deliveryCharge)}`
                   )}
                 </span>
               </div>
             )}
 
-            {/* Total Line */}
             <div className="border-t border-gray-300 pt-2 mt-2">
               <div className="flex justify-between text-lg font-bold">
                 <span className="text-gray-900">Total Amount:</span>
-                <span className="text-green-600">₹{grandTotal.toFixed(2)}</span>
+                <span className="text-green-600">₹{safeToFixed(grandTotal)}</span>
               </div>
             </div>
           </div>
         )}
 
-        {/* Delivery Status Messages */}
+        {/* Rest of components unchanged */}
         {!deliveryAvailable && hasSelectedAddress && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
             <div className="text-red-800 text-sm">
@@ -264,8 +255,7 @@ const CheckoutSummary = ({
                 </span>
               </div>
               <p className="text-xs mb-3 text-red-700">
-                We currently don't deliver to this area. Try selecting a
-                different address or contact us.
+                We currently don't deliver to this area. Try selecting a different address or contact us.
               </p>
               <button
                 onClick={handleWhatsAppContact}
@@ -278,7 +268,6 @@ const CheckoutSummary = ({
           </div>
         )}
 
-        {/* ✅ Backend-driven Delivery Info */}
         {hasSelectedAddress &&
           deliveryAvailable &&
           pricingData?.deliveryInfo &&
@@ -287,35 +276,31 @@ const CheckoutSummary = ({
               <div className="text-sm">
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-medium text-blue-900">
-                    🚚{" "}
-                    {pricingData.deliveryInfo.courierPartner ||
-                      "Standard Delivery"}
+                    🚚 {pricingData.deliveryInfo.courierPartner || "Standard Delivery"}
                   </span>
                   <span className="text-blue-700 font-medium">
                     COD: {pricingData.deliveryInfo.codAvailable ? "✅" : "❌"}
                   </span>
                 </div>
                 <p className="text-blue-700">
-                  Estimated delivery: {pricingData.deliveryInfo.estimatedDays}{" "}
-                  days
+                  Estimated delivery: {pricingData.deliveryInfo.estimatedDays} days
                 </p>
                 <p className="text-blue-600 text-xs mt-1">
-                  📦 Includes ₹{packagingFee} packaging fee
+                  📦 Includes ₹{safeToFixed(packagingFee)} packaging fee
                 </p>
               </div>
             </div>
           )}
 
-        {/* Footer note */}
         {!hasSelectedAddress && (
           <p className="text-xs text-gray-500 mt-2 text-center">
-            *Total includes ₹{packagingFee} packaging fee. Shipping calculated
-            after address selection.
+            *Total includes ₹{safeToFixed(packagingFee)} packaging fee. Shipping calculated after address selection.
           </p>
         )}
       </div>
     </div>
   );
-};
+});
 
+CheckoutSummary.displayName = "CheckoutSummary";
 export default CheckoutSummary;

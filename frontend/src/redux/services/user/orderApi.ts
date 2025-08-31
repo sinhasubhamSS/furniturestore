@@ -2,6 +2,7 @@ import { axiosBaseQuery } from "@/redux/api/customBaseQuery";
 import { createApi } from "@reduxjs/toolkit/query/react";
 import {
   Order,
+  OrderCreationResponse, // ✅ Import this
   PlaceOrderRequest,
   RazorpayOrderResponse,
   CheckoutPricingRequest,
@@ -15,9 +16,9 @@ export const orderApi = createApi({
   baseQuery: axiosBaseQuery(),
   tagTypes: ["Orders"],
   endpoints: (builder) => ({
-    // Place order (COD or Razorpay)
+    // ✅ FIXED: Return OrderCreationResponse instead of Order
     createOrder: builder.mutation<
-      Order,
+      OrderCreationResponse, // ✅ Changed from Order to OrderCreationResponse
       { data: PlaceOrderRequest; idempotencyKey?: string }
     >({
       query: ({ data, idempotencyKey }) => ({
@@ -26,6 +27,31 @@ export const orderApi = createApi({
         data,
         headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
       }),
+      // ✅ FIXED: Transform response to match OrderCreationResponse
+      transformResponse: (response: any) => {
+        // Assuming your backend returns something like:
+        // { success: true, message: "Order created", data: orderObject }
+        // Or { success: true, orderId: "123", isExisting: false, data: orderObject }
+        
+        if (response.data) {
+          // If backend returns { success, data, message } format
+          return {
+            success: response.success || true,
+            orderId: response.data.orderId || response.data._id,
+            isExisting: response.isExisting || false,
+            message: response.message,
+            data: response.data
+          };
+        }
+        
+        // If backend returns direct order data, wrap it
+        return {
+          success: true,
+          orderId: response.orderId || response._id,
+          isExisting: false,
+          data: response
+        };
+      },
       invalidatesTags: ["Orders"],
     }),
 
@@ -39,7 +65,7 @@ export const orderApi = createApi({
       transformResponse: (response: any) => response.data,
     }),
 
-    // ✅ NEW: Checkout pricing
+    // Checkout pricing
     getCheckoutPricing: builder.mutation<
       CheckoutPricingResponse,
       CheckoutPricingRequest
@@ -91,7 +117,7 @@ export const orderApi = createApi({
 export const {
   useCreateOrderMutation,
   useCreateRazorpayOrderMutation,
-  useGetCheckoutPricingMutation, // ✅ NEW
+  useGetCheckoutPricingMutation,
   useVerifyOrderAmountMutation,
   useGetMyOrdersQuery,
   useCancelOrderMutation,

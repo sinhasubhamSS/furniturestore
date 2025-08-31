@@ -6,7 +6,7 @@ Extra Validation	Cross-check DB for every entity	Data integrity, security
 Restock on Cancel	Transactional cancel support	Inventory accuracy
 Rate Limiting	API limit per-user	Bot/abuse 
 
-
+code .env.local
 components/reviews/
 ├── StarRating.tsx           ✅ Perfect
 ├── QuickRating.tsx          ✅ Perfect  

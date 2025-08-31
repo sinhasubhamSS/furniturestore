@@ -18,11 +18,10 @@ interface CheckoutState {
     quantity: number;
   }[];
   selectedAddress: Address | null;
-  paymentMethod: "COD" | "RAZORPAY" | "ADVANCE" | null; // ✅ Added ADVANCE
+  paymentMethod: "COD" | "RAZORPAY" | "ADVANCE" | null;
   verification: VerificationState;
   isRehydrated: boolean;
   
-  // ✅ New fee tracking
   fees: {
     packagingFee: number;
     deliveryCharge: number;
@@ -32,7 +31,6 @@ interface CheckoutState {
     totalAmount: number;
   };
   
-  // ✅ Advance payment eligibility
   isAdvanceEligible: boolean;
 }
 
@@ -48,8 +46,9 @@ const initialState: CheckoutState = {
     lastVerified: null,
   },
   isRehydrated: false,
+  // ✅ All fees from backend - no hardcoded values
   fees: {
-    packagingFee: 29,
+    packagingFee: 0, // ✅ Backend will set this
     deliveryCharge: 0,
     codHandlingFee: 0,
     advanceAmount: 0,
@@ -74,7 +73,7 @@ const checkoutSlice = createSlice({
       state.type = "direct_purchase";
       state.items = [action.payload];
       state.verification.status = "pending";
-      state.fees = { ...initialState.fees }; // Reset fees
+      state.fees = { ...initialState.fees };
     },
 
     setCartPurchase(
@@ -90,12 +89,64 @@ const checkoutSlice = createSlice({
       state.type = "cart_purchase";
       state.items = action.payload;
       state.verification.status = "pending";
-      state.fees = { ...initialState.fees }; // Reset fees
+      state.fees = { ...initialState.fees };
     },
 
-    updateQuantity(state, action: PayloadAction<number>) {
+    // ✅ UNIVERSAL: Works for both direct purchase AND cart items
+    updateQuantity(
+      state, 
+      action: PayloadAction<
+        | number // For direct purchase - just pass quantity
+        | { productId: string; variantId: string; quantity: number } // For cart items
+      >
+    ) {
       if (state.type === "direct_purchase" && state.items.length === 1) {
-        state.items[0].quantity = Math.max(1, action.payload);
+        // ✅ Direct purchase - payload is just a number
+        if (typeof action.payload === "number") {
+          state.items[0].quantity = Math.max(1, action.payload);
+        }
+      } else if (state.type === "cart_purchase" && typeof action.payload === "object") {
+        // ✅ Cart purchase - payload is an object with productId, variantId, quantity
+        const { productId, variantId, quantity } = action.payload;
+        const itemIndex = state.items.findIndex(
+          item => item.productId === productId && item.variantId === variantId
+        );
+        
+        if (itemIndex !== -1) {
+          state.items[itemIndex].quantity = Math.max(1, quantity);
+        }
+      }
+      
+      state.verification.status = "pending";
+    },
+
+    // ✅ NEW: Specific cart item quantity update (for backward compatibility)
+    updateItemQuantity(
+      state, 
+      action: PayloadAction<{ productId: string; variantId: string; quantity: number }>
+    ) {
+      const itemIndex = state.items.findIndex(
+        item => item.productId === action.payload.productId && 
+                item.variantId === action.payload.variantId
+      );
+      
+      if (itemIndex !== -1) {
+        state.items[itemIndex].quantity = Math.max(1, action.payload.quantity);
+        state.verification.status = "pending";
+      }
+    },
+
+    // ✅ NEW: Sync entire cart with fresh data from Cart API
+    syncCartItems(
+      state,
+      action: PayloadAction<{
+        productId: string;
+        variantId: string;
+        quantity: number;
+      }[]>
+    ) {
+      if (state.type === "cart_purchase") {
+        state.items = action.payload;
         state.verification.status = "pending";
       }
     },
@@ -104,12 +155,11 @@ const checkoutSlice = createSlice({
       state.selectedAddress = action.payload;
     },
 
-    // ✅ Enhanced payment method with ADVANCE
     setPaymentMethod(state, action: PayloadAction<"COD" | "RAZORPAY" | "ADVANCE" | null>) {
       state.paymentMethod = action.payload;
     },
 
-    // ✅ New action to update fees
+    // ✅ SECURE: No fallbacks - only update with backend values
     updateFees(
       state,
       action: PayloadAction<{
@@ -121,18 +171,47 @@ const checkoutSlice = createSlice({
         totalAmount?: number;
       }>
     ) {
-      state.fees = { ...state.fees, ...action.payload };
+      // ✅ Only update if backend provides values
+      if (action.payload.packagingFee !== undefined) {
+        state.fees.packagingFee = action.payload.packagingFee;
+      }
+      if (action.payload.deliveryCharge !== undefined) {
+        state.fees.deliveryCharge = action.payload.deliveryCharge;
+      }
+      if (action.payload.codHandlingFee !== undefined) {
+        state.fees.codHandlingFee = action.payload.codHandlingFee;
+      }
+      if (action.payload.advanceAmount !== undefined) {
+        state.fees.advanceAmount = action.payload.advanceAmount;
+      }
+      if (action.payload.remainingAmount !== undefined) {
+        state.fees.remainingAmount = action.payload.remainingAmount;
+      }
+      if (action.payload.totalAmount !== undefined) {
+        state.fees.totalAmount = action.payload.totalAmount;
+      }
     },
 
-    // ✅ Set advance eligibility
+    // ✅ SECURE: Backend calculates all advance values
     setAdvanceEligibility(
       state,
-      action: PayloadAction<{ eligible: boolean; orderValue: number }>
+      action: PayloadAction<{ 
+        eligible: boolean; 
+        orderValue: number;
+        percentage?: number;
+        advanceAmount?: number;
+        remainingAmount?: number;
+      }>
     ) {
       state.isAdvanceEligible = action.payload.eligible;
+      
       if (action.payload.eligible) {
-        state.fees.advanceAmount = Math.round(action.payload.orderValue * 0.1);
-        state.fees.remainingAmount = action.payload.orderValue - state.fees.advanceAmount;
+        if (action.payload.advanceAmount !== undefined) {
+          state.fees.advanceAmount = action.payload.advanceAmount;
+        }
+        if (action.payload.remainingAmount !== undefined) {
+          state.fees.remainingAmount = action.payload.remainingAmount;
+        }
       }
     },
 
@@ -161,7 +240,9 @@ const checkoutSlice = createSlice({
 export const {
   setDirectPurchase,
   setCartPurchase,
-  updateQuantity,
+  updateQuantity, // ✅ Universal quantity update
+  updateItemQuantity, // ✅ Specific cart item update
+  syncCartItems, // ✅ NEW: Sync with external cart data
   setSelectedAddress,
   setPaymentMethod,
   updateFees,

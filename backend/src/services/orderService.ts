@@ -138,7 +138,6 @@ class OrderService {
       );
     }
 
-    // ✅ USE SHARED UTILITY - Same logic as controller
     const charges = DeliveryCalculator.calculateCharges(
       deliveryInfo,
       weight,
@@ -150,7 +149,7 @@ class OrderService {
       estimatedDays: deliveryInfo.deliveryDays,
       courierPartner: deliveryInfo.courierPartner,
       codAvailable: deliveryInfo.codAvailable,
-      ...charges, // Spread calculated charges
+      ...charges,
     };
   }
 
@@ -675,41 +674,119 @@ class OrderService {
   /**
    * ✅ SIMPLE: Only pricing calculation for frontend display
    */
-async calculateDisplayPricing(
-  items: { productId: string; quantity: number; variantId?: string }[],
-  pincode: string
-) {
-  // Validate pincode format
-  if (!pincode || !/^\d{6}$/.test(pincode)) {
-    throw new AppError("Valid 6-digit pincode is required", 400);
+  async calculateDisplayPricing(
+    items: { productId: string; quantity: number; variantId?: string }[],
+    pincode: string
+  ) {
+    // Validate pincode format
+    if (!pincode || !/^\d{6}$/.test(pincode)) {
+      throw new AppError("Valid 6-digit pincode is required", 400);
+    }
+
+    if (!items || items.length === 0) {
+      throw new AppError("No items provided for pricing calculation", 400);
+    }
+
+    let subtotal = 0;
+
+    for (const item of items) {
+      const product = await Product.findById(item.productId);
+      if (!product) {
+        throw new AppError(`Product not found: ${item.productId}`, 404);
+      }
+
+      let selectedVariant;
+      if (item.variantId) {
+        selectedVariant = product.variants.find(
+          (v: IVariant) => v._id?.toString() === item.variantId
+        );
+      } else {
+        selectedVariant = product.variants[0];
+      }
+
+      if (!selectedVariant) {
+        throw new AppError(
+          `Variant not found for product: ${product.name}`,
+          404
+        );
+      }
+
+      const finalPrice =
+        selectedVariant.hasDiscount && selectedVariant.discountedPrice > 0
+          ? selectedVariant.discountedPrice
+          : selectedVariant.price;
+
+      subtotal += finalPrice * item.quantity;
+    }
+
+    const fixedWeight = 1;
+    let deliveryCharges;
+    let isServiceable = true;
+    let deliveryMessage = "";
+
+    try {
+      deliveryCharges = await this.calculateDeliveryCharges(
+        pincode,
+        fixedWeight,
+        subtotal
+      );
+    } catch (error) {
+      console.log(
+        `⚠️ Delivery unavailable for pincode ${pincode}:`,
+      );
+
+      // ✅ Use isServiceable to match your delivery types
+      isServiceable = false;
+      deliveryCharges = {
+        finalCharge: 0,
+        codAvailable: false,
+        zone: "Not Available",
+        estimatedDays: 0,
+        courierPartner: "Not Available",
+      };
+    }
+
+    const packagingFee = 29;
+    const deliveryCharge = isServiceable ? deliveryCharges.finalCharge : 0;
+    const codHandlingFee = 99;
+    const isAdvanceEligible = isServiceable && subtotal >= 15000;
+
+    let advanceAmount = 0;
+    let remainingAmount = 0;
+
+    if (isAdvanceEligible) {
+      advanceAmount = Math.round(subtotal * 0.1);
+      remainingAmount = subtotal - advanceAmount;
+    }
+
+    const result = {
+      subtotal,
+      packagingFee,
+      deliveryCharge,
+      codHandlingFee,
+      checkoutTotal: subtotal + packagingFee + deliveryCharge,
+      codTotal: subtotal + packagingFee + deliveryCharge + codHandlingFee,
+
+      // ✅ Use isServiceable to match your delivery system
+      isServiceable: isServiceable,
+
+      advanceEligible: isAdvanceEligible,
+      advanceAmount,
+      remainingAmount,
+      advancePercentage: isAdvanceEligible ? 10 : 0,
+
+      deliveryInfo: {
+        codAvailable: isServiceable ? deliveryCharges.codAvailable : false,
+        zone: deliveryCharges.zone,
+        estimatedDays: deliveryCharges.estimatedDays,
+        courierPartner: deliveryCharges.courierPartner || "Not Available",
+        isServiceable: isServiceable, // ✅ Add isServiceable here too
+        message: isServiceable ? "Delivery available" : deliveryMessage,
+      },
+    };
+
+    return result;
   }
-
-  let subtotal = 0;
-  let totalWeight = 0;
-
-  // Calculate items (same logic as before)...
-
-  // Calculate delivery charges using pincode only
-  const deliveryCharges = await this.calculateDeliveryCharges(
-    pincode,    // Just pincode - sufficient!
-    totalWeight,
-    subtotal
-  );
-
-  return {
-    subtotal,
-    packagingFee: 29,
-    deliveryCharge: deliveryCharges.finalCharge,
-    checkoutTotal: subtotal + 29 + deliveryCharges.finalCharge,
-    codTotal: subtotal + 29 + deliveryCharges.finalCharge + 99,
-    deliveryInfo: {
-      codAvailable: deliveryCharges.codAvailable,
-      zone: deliveryCharges.zone,
-      estimatedDays: deliveryCharges.estimatedDays,
-    },
-  };
-}
-
 }
 
 export default OrderService;

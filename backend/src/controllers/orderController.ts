@@ -124,15 +124,39 @@ export const getCheckoutPricing = catchAsync(
       throw new AppError("Pincode required", 400);
     }
 
-    const pricingData = await orderService.calculateDisplayPricing(
-      items,
-      pincode
-    );
-
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(200, pricingData, "Pricing calculated successfully")
+    // ✅ यहाँ try-catch add किया है extra safety के लिए
+    try {
+      const pricingData = await orderService.calculateDisplayPricing(
+        items,
+        pincode
       );
+
+      // ✅ हमेशा success response return करेंगे - crash नहीं होगा
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            pricingData,
+            pricingData.isServiceable
+              ? "Pricing calculated successfully"
+              : "Pricing calculated. Delivery not available for this pincode"
+          )
+        );
+    } catch (error: any) {
+      console.error("Pricing calculation error:", error.message);
+
+      // ✅ अगर कोई error आए तो proper response भेजेंगे
+      if (error instanceof AppError) {
+        return res
+          .status(error.statusCode)
+          .json(new ApiResponse(error.statusCode, null, error.message));
+      }
+
+      // Unexpected errors के लिए
+      return res
+        .status(500)
+        .json(new ApiResponse(500, null, "Internal server error"));
+    }
   }
 );

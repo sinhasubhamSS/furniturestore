@@ -11,12 +11,16 @@ export interface DeliveryInfo {
   zone: string;
   estimatedDays: number;
   deliveryCharge: number;
+  originalCharge?: number;
+  discount?: number;
   courierPartner: string;
   trackingId?: string;
   totalWeight?: number;
   pincode?: string;
   city?: string;
-  codAvailable: boolean; // ✅ Added
+  codAvailable: boolean;
+  isServiceable: boolean; // ✅ Use your existing property name
+  message?: string;
 }
 
 export interface PaymentInfo {
@@ -79,8 +83,12 @@ export interface CheckoutPricingResponse extends FeeBreakdown {
   checkoutTotal: number;
   deliveryInfo: DeliveryInfo | null;
   hasDeliveryCharges: boolean;
-  advanceEligible: boolean; // ✅ FIXED: Added missing property
-  advanceAmount: number;    // ✅ FIXED: Added missing property
+  advanceEligible: boolean;
+  advanceAmount: number;
+  advancePercentage: number;
+
+  // ✅ Use isServiceable instead of deliveryAvailable to match backend
+  isServiceable: boolean;
 }
 
 export interface VerifyAmountResponse extends FeeBreakdown {
@@ -102,7 +110,7 @@ export interface Order {
   paymentStatus: PaymentStatus;
   status: OrderStatus;
   totalAmount: number;
-  
+
   packagingFee?: number;
   codHandlingFee?: number;
   isAdvancePayment?: boolean;
@@ -130,7 +138,7 @@ export interface RazorpayOrderResponse {
   orderId: string;
   amount: number;
   currency: string;
-  
+
   id?: string;
   entity?: string;
   amount_paid?: number;
