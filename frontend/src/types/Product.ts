@@ -3,7 +3,6 @@ export type Variant = {
   _id?: string;
   color: string;
   size: string;
-  basePrice: number;
   gstRate: number;
   stock: number;
   images: {
@@ -34,7 +33,7 @@ export type BaseProduct = {
   isPublished: boolean;
   warranty?: string;
   disclaimer?: string;
-
+ slug: string;
   // ✅ Pricing fields (existing)
   price?: number; // Lowest original price
 

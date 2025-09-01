@@ -18,6 +18,7 @@ export type CartItem = {
   size: string;
   stock: number;
   weight: number;
+  title: string;
 };
 
 export type CartResponse = {

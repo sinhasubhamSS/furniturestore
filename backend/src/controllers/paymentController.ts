@@ -77,43 +77,57 @@ export const verifyPayment = catchAsync(
       );
   }
 );
+//implement later when high traffic comes display price from frontend and then verify by this okay
+// export const verifyPaymentAmount = catchAsync(
+//   async (req: Request, res: Response) => {
+//     const { items, expectedTotal, payment, pincode } = req.body;
 
-export const verifyPaymentAmount = catchAsync(
-  async (req: Request, res: Response) => {
-    const { items, expectedTotal } = req.body;
+//     console.log("📥 Verifying payment amount:", {
+//       itemsCount: items?.length,
+//       expectedTotal,
+//       paymentMethod: payment?.method,
+//       isAdvance: payment?.isAdvance,
+//       pincode,
+//     });
 
-    console.log("📥 Verifying payment amount:", {
-      itemsCount: items?.length,
-      expectedTotal,
-    });
+//     // Validation
+//     if (!items || !Array.isArray(items) || items.length === 0) {
+//       throw new AppError("Items array is required", 400);
+//     }
 
-    // Simple validation
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      throw new AppError("Items array is required", 400);
-    }
+//     if (!expectedTotal || typeof expectedTotal !== "number") {
+//       throw new AppError("Expected total amount is required", 400);
+//     }
 
-    if (!expectedTotal || typeof expectedTotal !== "number") {
-      throw new AppError("Expected total amount is required", 400);
-    }
+//     if (!payment || !payment.method) {
+//       throw new AppError("Payment method is required", 400);
+//     }
 
-    const verificationResult = await paymentService.verifyPaymentAmount(
-      items,
-      expectedTotal
-    );
+//     if (!pincode) {
+//       throw new AppError("Pincode is required", 400);
+//     }
 
-    console.log(
-      "✅ Payment amount verified:",
-      verificationResult.calculatedTotal
-    );
+//     // ✅ FIXED: Call with all 4 required parameters
+//     const verificationResult = await paymentService.verifyPaymentAmount(
+//       items, // Parameter 1
+//       expectedTotal, // Parameter 2
+//       payment, // Parameter 3 ✅ Added
+//       pincode // Parameter 4 ✅ Added
+//     );
 
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          verificationResult,
-          "Payment amount verified successfully"
-        )
-      );
-  }
-);
+//     console.log(
+//       "✅ Payment amount verified:",
+//       verificationResult.calculatedTotal
+//     );
+
+//     return res
+//       .status(200)
+//       .json(
+//         new ApiResponse(
+//           200,
+//           verificationResult,
+//           "Payment amount verified successfully"
+//         )
+//       );
+//   }
+// );

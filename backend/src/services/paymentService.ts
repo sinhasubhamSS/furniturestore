@@ -3,8 +3,10 @@ import crypto from "crypto";
 import { AppError } from "../utils/AppError";
 import Product, { IVariant } from "../models/product.models";
 import { PlaceOrderItem, PlaceOrderPayment } from "../types/orderservicetypes";
+// import OrderService from "./orderService";
 
 class PaymentService {
+  // private orderService = new OrderService();
   async createOrder(amountInRupees: number) {
     if (!amountInRupees || amountInRupees <= 0) {
       throw new AppError("Amount must be greater than 0", 400);
@@ -55,76 +57,102 @@ class PaymentService {
   }
 
   // ✅ SIMPLE - Only verify payment amount, no address needed
-  async verifyPaymentAmount(items: PlaceOrderItem[], expectedTotal: number) {
-    // Step 1: Verify items and calculate amount
-    if (!items || items.length === 0) {
-      throw new AppError("No items provided for verification", 400);
-    }
+// async verifyPaymentAmount(
+//   items: { productId: string; quantity: number; variantId?: string }[],
+//   expectedTotal: number,
+//   payment: PlaceOrderPayment,
+//   pincode: string
+// ) {
+//   // Step 1: Validate inputs
+//   if (!items || items.length === 0) {
+//     throw new AppError("No items provided for verification", 400);
+//   }
 
-    let calculatedTotal = 0;
+//   if (!pincode || !/^\d{6}$/.test(pincode)) {
+//     throw new AppError("Valid 6-digit pincode is required", 400);
+//   }
 
-    for (const item of items) {
-      if (!item.productId || item.quantity <= 0) {
-        throw new AppError("Invalid item data", 400);
-      }
+//   // ✅ SIMPLE FIX: Use existing calculateDisplayPricing method directly
+//   const pricing = await this.orderService.calculateDisplayPricing(items, pincode);
 
-      const product = await Product.findById(item.productId);
-      if (!product) {
-        throw new AppError(`Product not found: ${item.productId}`, 404);
-      }
+//   // ✅ FIXED: Calculate total based on payment method
+//   let calculatedTotal = 0;
+//   let paymentTypeDesc = "";
 
-      // Handle optional variantId
-      let selectedVariant;
-      if (item.variantId) {
-        selectedVariant = product.variants.find(
-          (v: IVariant) => v._id?.toString() === item.variantId
-        );
-      } else {
-        selectedVariant = product.variants[0];
-      }
+//   switch (payment.method) {
+//     case "RAZORPAY":
+//       if (payment.isAdvance) {
+//         // Advance payment: advance amount + packaging + delivery
+//         calculatedTotal = pricing.advanceAmount + pricing.packagingFee + pricing.deliveryCharge;
+//         paymentTypeDesc = "Advance Payment (10%)";
+//       } else {
+//         // Full online payment: subtotal + packaging + delivery
+//         calculatedTotal = pricing.checkoutTotal;
+//         paymentTypeDesc = "Online Full Payment";
+//       }
+//       break;
 
-      if (!selectedVariant) {
-        throw new AppError(
-          `Variant not found for product: ${product.name}`,
-          404
-        );
-      }
+//     case "COD":
+//       // COD: subtotal + packaging + delivery + COD fee
+//       calculatedTotal = pricing.codTotal;
+//       paymentTypeDesc = "Cash on Delivery";
+//       break;
 
-      // Stock validation
-      const availableStock =
-        selectedVariant.stock - (selectedVariant.reservedStock || 0);
-      if (availableStock < item.quantity) {
-        throw new AppError(
-          `Insufficient stock for ${product.name}. Available: ${availableStock}`,
-          400
-        );
-      }
+//     default:
+//       throw new AppError("Invalid payment method", 400);
+//   }
 
-      // Price calculation
-      const actualPrice =
-        selectedVariant.hasDiscount && selectedVariant.discountedPrice > 0
-          ? selectedVariant.discountedPrice
-          : selectedVariant.price;
+//   // ✅ FIXED: Payment method constraints
+//   if (payment.method === "COD" && !pricing.deliveryInfo.codAvailable) {
+//     throw new AppError(
+//       "COD is not available for this delivery location",
+//       400
+//     );
+//   }
 
-      calculatedTotal += actualPrice * item.quantity;
-    }
+//   if (payment.isAdvance && payment.method === "COD") {
+//     throw new AppError(
+//       "Advance payment cannot be COD. Please use online payment.",
+//       400
+//     );
+//   }
 
-    // Step 2: Verify against expected amount
-    const verified = Math.abs(calculatedTotal - expectedTotal) <= 0.01;
+//   if (payment.isAdvance && !pricing.advanceEligible) {
+//     throw new AppError(
+//       "Advance payment requires minimum order of ₹15,000",
+//       400
+//     );
+//   }
 
-    if (!verified) {
-      throw new AppError(
-        `Amount mismatch. Expected: ₹${expectedTotal}, Calculated: ₹${calculatedTotal}`,
-        400
-      );
-    }
+//   // ✅ FIXED: Verify against expected amount
+//   const tolerance = 0.01;
+//   const verified = Math.abs(calculatedTotal - expectedTotal) <= tolerance;
 
-    return {
-      verified: true,
-      calculatedTotal,
-      itemsVerified: items.length,
-    };
-  }
+//   if (!verified) {
+//     throw new AppError(
+//       `${paymentTypeDesc} amount mismatch. Expected: ₹${expectedTotal.toFixed(2)}, Calculated: ₹${calculatedTotal.toFixed(2)}`,
+//       400
+//     );
+//   }
+
+//   return {
+//     verified: true,
+//     calculatedTotal,
+//     calculatedSubtotal: pricing.subtotal,
+//     itemsVerified: items.length,
+//     paymentMethod: payment.method,
+//     isAdvance: payment.isAdvance || false,
+//     breakdown: {
+//       subtotal: pricing.subtotal,
+//       packagingFee: pricing.packagingFee,
+//       deliveryCharge: pricing.deliveryCharge,
+//       codHandlingFee: pricing.codHandlingFee,
+//       advanceAmount: pricing.advanceAmount,
+//       remainingAmount: pricing.remainingAmount,
+//     }
+//   };
+// }
+
 }
 
 export const paymentService = new PaymentService();
