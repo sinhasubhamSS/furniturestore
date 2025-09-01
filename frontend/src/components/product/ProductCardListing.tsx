@@ -1,33 +1,47 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, memo, useMemo } from "react";
 import { DisplayProduct } from "@/types/Product";
 import { useAddToCartMutation } from "@/redux/services/user/cartApi";
-import { useAddToWishlistMutation } from "@/redux/services/user/wishlistApi";
+import { useWishlistManager } from "@/hooks/useWishlistManger";
 import Button from "../ui/Button";
+import { FaHeart, FaRegHeart } from "react-icons/fa";
 
 interface ProductCardListingProps {
   product: DisplayProduct;
 }
 
-const ProductCardListing = ({ product }: ProductCardListingProps) => {
+const ProductCardListing = memo(({ product }: ProductCardListingProps) => {
   const [activeVariant, setActiveVariant] = useState(product.variants[0]);
   const [addToCart] = useAddToCartMutation();
-  const [addToWishlist] = useAddToWishlistMutation();
+
+  const {
+    isInWishlist,
+    addToWishlist,
+    removeFromWishlist,
+    isProductLoading, // ✅ Use per-product loading
+  } = useWishlistManager();
+
+  const isProductInWishlist = useMemo(
+    () => isInWishlist(product._id),
+    [isInWishlist, product._id]
+  );
+
+  // ✅ Check loading for this specific product
+  const isLoading = useMemo(
+    () => isProductLoading(product._id),
+    [isProductLoading, product._id]
+  );
 
   const uniqueColors = [...new Set(product.variants.map((v) => v.color))];
   const getVariantByColor = (color: string) =>
     product.variants.find((v) => v.color === color);
 
-  // ✅ No Redux dispatch - pure local state
   const handleColorSelect = (e: React.MouseEvent, color: string) => {
     e.preventDefault();
     e.stopPropagation();
-
     const variant = getVariantByColor(color);
-    if (variant) {
-      setActiveVariant(variant); // ✅ Only local state
-    }
+    if (variant) setActiveVariant(variant);
   };
 
   const handleAddToCart = async (e: React.MouseEvent) => {
@@ -39,10 +53,10 @@ const ProductCardListing = ({ product }: ProductCardListingProps) => {
         productId: product._id,
         variantId: activeVariant._id!,
         quantity: 1,
-      });
+      }).unwrap();
       console.log("✅ Added to cart:", product.name);
     } catch (error) {
-      console.error("Add to cart failed:", error);
+      console.error("❌ Add to cart failed:", error);
     }
   };
 
@@ -51,26 +65,29 @@ const ProductCardListing = ({ product }: ProductCardListingProps) => {
     e.stopPropagation();
 
     try {
-      await addToWishlist({ productId: product._id });
-      console.log("✅ Added to wishlist:", product.name);
+      if (isProductInWishlist) {
+        await removeFromWishlist(product._id);
+        console.log("✅ Removed from wishlist:", product.name);
+      } else {
+        await addToWishlist(product._id);
+        console.log("✅ Added to wishlist:", product.name);
+      }
     } catch (error) {
-      console.error("Add to wishlist failed:", error);
+      console.error("❌ Wishlist action failed:", error);
     }
   };
 
-  // ✅ Calculate price locally (no ProductPrice component)
   const displayPrice = activeVariant.hasDiscount
     ? activeVariant.discountedPrice
     : activeVariant.price;
 
-  const savings = activeVariant.hasDiscount 
+  const savings = activeVariant.hasDiscount
     ? (activeVariant.price || 0) - (activeVariant.discountedPrice || 0)
     : 0;
 
   return (
     <div className="w-full bg-white border-b border-gray-200 hover:shadow-md transition-shadow duration-200">
       <div className="flex items-center p-6 min-h-[200px]">
-        
         {/* Left: Product Image */}
         <div className="flex-shrink-0 w-44 h-44 mr-8 relative bg-gray-50 rounded-lg overflow-hidden border border-gray-100">
           <img
@@ -86,20 +103,29 @@ const ProductCardListing = ({ product }: ProductCardListingProps) => {
             </div>
           )}
 
-          {/* Wishlist Button */}
+          {/* ✅ Wishlist Button - Only this product's loading affects it */}
           <button
             onClick={handleWishlist}
-            className="absolute top-2 right-2 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-red-50 transition-colors z-10 border border-gray-200"
+            disabled={isLoading} // ✅ Per-product loading state
+            className={`absolute top-2 right-2 w-9 h-9 rounded-full shadow-md flex items-center justify-center transition-all duration-200 z-10 border border-gray-200 ${
+              isLoading
+                ? "opacity-50 cursor-not-allowed"
+                : "cursor-pointer hover:scale-110"
+            }`}
           >
-            ❤️
+            {isLoading ? (
+              <div className="animate-spin w-4 h-4 border border-current border-t-transparent rounded-full"></div>
+            ) : isProductInWishlist ? (
+              <FaHeart className="text-red-500 text-lg" />
+            ) : (
+              <FaRegHeart className="text-gray-500 text-lg hover:text-red-500" />
+            )}
           </button>
         </div>
 
-        {/* Right: Product Details */}
+        {/* Right: Product Details - Same as before */}
         <div className="flex-1 min-w-0">
-          {/* Product Info Section */}
           <div className="mb-6">
-            {/* Product Name & Category */}
             <div className="mb-3">
               <h2 className="text-2xl font-semibold text-gray-900 line-clamp-2 leading-tight mb-2">
                 {product.name}
@@ -109,16 +135,13 @@ const ProductCardListing = ({ product }: ProductCardListingProps) => {
               </p>
             </div>
 
-            {/* Description */}
             {product.description && (
               <p className="text-gray-600 line-clamp-2 mb-4 leading-relaxed">
                 {product.description}
               </p>
             )}
 
-            {/* Variant Information Row */}
             <div className="flex items-center gap-8 mb-4">
-              {/* Color Swatches */}
               {uniqueColors.length > 1 && (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-700 font-medium">
@@ -143,16 +166,10 @@ const ProductCardListing = ({ product }: ProductCardListingProps) => {
                         />
                       );
                     })}
-                    {uniqueColors.length > 5 && (
-                      <span className="text-xs text-gray-500 self-center ml-2">
-                        +{uniqueColors.length - 5} more
-                      </span>
-                    )}
                   </div>
                 </div>
               )}
 
-              {/* Size */}
               {activeVariant.size && (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-700 font-medium">
@@ -164,7 +181,6 @@ const ProductCardListing = ({ product }: ProductCardListingProps) => {
                 </div>
               )}
 
-              {/* Stock Status */}
               <div className="flex items-center gap-2">
                 <span
                   className={`w-2 h-2 rounded-full ${
@@ -186,12 +202,8 @@ const ProductCardListing = ({ product }: ProductCardListingProps) => {
             </div>
           </div>
 
-          {/* Bottom Section: Price & Actions */}
           <div className="flex items-center justify-between">
-            
-            {/* ✅ Left: Direct Price Display (No Redux) */}
             <div className="flex flex-col">
-              {/* Price Section */}
               <div className="flex items-center gap-4 mb-2">
                 <span className="text-3xl font-bold text-gray-900">
                   ₹{displayPrice?.toFixed(2) || "0.00"}
@@ -209,7 +221,6 @@ const ProductCardListing = ({ product }: ProductCardListingProps) => {
                 )}
               </div>
 
-              {/* Warranty Info */}
               {product.warranty && (
                 <div className="mt-2">
                   <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-md font-medium inline-flex items-center gap-1">
@@ -219,7 +230,6 @@ const ProductCardListing = ({ product }: ProductCardListingProps) => {
               )}
             </div>
 
-            {/* Right: Action Button */}
             <div>
               <Button
                 onClick={handleAddToCart}
@@ -234,6 +244,7 @@ const ProductCardListing = ({ product }: ProductCardListingProps) => {
       </div>
     </div>
   );
-};
+});
 
+ProductCardListing.displayName = "ProductCardListing";
 export default ProductCardListing;

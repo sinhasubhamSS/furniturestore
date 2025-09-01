@@ -22,7 +22,7 @@ const WishlistItem = ({ product, onRemove, onAddToCart }: Props) => {
 
   const displayPrice = firstVariant.hasDiscount 
     ? firstVariant.discountedPrice 
-    : firstVariant.basePrice;
+    : firstVariant.price;
 
   return (
     <div className="flex flex-col sm:flex-row gap-6 bg-white p-6 rounded-xl shadow-md border border-gray-200">
@@ -70,7 +70,7 @@ const WishlistItem = ({ product, onRemove, onAddToCart }: Props) => {
             {firstVariant.hasDiscount && (
               <>
                 <span className="text-sm text-gray-500 line-through">
-                  ₹{firstVariant.basePrice?.toFixed(2)}
+                  ₹{firstVariant.price?.toFixed(2)}
                 </span>
                 <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
                   {firstVariant.discountPercent}% OFF

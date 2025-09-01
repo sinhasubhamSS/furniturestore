@@ -1,27 +1,27 @@
 "use client";
 
 import WishlistItem from "@/components/wishlist/wishlishtComponent";
-import {
-  useGetWishlistWithProductsQuery,
-  useRemoveFromWishlistMutation,
-} from "@/redux/services/user/wishlistApi";
+import { useGetWishlistWithProductsQuery } from "@/redux/services/user/wishlistApi";
 import { useAddToCartMutation } from "@/redux/services/user/cartApi";
+import { useWishlistManager } from "@/hooks/useWishlistManger"; // ✅ Add custom hook
 import { DisplayProduct } from "@/types/Product";
 
 const WishlistPage = () => {
-  const { data: wishlistProducts = [], isLoading, isError } =
-    useGetWishlistWithProductsQuery();
-
-  const [removeFromWishlist, { isLoading: isRemoving }] =
-    useRemoveFromWishlistMutation();
+  const {
+    data: wishlistProducts = [],
+    isLoading,
+    isError,
+  } = useGetWishlistWithProductsQuery();
   const [addToCart, { isLoading: isAdding }] = useAddToCartMutation();
 
+  // ✅ Use Redux-powered wishlist manager
+  const {
+    removeFromWishlist,
+    count,
+  } = useWishlistManager();
+
   const handleRemove = async (productId: string) => {
-    try {
-      await removeFromWishlist({ productId }).unwrap();
-    } catch (error) {
-      console.error("❌ Failed to remove from wishlist:", error);
-    }
+    await removeFromWishlist(productId); // ✅ Now uses Redux with optimistic updates
   };
 
   const handleAddToCart = async (product: DisplayProduct) => {
@@ -35,7 +35,7 @@ const WishlistPage = () => {
       await addToCart({
         productId: product._id,
         variantId: firstVariant._id,
-        quantity: 1
+        quantity: 1,
       }).unwrap();
 
       console.log("✅ Added to cart:", product.name);
@@ -52,7 +52,7 @@ const WishlistPage = () => {
       </div>
     );
   }
-  
+
   if (isError) {
     return (
       <div className="text-center mt-10">
@@ -61,24 +61,31 @@ const WishlistPage = () => {
       </div>
     );
   }
-    
+
   if (!wishlistProducts.length) {
     return (
       <div className="text-center mt-16">
         <div className="text-6xl mb-6">💝</div>
         <h2 className="text-3xl font-bold mb-4">Your wishlist is empty</h2>
-        <p className="text-gray-600 mb-6">Add some products to your wishlist!</p>
+        <p className="text-gray-600 mb-6">
+          Add some products to your wishlist!
+        </p>
       </div>
     );
   }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">My Wishlist</h1>
-      <p className="text-gray-600 mb-6">{wishlistProducts.length} items saved</p>
+      <div className="flex items-center gap-3 mb-6">
+        <h1 className="text-3xl font-bold">My Wishlist</h1>
+        {/* ✅ Real-time count from Redux */}
+        <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+          {count} items
+        </span>
+      </div>
 
       <div className="space-y-6">
-        {wishlistProducts.map((product: DisplayProduct) => ( // ✅ Explicit typing
+        {wishlistProducts.map((product: DisplayProduct) => (
           <WishlistItem
             key={product._id}
             product={product}
