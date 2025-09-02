@@ -58,26 +58,40 @@ export const getAllProductsAdmin = catchAsync(
 
 export const getAllProducts = catchAsync(
   async (req: AuthRequest, res: Response) => {
-    console.log("📥 Request query:", req.query); // Debug log
+    console.log("📥 Request query:", req.query);
 
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
     const isAdmin = req.user?.role === "admin";
 
-    // ✅ Build filter object from query parameters
+    // ✅ Extract sort parameters from frontend
+    const sortBy = req.query.sortBy?.toString() || "latest";
+
+    console.log("🔄 Controller received sortBy:", sortBy);
+
+    // Build filter object from query parameters
     const filter: any = {};
 
     if (req.query.category) {
-      filter.category = req.query.category; // This is the category slug
+      filter.category = req.query.category;
     }
 
     console.log("🔍 Processed filter:", filter);
 
     const products = await productService.getAllProducts(
-      filter, // ✅ Pass filter object
+      filter,
       page,
       limit,
-      isAdmin
+      isAdmin,
+      false,
+      sortBy // ✅ Pass sort parameter to service
+    );
+
+    console.log(
+      "✅ Products fetched with sort:",
+      sortBy,
+      "Count:",
+      products.products.length
     );
 
     res

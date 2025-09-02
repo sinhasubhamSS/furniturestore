@@ -7,7 +7,7 @@ import { useGetPublishedProductsQuery } from "@/redux/services/user/publicProduc
 import { useGetCategoriesQuery } from "@/redux/services/admin/adminCategoryapi";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
+import SortDropdown from "@/components/filter/SortDropdown";
 
 const ProductsPage = () => {
   const searchParams = useSearchParams();
@@ -15,6 +15,7 @@ const ProductsPage = () => {
   const pathname = usePathname();
 
   const categoryFromUrl = searchParams.get("category") || "";
+  const sortFromUrl = searchParams.get("sortBy") || "latest";
   const [page, setPage] = useState(1);
   const [searchText, setSearchText] = useState("");
 
@@ -26,10 +27,12 @@ const ProductsPage = () => {
     return filters;
   }, [categoryFromUrl]);
 
+  // ✅ Updated API call with sortBy
   const { data, isLoading, isError } = useGetPublishedProductsQuery({
     page,
     limit: 12,
     filter: apiFilters,
+    sortBy: sortFromUrl as "latest" | "price_low" | "price_high" | "discount",
   });
 
   const { data: categories } = useGetCategoriesQuery();
@@ -68,6 +71,12 @@ const ProductsPage = () => {
     router.replace(`${pathname}${query}`, { scroll: false });
   };
 
+  // ✅ Sort change handler
+  const handleSortChange = (sortValue: string) => {
+    updateURL({ sortBy: sortValue });
+    setPage(1); // Reset to first page when sorting changes
+  };
+
   const clearCategoryFilter = () => {
     updateURL({ category: null });
     setPage(1);
@@ -104,16 +113,27 @@ const ProductsPage = () => {
   }
 
   return (
-    <div className="min-h-screen  bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-full mx-auto px-4 py-8">
-        {/* ✅ Minimal Header - Just Title and Search */}
-      
-          <div className="mb-5">
+        {/* ✅ Header with Title and Sort */}
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
             <h1 className="text-xl text-gray-800 font-medium">
               Showing results for {selectedCategoryName || "All Products"}
             </h1>
+            <p className="text-sm text-gray-600 mt-1">
+              {data?.totalItems || 0} products found
+            </p>
           </div>
- 
+
+          {/* ✅ Sort Dropdown */}
+          <SortDropdown
+            currentSort={sortFromUrl}
+            onSortChange={handleSortChange}
+            className="self-start sm:self-center"
+          />
+        </div>
+
         {/* ✅ Product List */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           {filteredProducts.length > 0 ? (
@@ -158,7 +178,7 @@ const ProductsPage = () => {
           )}
         </div>
 
-        {/* ✅ Pagination - Only when needed */}
+        {/* ✅ Pagination */}
         {(data?.totalPages || 1) > 1 && filteredProducts.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm p-6 mt-6">
             <div className="flex justify-center items-center gap-6">
@@ -187,16 +207,6 @@ const ProductsPage = () => {
           </div>
         )}
       </div>
-
-      <style jsx>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </div>
   );
 };

@@ -6,7 +6,7 @@ import { IProductInput } from "../types/productservicetype";
 import { AppError } from "../utils/AppError";
 import slugify from "slugify";
 import { generateSKU } from "../utils/genetateSku";
-
+import { SortByOptions } from "../types/productservicetype";
 class ProductService {
   // ==================== PRIVATE/UTILITY METHODS ====================
 
@@ -50,6 +50,30 @@ class ProductService {
     }
 
     return query;
+  }
+  // ==================== PRIVATE/UTILITY METHODS ==================== में add करें
+
+  private buildSortOptions(sortBy: string): { [key: string]: 1 | -1 } {
+    console.log("🛠️ Building sort options for:", sortBy);
+
+    switch (sortBy) {
+      case "price_low":
+        console.log("💰 Applying Price Low to High sort");
+        return { price: 1 }; // Lowest price first
+
+      case "price_high":
+        console.log("💰 Applying Price High to Low sort");
+        return { price: -1 }; // Highest price first
+
+      case "discount":
+        console.log("🔥 Applying Best Discount/Savings sort");
+        return { maxSavings: -1 }; // Highest savings first
+
+      case "latest":
+      default:
+        console.log("📅 Applying Latest first sort");
+        return { createdAt: -1 }; // Newest first
+    }
   }
 
   // ==================== ADMIN-ONLY METHODS ====================
@@ -140,72 +164,80 @@ class ProductService {
    * @param populateCreatedBy - Whether to populate creator info
    */
   // ProductService.js - Debug getAllProducts method
-  async getAllProducts(
-    filter: any = {},
-    page: number = 1,
-    limit: number = 10,
-    isAdmin: boolean = false,
-    populateCreatedBy: boolean = false
-  ) {
-    console.log("🔍 Received filter:", filter);
+ async getAllProducts(
+  filter: any = {},
+  page: number = 1,
+  limit: number = 10,
+  isAdmin: boolean = false,
+  populateCreatedBy: boolean = false,
+  sortBy: string = 'latest'  // ✅ NEW PARAMETER
+) {
+  console.log("🔄 Service received sort parameter:", sortBy);
+  console.log("🔍 Received filter:", filter);
 
-    const mongoFilter: any = {};
+  const mongoFilter: any = {};
 
-    // Handle category filter - convert slug to ObjectId
-    if (filter.category) {
-      console.log("🏷️ Finding category by slug:", filter.category);
+  // Handle category filter - convert slug to ObjectId
+  if (filter.category) {
+    console.log("🏷️ Finding category by slug:", filter.category);
 
-      const category = await Category.findOne({ slug: filter.category });
-      console.log("📋 Category found:", category);
+    const category = await Category.findOne({ slug: filter.category });
+    console.log("📋 Category found:", category);
 
-      if (category) {
-        mongoFilter.category = category._id;
-        console.log("✅ Using category ID:", category._id);
-      } else {
-        console.log("❌ Category not found, returning empty results");
-        return {
-          products: [],
-          page,
-          limit,
-          totalPages: 0,
-          totalItems: 0,
-        };
-      }
+    if (category) {
+      mongoFilter.category = category._id;
+      console.log("✅ Using category ID:", category._id);
+    } else {
+      console.log("❌ Category not found, returning empty results");
+      return {
+        products: [],
+        page,
+        limit,
+        totalPages: 0,
+        totalItems: 0,
+      };
     }
-
-    console.log("🔍 Final MongoDB filter:", mongoFilter);
-
-    // ✅ CRITICAL: Build the query first
-    const query = this.buildProductQuery(
-      mongoFilter,
-      isAdmin,
-      populateCreatedBy
-    ).sort({ createdAt: -1 });
-
-    // ✅ CRITICAL: Apply pagination to the query
-    const paginated = this.applyPagination(query, page, limit);
-
-    // ✅ Now execute the queries
-    const [products, total] = await Promise.all([
-      paginated.lean(), // ✅ Now 'paginated' is defined
-      Product.countDocuments(mongoFilter),
-    ]);
-
-    console.log(
-      "📊 Query results - Products found:",
-      products.length,
-      "Total:",
-      total
-    );
-
-    return {
-      products,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-      totalItems: total,
-    };
   }
+
+  console.log("🔍 Final MongoDB filter:", mongoFilter);
+
+  // ✅ NEW: Build dynamic sort options
+  const sortOptions = this.buildSortOptions(sortBy);
+  console.log("📊 Sort options applied:", sortOptions);
+
+  // ✅ CRITICAL: Build the query with dynamic sort
+  const query = this.buildProductQuery(
+    mongoFilter,
+    isAdmin,
+    populateCreatedBy
+  ).sort(sortOptions); // ✅ CHANGED: Dynamic sort instead of hardcoded
+
+  // ✅ CRITICAL: Apply pagination to the query
+  const paginated = this.applyPagination(query, page, limit);
+
+  // ✅ Now execute the queries
+  const [products, total] = await Promise.all([
+    paginated.lean(),
+    Product.countDocuments(mongoFilter),
+  ]);
+
+  console.log(
+    "📊 Query results - Products found:",
+    products.length,
+    "Total:",
+    total,
+    "Sorted by:", sortBy
+  );
+
+  return {
+    products,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+    totalItems: total,
+  };
+}
+
 
   /**
    * ✅ UNIFIED - Get single product by query
