@@ -48,7 +48,7 @@ const Footer: React.FC<FooterProps> = ({ className = "" }) => {
         <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <p className="text-sm">
-              &copy; 2025 Your Store Name. All rights reserved.
+              &copy; 2025 Suvidha Furniture. All rights reserved.
             </p>
             <div className="flex space-x-6 text-sm">
               <a

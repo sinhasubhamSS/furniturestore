@@ -5,8 +5,7 @@ const ContactInfo: React.FC = () => {
   const contactDetails: ContactInfoType = {
     phone: "+91 1800-123-4567",
     email: "support@yourstore.com",
-    address:
-      "Head Office: 123 Business Park, Sector 18, Gurgaon, Haryana - 122001",
+    address: "Head Office: Main Road Gumla Jharkand - 835207",
     hours: "Mon-Fri: 9 AM - 8 PM, Sat-Sun: 10 AM - 6 PM",
   };
 

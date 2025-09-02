@@ -1,6 +1,6 @@
 import { configureStore, combineReducers } from "@reduxjs/toolkit";
 import userReducer from "./slices/userSlice";
-import cartReducer from "./slices/cartSlice";
+// import cartReducer from "./slices/cartSlice";
 import checkoutReducer from "./slices/checkoutSlice"; // ✅ Import checkout reducer
 import wishlistReducer from "./slices/wishlistSlice"
 import {
@@ -32,7 +32,7 @@ const rootReducer = combineReducers({
   user: userReducer,
   checkout: checkoutReducer,
   productDetail: productDetailReducer,
-  cart: cartReducer,
+  // cart: cartReducer,
   wishlist: wishlistReducer,
   [adminProductApi.reducerPath]: adminProductApi.reducer,
   [adminCategoryApi.reducerPath]: adminCategoryApi.reducer,

@@ -31,9 +31,9 @@ const CompanyInfo: React.FC = () => {
       {/* Logo & Brand */}
       <div className="flex items-center space-x-3">
         <div className="w-12 h-12 bg-[--color-accent] rounded-lg flex items-center justify-center">
-          <span className="text-[--text-light] font-bold text-xl">S</span>
+          <span className="text-[--text-light] font-bold text-xl">SF</span>
         </div>
-        <h3 className="text-2xl font-bold text-[--color-accent]">Your Store</h3>
+        <h3 className="text-2xl font-bold text-[--color-accent]">Suvidha Furniture</h3>
       </div>
 
       {/* Description */}
