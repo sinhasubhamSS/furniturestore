@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
+import { useRouter } from 'next/navigation'; // ✅ Add this import
 import { useGetCategoriesQuery } from "@/redux/services/admin/adminCategoryapi";
 import CategoryCard from "../helperComponents/CategoryCard";
 
@@ -10,6 +11,7 @@ type Props = {
 
 const CategorySection = ({ onSelect }: Props) => {
   const { data: categories, isLoading, error } = useGetCategoriesQuery();
+  const router = useRouter(); // ✅ Add router
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -42,6 +44,15 @@ const CategorySection = ({ onSelect }: Props) => {
     } else {
       el.scrollBy({ left: scrollAmount, behavior: "smooth" });
     }
+  };
+
+  // ✅ NEW: Category click handler
+  const handleCategoryClick = (category: any) => {
+    // Navigate to products page with category filter
+    router.push(`/products?category=${category.slug}`);
+    
+    // Optional: Also call the parent callback if provided
+    onSelect?.(category._id);
   };
 
   if (isLoading)
@@ -101,8 +112,8 @@ const CategorySection = ({ onSelect }: Props) => {
               >
                 <CategoryCard
                   category={category}
-                  onClick={() => onSelect?.(category._id)}
-                  isCompact={true} // to adjust card styles for smaller height
+                  onClick={() => handleCategoryClick(category)} // ✅ Updated click handler
+                  isCompact={true}
                 />
               </div>
             ))}

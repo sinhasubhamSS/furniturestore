@@ -4,27 +4,18 @@ import { AuthRequest } from "../types/app-request";
 import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 import { ApiResponse } from "../utils/ApiResponse";
-
-import {
-  createProductSchema,
-  updateProductSchema,
-} from "../validations/product.validation";
+import { createProductSchema } from "../validations/product.validation";
 import { Types } from "mongoose";
-import { generateSKU } from "../utils/genetateSku";
 
-// ✅ Create Product
+// ==================== ADMIN CONTROLLERS ====================
+
 export const createProduct = catchAsync(
   async (req: AuthRequest, res: Response) => {
     if (!req.userId) throw new AppError("Unauthorized", 401);
     const parsedData = createProductSchema.parse(req.body);
-    const productInput = {
-      ...parsedData,
-      createdBy: new Types.ObjectId(req.userId), // 🟢 यहाँ createdBy जोड़ा गया है
-    };
 
-    // Call service without SKU/price logic here
     const product = await productService.createProduct(
-      productInput,
+      { ...parsedData, createdBy: new Types.ObjectId(req.userId) },
       req.userId
     );
 
@@ -34,57 +25,6 @@ export const createProduct = catchAsync(
   }
 );
 
-// ✅ Update Product
-// export const updateProduct = catchAsync(
-//   async (req: AuthRequest, res: Response) => {
-//     console.log("📩 Reached update product");
-
-//     const parsedData = updateProductSchema.parse(req.body);
-//     if (!req.userId) throw new AppError("Unauthorized", 401);
-
-//     let { name, basePrice, gstRate, ...rest } = parsedData;
-
-//     // ✅ Separate variable to avoid overwriting the original gstRate
-//     let finalGstRate: number | undefined = undefined;
-//     let price: number | undefined = undefined;
-
-//     if (typeof gstRate !== "undefined") {
-//       finalGstRate = gstRate / 100;
-//     }
-
-//     if (
-//       typeof basePrice !== "undefined" &&
-//       typeof finalGstRate !== "undefined"
-//     ) {
-//       price = basePrice + basePrice * finalGstRate;
-//     }
-
-//     const slug = name
-//       ? slugify(name, { lower: true, strict: true })
-//       : undefined;
-
-//     const updatedProductInput = {
-//       ...rest,
-//       ...(name && { name }),
-//       ...(slug && { slug }),
-//       ...(typeof basePrice !== "undefined" && { basePrice }),
-//       ...(typeof gstRate !== "undefined" && { gstRate }), // ✅ percentage value stored
-//       ...(typeof price !== "undefined" && { price }),
-//     };
-
-//     const updated = await productService.updateProduct(
-//       updatedProductInput,
-//       req.params.productId,
-//       req.userId
-//     );
-
-//     res
-//       .status(200)
-//       .json(new ApiResponse(200, updated, "Product updated successfully"));
-//   }
-// );
-
-// ✅ Delete Product
 export const deleteProduct = catchAsync(
   async (req: AuthRequest, res: Response) => {
     if (!req.userId) throw new AppError("Unauthorized", 401);
@@ -100,14 +40,59 @@ export const deleteProduct = catchAsync(
   }
 );
 
-// ✅ Get Single Product by ID
+// Admin get all products
+export const getAllProductsAdmin = catchAsync(
+  async (req: AuthRequest, res: Response) => {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+
+    const products = await productService.getAllProductsAdmin({}, page, limit);
+
+    res
+      .status(200)
+      .json(new ApiResponse(200, products, "All products fetched (Admin)"));
+  }
+);
+
+// ==================== PUBLIC CONTROLLERS ====================
+
+export const getAllProducts = catchAsync(
+  async (req: AuthRequest, res: Response) => {
+    console.log("📥 Request query:", req.query); // Debug log
+
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const isAdmin = req.user?.role === "admin";
+
+    // ✅ Build filter object from query parameters
+    const filter: any = {};
+
+    if (req.query.category) {
+      filter.category = req.query.category; // This is the category slug
+    }
+
+    console.log("🔍 Processed filter:", filter);
+
+    const products = await productService.getAllProducts(
+      filter, // ✅ Pass filter object
+      page,
+      limit,
+      isAdmin
+    );
+
+    res
+      .status(200)
+      .json(new ApiResponse(200, products, "Products fetched successfully"));
+  }
+);
+
 export const getProductBySlug = catchAsync(
   async (req: AuthRequest, res: Response) => {
-    const isAdmin = req.user?.role === "admin"; // User ya Admin yahan check ho raha hai
+    const isAdmin = req.user?.role === "admin";
 
     const product = await productService.getProductBySlug(
       req.params.slug,
-      isAdmin // ← Ye flag service ko batata hai ki kaun request kar raha hai
+      isAdmin
     );
 
     res
@@ -115,103 +100,75 @@ export const getProductBySlug = catchAsync(
       .json(new ApiResponse(200, product, "Product fetched successfully"));
   }
 );
-// ✅ Get Single Product by ID (used in checkout, etc.)
+
 export const getProductById = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const isAdmin = req.user?.role === "admin";
-    const productId = req.params.productId;
 
-    if (!productId) throw new AppError("Product ID is required", 400);
-
-    const product = await productService.getProductById(productId, isAdmin);
+    const product = await productService.getProductById(
+      req.params.productId,
+      isAdmin
+    );
 
     res
       .status(200)
-      .json(
-        new ApiResponse(200, product, "Product fetched by ID successfully")
-      );
+      .json(new ApiResponse(200, product, "Product fetched successfully"));
   }
 );
 
-// ✅ Get All Products
-export const getAllProducts = catchAsync(
-  async (_req: AuthRequest, res: Response) => {
-    console.log("reached get product list");
-    const products = await productService.getAllProducts();
-    res
-      .status(200)
-      .json(
-        new ApiResponse(200, products, "All products fetched successfully")
-      );
-  }
-);
-
-// ✅ Search Products
 export const searchProducts = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const keyword = req.query.q?.toString().trim();
     if (!keyword) throw new AppError("Search query is required", 400);
 
-    const products = await productService.searchProducts(keyword);
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const isAdmin = req.user?.role === "admin";
+
+    const products = await productService.searchProducts(
+      keyword,
+      page,
+      limit,
+      isAdmin
+    );
+
     res
       .status(200)
-      .json(
-        new ApiResponse(200, products, "Search results fetched successfully")
-      );
+      .json(new ApiResponse(200, products, "Search results fetched"));
   }
 );
 
-// ✅ Get Products by Category (by category slug)
 export const getProductsByCategory = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const slug = req.params.slug?.toString().trim();
     if (!slug) throw new AppError("Slug is required", 400);
 
-    const products = await productService.getProductsByCategory(slug);
-    res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          products,
-          "Products by category fetched successfully"
-        )
-      );
-  }
-);
-
-// ✅ Latest Products
-export const getLatestProducts = catchAsync(
-  async (req: AuthRequest, res: Response) => {
-    const limit = parseInt(req.query.limit as string) || 8;
-    const products = await productService.getLatestProducts(limit);
-    res
-      .status(200)
-      .json(new ApiResponse(200, products, "Latest products fetched"));
-  }
-);
-
-//user controler
-// Controller for public products
-export const getPublishedProducts = catchAsync(
-  async (req: AuthRequest, res: Response) => {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
+    const isAdmin = req.user?.role === "admin";
 
-    const products = await productService.getAllProducts(
-      { isPublished: true },
+    const products = await productService.getProductsByCategory(
+      slug,
       page,
-      limit
+      limit,
+      isAdmin
     );
 
     res
       .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          products,
-          "Published products fetched successfully"
-        )
-      );
+      .json(new ApiResponse(200, products, "Category products fetched"));
+  }
+);
+
+export const getLatestProducts = catchAsync(
+  async (req: AuthRequest, res: Response) => {
+    const limit = parseInt(req.query.limit as string) || 8;
+    const isAdmin = req.user?.role === "admin";
+
+    const products = await productService.getLatestProducts(limit, isAdmin);
+
+    res
+      .status(200)
+      .json(new ApiResponse(200, products, "Latest products fetched"));
   }
 );

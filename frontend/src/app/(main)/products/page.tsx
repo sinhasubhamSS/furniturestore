@@ -1,20 +1,38 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import ProductCardListing from "@/components/product/ProductCardListing";
 import { useGetPublishedProductsQuery } from "@/redux/services/user/publicProductApi";
+import { useGetCategoriesQuery } from "@/redux/services/admin/adminCategoryapi";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 
 const ProductsPage = () => {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const categoryFromUrl = searchParams.get("category") || "";
   const [page, setPage] = useState(1);
   const [searchText, setSearchText] = useState("");
+
+  const apiFilters = useMemo(() => {
+    const filters: any = {};
+    if (categoryFromUrl) {
+      filters.category = categoryFromUrl;
+    }
+    return filters;
+  }, [categoryFromUrl]);
 
   const { data, isLoading, isError } = useGetPublishedProductsQuery({
     page,
     limit: 12,
+    filter: apiFilters,
   });
+
+  const { data: categories } = useGetCategoriesQuery();
 
   const filteredProducts = useMemo(() => {
     if (!data?.products) return [];
@@ -26,6 +44,34 @@ const ProductsPage = () => {
         product.category?.name.toLowerCase().includes(searchText.toLowerCase())
     );
   }, [data, searchText]);
+
+  const selectedCategoryName = useMemo(() => {
+    if (!categoryFromUrl || !categories) return null;
+    const category = categories.find((cat) => cat.slug === categoryFromUrl);
+    return category?.name || null;
+  }, [categoryFromUrl, categories]);
+
+  const updateURL = (params: { [key: string]: string | null }) => {
+    const current = new URLSearchParams(Array.from(searchParams.entries()));
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) {
+        current.set(key, value);
+      } else {
+        current.delete(key);
+      }
+    });
+
+    const search = current.toString();
+    const query = search ? `?${search}` : "";
+
+    router.replace(`${pathname}${query}`, { scroll: false });
+  };
+
+  const clearCategoryFilter = () => {
+    updateURL({ category: null });
+    setPage(1);
+  };
 
   if (isLoading) {
     return (
@@ -58,51 +104,21 @@ const ProductsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* ✅ Perfectly Centered Container */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header Section */}
-        <div className="bg-white rounded-xl shadow-sm p-8 mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">
-                All Products
-              </h1>
-              <p className="text-gray-600 text-lg">
-                {filteredProducts.length > 0
-                  ? `Showing ${filteredProducts.length} products${
-                      searchText ? ` for "${searchText}"` : ""
-                    }`
-                  : "No products found"}
-              </p>
-            </div>
-
-            {/* Search Bar */}
-            <div className="flex gap-3 items-center w-full lg:w-auto lg:min-w-96">
-              <Input
-                name="search"
-                type="search"
-                placeholder="Search products..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="flex-1 h-12 text-lg"
-              />
-              <Button
-                onClick={() => setSearchText("")}
-           
-                className="h-12 px-6"
-              >
-                Clear
-              </Button>
-            </div>
+    <div className="min-h-screen  bg-gray-50">
+      <div className="max-w-full mx-auto px-4 py-8">
+        {/* ✅ Minimal Header - Just Title and Search */}
+      
+          <div className="mb-5">
+            <h1 className="text-xl text-gray-800 font-medium">
+              Showing results for {selectedCategoryName || "All Products"}
+            </h1>
           </div>
-        </div>
-
-        {/* ✅ Product List - Full Width Cards with Perfect Spacing */}
+ 
+        {/* ✅ Product List */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           {filteredProducts.length > 0 ? (
-            <div>
-              {filteredProducts.map((product, index) => (
+            <div className="divide-y divide-gray-100">
+              {filteredProducts.map((product) => (
                 <Link
                   key={product._id}
                   href={`/products/${product.slug}`}
@@ -114,40 +130,47 @@ const ProductsPage = () => {
             </div>
           ) : (
             <div className="text-center py-20 px-4">
-              <div className="text-8xl mb-6">🔍</div>
-              <h3 className="text-2xl font-semibold text-gray-800 mb-4">
+              <div className="text-6xl mb-6">🔍</div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-3">
                 No products found
               </h3>
-              <p className="text-gray-600 mb-8 text-lg">
+              <p className="text-gray-600 mb-6">
                 {searchText
-                  ? `We couldn't find any products matching "${searchText}"`
-                  : "No products available at the moment"}
+                  ? `No products match "${searchText}"`
+                  : selectedCategoryName
+                  ? `No products in ${selectedCategoryName} category`
+                  : "No products available"}
               </p>
-              {searchText && (
-                <Button
-                  onClick={() => setSearchText("")}
-                  className="px-8 py-3 text-lg"
-                >
-                  Clear Search
-                </Button>
-              )}
+
+              <div className="flex gap-3 justify-center">
+                {searchText && (
+                  <Button onClick={() => setSearchText("")} variant="outline">
+                    Clear Search
+                  </Button>
+                )}
+                {selectedCategoryName && (
+                  <Button onClick={clearCategoryFilter} variant="outline">
+                    View All Products
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </div>
 
-        {/* Pagination */}
-        {(data?.totalPages || 1) > 1 && (
-          <div className="bg-white rounded-xl shadow-sm p-8 mt-8">
-            <div className="flex justify-center items-center space-x-6">
+        {/* ✅ Pagination - Only when needed */}
+        {(data?.totalPages || 1) > 1 && filteredProducts.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm p-6 mt-6">
+            <div className="flex justify-center items-center gap-6">
               <Button
                 onClick={() => setPage((p) => Math.max(p - 1, 1))}
                 disabled={page === 1}
-                className="px-6 py-3"
+                variant="outline"
               >
                 ← Previous
               </Button>
 
-              <span className="text-gray-700 font-medium text-lg">
+              <span className="text-gray-700 font-medium">
                 Page {page} of {data?.totalPages || 1}
               </span>
 
@@ -156,8 +179,7 @@ const ProductsPage = () => {
                   setPage((p) => Math.min(p + 1, data?.totalPages || 1))
                 }
                 disabled={page === (data?.totalPages || 1)}
-      
-                className="px-6 py-3"
+                variant="outline"
               >
                 Next →
               </Button>
@@ -165,6 +187,16 @@ const ProductsPage = () => {
           </div>
         )}
       </div>
+
+      <style jsx>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 };

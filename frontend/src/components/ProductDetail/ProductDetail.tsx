@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { useGetProductBySlugQuery } from "@/redux/services/user/publicProductApi";
 import { useDispatch, useSelector } from "react-redux"; // ✅ Add useSelector
 import { AppDispatch, RootState } from "@/redux/store"; // ✅ Add RootState

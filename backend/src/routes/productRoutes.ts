@@ -1,36 +1,31 @@
-// updateProductImages,
-// softDeleteProduct,
-// paginateProducts,
-
 import { Router } from "express";
 import {
   createProduct,
-  // updateProduct,
   deleteProduct,
   getAllProducts,
+  getAllProductsAdmin,
   getProductBySlug,
+  getProductById,
   searchProducts,
   getProductsByCategory,
   getLatestProducts,
-  getPublishedProducts,
-  getProductById,
 } from "../controllers/productController";
-
 import { authVerify } from "../middlewares/authVerify";
 import { isAdmin } from "../middlewares/isAdmin";
+
 const router = Router();
 
-router.post("/createproduct", authVerify, isAdmin, createProduct);
-// router.put("/editproduct/:productId", authVerify, isAdmin, updateProduct);
-router.delete("/deleteproduct/:productId", authVerify, isAdmin, deleteProduct);
-router.get("/admin/getallproducts", authVerify, isAdmin, getAllProducts);
+// ==================== ADMIN ROUTES ====================
+router.post("/admin/create", authVerify, isAdmin, createProduct);
+router.delete("/admin/delete/:productId", authVerify, isAdmin, deleteProduct);
+router.get("/admin/all", authVerify, isAdmin, getAllProductsAdmin);
 
+// ==================== PUBLIC ROUTES ====================
+router.get("/all", getAllProducts); // Public + Admin both can access
 router.get("/search", searchProducts);
+router.get("/latest", getLatestProducts);
 router.get("/category/:slug", getProductsByCategory);
-router.get("/latest-products", getLatestProducts);
-router.get("/getproductbyslug/:slug", getProductBySlug);
-router.get("/getproductbyid/:productId", getProductById);
+router.get("/slug/:slug", getProductBySlug);
+router.get("/id/:productId", getProductById);
 
-//user
-router.get("/published-products", getPublishedProducts);
 export default router;

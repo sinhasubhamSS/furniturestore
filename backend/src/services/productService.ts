@@ -8,6 +8,8 @@ import slugify from "slugify";
 import { generateSKU } from "../utils/genetateSku";
 
 class ProductService {
+  // ==================== PRIVATE/UTILITY METHODS ====================
+
   private buildSlug(name: string) {
     return slugify(name, { lower: true, strict: true });
   }
@@ -32,6 +34,26 @@ class ProductService {
     return query.skip(skip).limit(limit);
   }
 
+  // ✅ CENTRALIZED QUERY BUILDER - DRY Principle
+  private buildProductQuery(
+    filter: FilterQuery<IProductInput> = {},
+    isAdmin: boolean = false,
+    populateCreatedBy: boolean = false
+  ) {
+    // Admin can see all, users only published
+    const finalFilter = isAdmin ? filter : { ...filter, isPublished: true };
+
+    let query = Product.find(finalFilter).populate("category", "name");
+
+    if (populateCreatedBy) {
+      query = query.populate("createdBy", "name email");
+    }
+
+    return query;
+  }
+
+  // ==================== ADMIN-ONLY METHODS ====================
+
   async createProduct(productData: IProductInput, userId: string) {
     if (!productData.variants || productData.variants.length === 0) {
       throw new AppError("At least one variant is required", 400);
@@ -42,14 +64,10 @@ class ProductService {
         throw new AppError("Each variant must have at least one image", 400);
       }
 
-      // Generate SKU using shared util
       const sku = generateSKU(productData.name, variant.color, variant.size);
-
-      // Calculate price with GST
       const gstDecimal = variant.gstRate / 100;
       const price = variant.basePrice + variant.basePrice * gstDecimal;
 
-      // Calculate discounted price and savings
       let discountedPrice = price;
       let savings = 0;
       const isDiscountValid =
@@ -77,13 +95,11 @@ class ProductService {
       };
     });
 
-    // Calculate product-level stats
     const minPrice = Math.min(...processedVariants.map((v) => v.price));
     const minDiscountedPrice = Math.min(
       ...processedVariants.map((v) => v.discountedPrice)
     );
     const maxSavings = Math.max(...processedVariants.map((v) => v.savings));
-
     const colors = [...new Set(processedVariants.map((v) => v.color))];
     const sizes = [...new Set(processedVariants.map((v) => v.size))];
 
@@ -103,35 +119,7 @@ class ProductService {
     const product = await Product.create(productDocument);
     return product;
   }
-  // async updateProduct(
-  //   data: Partial<IProductInput>,
-  //   productId: string,
-  //   userId: string
-  // ) {
-  //   const product = await Product.findOne({
-  //     _id: productId,
-  //     createdBy: userId,
-  //   });
-  //   if (!product) throw new AppError("Product not found or unauthorized", 404);
 
-  //   if (data.name) {
-  //     product.slug = this.buildSlug(data.name);
-  //   }
-
-  //   if (Array.isArray(data.images)) {
-  //     await this.deleteRemovedImages(product.images, data.images);
-  //     product.images = data.images;
-  //   }
-
-  //   if (typeof data.isPublished === "boolean") {
-  //     product.isPublished = data.isPublished;
-  //   }
-
-  //   Object.assign(product, data);
-  //   return await product.save();
-  // }
-
-  // ✅ Delete Product
   async deleteProduct(productId: string, userId: string) {
     const product = await Product.findOneAndDelete({
       _id: productId,
@@ -141,64 +129,135 @@ class ProductService {
     return product;
   }
 
-  // ✅ Get Single Product
-  private async getProduct(
-    query: FilterQuery<IProductInput>,
-    isAdmin: boolean
+  // ==================== UNIFIED GET METHODS ====================
+
+  /**
+   * ✅ UNIFIED - Get all products with filters
+   * @param filter - MongoDB filter object
+   * @param page - Page number
+   * @param limit - Items per page
+   * @param isAdmin - Admin access flag
+   * @param populateCreatedBy - Whether to populate creator info
+   */
+  // ProductService.js - Debug getAllProducts method
+  async getAllProducts(
+    filter: any = {},
+    page: number = 1,
+    limit: number = 10,
+    isAdmin: boolean = false,
+    populateCreatedBy: boolean = false
   ) {
-    const product = await Product.findOne(query).lean<IProductInput>();
+    console.log("🔍 Received filter:", filter);
 
-    if (!product) throw new AppError("Product not found", 404);
+    const mongoFilter: any = {};
 
-    if (!isAdmin && !product.isPublished) {
-      throw new AppError("Product is not available", 403);
+    // Handle category filter - convert slug to ObjectId
+    if (filter.category) {
+      console.log("🏷️ Finding category by slug:", filter.category);
+
+      const category = await Category.findOne({ slug: filter.category });
+      console.log("📋 Category found:", category);
+
+      if (category) {
+        mongoFilter.category = category._id;
+        console.log("✅ Using category ID:", category._id);
+      } else {
+        console.log("❌ Category not found, returning empty results");
+        return {
+          products: [],
+          page,
+          limit,
+          totalPages: 0,
+          totalItems: 0,
+        };
+      }
     }
 
+    console.log("🔍 Final MongoDB filter:", mongoFilter);
+
+    // ✅ CRITICAL: Build the query first
+    const query = this.buildProductQuery(
+      mongoFilter,
+      isAdmin,
+      populateCreatedBy
+    ).sort({ createdAt: -1 });
+
+    // ✅ CRITICAL: Apply pagination to the query
+    const paginated = this.applyPagination(query, page, limit);
+
+    // ✅ Now execute the queries
+    const [products, total] = await Promise.all([
+      paginated.lean(), // ✅ Now 'paginated' is defined
+      Product.countDocuments(mongoFilter),
+    ]);
+
+    console.log(
+      "📊 Query results - Products found:",
+      products.length,
+      "Total:",
+      total
+    );
+
+    return {
+      products,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      totalItems: total,
+    };
+  }
+
+  /**
+   * ✅ UNIFIED - Get single product by query
+   */
+  private async getSingleProduct(
+    query: FilterQuery<IProductInput>,
+    isAdmin: boolean = false
+  ) {
+    const finalQuery = isAdmin ? query : { ...query, isPublished: true };
+
+    const product = await this.buildProductQuery(finalQuery, isAdmin)
+      .findOne()
+      .lean();
+
+    if (!product) throw new AppError("Product not found", 404);
     return product;
   }
 
-  async getProductBySlug(slug: string, isAdmin = false) {
-    return this.getProduct({ slug }, isAdmin);
+  async getProductBySlug(slug: string, isAdmin: boolean = false) {
+    return this.getSingleProduct({ slug }, isAdmin);
   }
 
-  async getProductById(productId: string, isAdmin = false) {
-    return this.getProduct({ _id: productId }, isAdmin);
+  async getProductById(productId: string, isAdmin: boolean = false) {
+    return this.getSingleProduct({ _id: productId }, isAdmin);
   }
 
-  // ✅ Get All Products with Pagination
-  async getAllProducts(filter = {}, page: number = 1, limit: number = 10) {
-    const query = Product.find(filter)
-      .populate("category", "name") // 👈 This line adds the category name
-      .sort({ createdAt: -1 });
-
-    const paginated = this.applyPagination(query, page, limit);
-
-    const [products, total] = await Promise.all([
-      paginated.lean(),
-      Product.countDocuments(filter),
-    ]);
-
-    return {
-      products,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-      totalItems: total,
+  /**
+   * ✅ UNIFIED - Search products
+   */
+  async searchProducts(
+    searchQuery: string,
+    page = 1,
+    limit = 10,
+    isAdmin: boolean = false
+  ) {
+    const textSearchFilter = {
+      $text: { $search: searchQuery },
     };
-  }
 
-  // ✅ Search Products
-  async searchProducts(query: string, page = 1, limit = 10) {
-    const searchQuery = Product.find({
-      $text: { $search: query },
-    })
+    const query = this.buildProductQuery(textSearchFilter, isAdmin)
       .sort({ score: { $meta: "textScore" } })
       .select({ score: { $meta: "textScore" } });
 
-    const paginated = this.applyPagination(searchQuery, page, limit);
+    const paginated = this.applyPagination(query, page, limit);
+
+    const finalFilter = isAdmin
+      ? textSearchFilter
+      : { ...textSearchFilter, isPublished: true };
+
     const [products, total] = await Promise.all([
       paginated.lean(),
-      Product.countDocuments({ $text: { $search: query } }),
+      Product.countDocuments(finalFilter),
     ]);
 
     return {
@@ -210,19 +269,33 @@ class ProductService {
     };
   }
 
-  // ✅ Get Products by Category (with optional pagination)
-  async getProductsByCategory(slug: string, page = 1, limit = 10) {
+  /**
+   * ✅ UNIFIED - Get products by category
+   */
+  async getProductsByCategory(
+    slug: string,
+    page = 1,
+    limit = 10,
+    isAdmin: boolean = false
+  ) {
     const category = await Category.findOne({ slug });
     if (!category) throw new AppError("Category not found", 404);
 
-    const query = Product.find({ category: category._id }).sort({
+    const categoryFilter = { category: category._id };
+
+    const query = this.buildProductQuery(categoryFilter, isAdmin).sort({
       createdAt: -1,
     });
+
     const paginated = this.applyPagination(query, page, limit);
+
+    const finalFilter = isAdmin
+      ? categoryFilter
+      : { ...categoryFilter, isPublished: true };
 
     const [products, total] = await Promise.all([
       paginated.lean(),
-      Product.countDocuments({ category: category._id }),
+      Product.countDocuments(finalFilter),
     ]);
 
     return {
@@ -234,29 +307,59 @@ class ProductService {
     };
   }
 
-  // ✅ Get Latest Products
-  async getLatestProducts(limit: number = 8) {
-    const products = await Product.find({})
+  /**
+   * ✅ Get latest products
+   */
+  async getLatestProducts(limit: number = 8, isAdmin: boolean = false) {
+    const products = await this.buildProductQuery({}, isAdmin)
       .sort({ createdAt: -1 })
       .limit(limit)
-      .select(" slug variants createdAt")
+      .select("name slug variants category createdAt")
       .lean();
 
-    // Only return the first image and price from the first variant
-    const modifiedProducts = products.map((product) => {
+    // Return optimized data for frontend
+    return products.map((product) => {
       const firstVariant = product.variants?.[0];
 
       return {
         _id: product._id,
         name: product.name,
         slug: product.slug,
+        category: product.category,
         image: firstVariant?.images?.[0]?.url || "",
         price: firstVariant?.price,
+        discountedPrice: firstVariant?.discountedPrice,
+        hasDiscount: firstVariant?.hasDiscount,
         createdAt: product.createdAt,
       };
     });
+  }
 
-    return modifiedProducts;
+  /**
+   * ✅ Get featured/trending products
+   */
+  async getFeaturedProducts(limit: number = 8, isAdmin: boolean = false) {
+    const featuredFilter = {
+      "reviewStats.averageRating": { $gte: 4 },
+    };
+
+    return await this.buildProductQuery(featuredFilter, isAdmin)
+      .sort({
+        "reviewStats.averageRating": -1,
+        "reviewStats.totalReviews": -1,
+      })
+      .limit(limit)
+      .lean();
+  }
+
+  // ==================== ADMIN SPECIFIC SHORTCUTS ====================
+
+  async getAllProductsAdmin(filter = {}, page: number = 1, limit: number = 10) {
+    return this.getAllProducts(filter, page, limit, true, true); // Admin + populate creator
+  }
+
+  async getProductByIdAdmin(productId: string) {
+    return this.getProductById(productId, true);
   }
 }
 

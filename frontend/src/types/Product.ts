@@ -88,3 +88,41 @@ export type UserProductResponse = {
   page: number;
   limit: number;
 };
+
+// export interface ProductFilters {
+//   category?: string;           // Category slug for filtering
+//   search?: string;            // Search term
+//   minPrice?: number;          // Price range filter
+//   maxPrice?: number;
+//   inStockOnly?: boolean;      // Show only in-stock products
+//   hasDiscount?: boolean;      // Show only discounted products
+//   brands?: string[];          // Multiple brand filter (future)
+//   colors?: string[];          // Color filter (future)
+//   sizes?: string[];           // Size filter (future)
+// }
+
+// export interface ProductSortOptions {
+//   sortBy?: 'priceAsc' | 'priceDesc' | 'newest' | 'oldest' | 'popularity' | 'discount';
+//   orderBy?: 'asc' | 'desc';
+// }
+
+// // ==================== QUERY PARAMETERS TYPES ====================
+
+// export interface PaginationParams {
+//   page?: number;
+//   limit?: number;
+// }
+
+// export interface ProductQueryParams extends PaginationParams {
+//   filter?: ProductFilters;
+//   sort?: ProductSortOptions;
+// }
+
+//for now just for category then we will use abouve one only 
+export interface ProductQueryParams {
+  page?: number;
+  limit?: number;
+  filter?: {
+    category?: string;  // ✅ Just category for now
+  };
+}

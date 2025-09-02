@@ -3,7 +3,9 @@
 type Category = {
   _id: string;
   name: string;
-  image: string;
+  image: {
+    url: string;
+  };
 };
 
 type Props = {
@@ -26,7 +28,7 @@ const CategoryCard = ({ category, onClick, isCompact = false }: Props) => {
         }`}
       >
         <img
-          src={category.image}
+          src={category.image.url}
           alt={category.name}
           className="w-full h-full object-cover"
           loading="lazy"
