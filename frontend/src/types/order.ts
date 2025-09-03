@@ -1,6 +1,6 @@
 import { Address } from "./address";
 
-// ✅ BASE REUSABLE TYPES (Single Source of Truth)
+// ✅ BASE REUSABLE TYPES
 export interface OrderItem {
   productId: string;
   variantId?: string;
@@ -19,7 +19,7 @@ export interface DeliveryInfo {
   pincode?: string;
   city?: string;
   codAvailable: boolean;
-  isServiceable: boolean; // ✅ Use your existing property name
+  isServiceable: boolean;
   message?: string;
 }
 
@@ -46,9 +46,9 @@ export interface FeeBreakdown {
   isEligibleForAdvance: boolean;
 }
 
-// ✅ UNION TYPES (Centralized)
+// ✅ UNION TYPES - Updated with 'partial'
 export type PaymentMethod = "COD" | "RAZORPAY" | "ADVANCE";
-export type PaymentStatus = "paid" | "unpaid" | "partial" | "pending";
+export type PaymentStatus = "paid" | "unpaid" | "partial" | "pending"; // ✅ Added 'partial'
 export type OrderStatus =
   | "pending"
   | "confirmed"
@@ -59,7 +59,7 @@ export type OrderStatus =
   | "refunded"
   | "failed";
 
-// ✅ REQUEST INTERFACES (Using Base Types)
+// ✅ REQUEST INTERFACES
 export interface PlaceOrderRequest {
   items: OrderItem[];
   shippingAddress: Address;
@@ -77,7 +77,7 @@ export interface VerifyAmountRequest {
   items: OrderItem[];
 }
 
-// ✅ RESPONSE INTERFACES (Fixed with missing properties)
+// ✅ RESPONSE INTERFACES - Updated with pagination
 export interface CheckoutPricingResponse extends FeeBreakdown {
   codTotal: number;
   checkoutTotal: number;
@@ -86,8 +86,6 @@ export interface CheckoutPricingResponse extends FeeBreakdown {
   advanceEligible: boolean;
   advanceAmount: number;
   advancePercentage: number;
-
-  // ✅ Use isServiceable instead of deliveryAvailable to match backend
   isServiceable: boolean;
 }
 
@@ -102,6 +100,7 @@ export interface VerifyAmountResponse extends FeeBreakdown {
   };
 }
 
+// ✅ Updated Order interface with return info
 export interface Order {
   _id: string;
   orderId?: string;
@@ -110,12 +109,20 @@ export interface Order {
   paymentStatus: PaymentStatus;
   status: OrderStatus;
   totalAmount: number;
-
   packagingFee?: number;
   codHandlingFee?: number;
   isAdvancePayment?: boolean;
   advancePaymentAmount?: number;
   remainingAmount?: number;
+
+  // ✅ Added return info for MyOrders component
+  hasActiveReturn?: boolean;
+  returnInfo?: {
+    hasActiveReturn: boolean;
+    returnStatus: string;
+    returnId: string;
+    returnRequestedAt: string;
+  } | null;
 
   productPreview: {
     name: string;
@@ -134,11 +141,23 @@ export interface Order {
   paymentInfo?: PaymentInfo;
 }
 
+// ✅ Pagination wrapper for API responses
+export interface OrderListResponse {
+  orders: Order[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
 export interface RazorpayOrderResponse {
   orderId: string;
   amount: number;
   currency: string;
-
   id?: string;
   entity?: string;
   amount_paid?: number;

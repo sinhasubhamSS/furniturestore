@@ -11,16 +11,19 @@ import { isAdmin } from "../middlewares/isAdmin";
 
 const router = Router();
 
-router.post("/placeorder", authVerify, placeOrder);
+// ✅ User Routes
+router.post("/place-order", authVerify, placeOrder); // ✅ Better naming
+router.get("/my-orders", authVerify, getMyOrders); // ✅ Better naming
+router.post("/cancel", authVerify, cancelOrderController); // ✅ Cleaner URL
 
-router.get("/myorders", authVerify, getMyOrders);
-router.post("/cancel-order", authVerify, cancelOrderController);
-router.post(
-  "/update-order-status/:orderId",
-  authVerify,
+// ✅ Admin Routes
+router.put(
+  "/:orderId/status", // ✅ FIX: Use PUT instead of POST for updates
   isAdmin,
   updateOrderStatusController
 );
 
-router.post("/checkout-pricing", authVerify, getCheckoutPricing);
+// ✅ Pricing Route (can be used before auth for cart pricing)
+router.post("/checkout-pricing", getCheckoutPricing); // ✅ Remove authVerify - optional
+
 export default router;

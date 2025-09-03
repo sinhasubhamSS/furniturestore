@@ -12,9 +12,10 @@ import { useRouter } from "next/navigation";
 import { useGetCartQuery } from "@/redux/services/user/cartApi";
 import { useGetProductByIDQuery } from "@/redux/services/user/publicProductApi";
 import { useState, useEffect, useMemo } from "react";
-import { OrderCreationResponse } from "@/types/order";
+// ✅ UPDATED: Use existing types
+import { OrderCreationResponse, PaymentMethod } from "@/types/order";
 
-// ✅ CLEAN: Only essential env config (NO HARDCODED VALUES)
+// ✅ CLEAN: Only essential env config
 const APP_CONFIG = {
   razorpayKeyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_key",
   companyName: process.env.NEXT_PUBLIC_COMPANY_NAME || "SUVIDHA Store",
@@ -69,11 +70,9 @@ const PaymentPage = () => {
   const [createRazorpayOrder] = useCreateRazorpayOrderMutation();
   const [getCheckoutPricing] = useGetCheckoutPricingMutation();
 
-  const [selectedMethod, setSelectedMethod] = useState<
-    "ONLINE" | "ADVANCE" | "COD" | null
-  >(null);
-  const [currentIdempotencyKey, setCurrentIdempotencyKey] =
-    useState<string>("");
+  // ✅ UPDATED: Use PaymentMethod type
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
+  const [currentIdempotencyKey, setCurrentIdempotencyKey] = useState<string>("");
   const [pricingData, setPricingData] = useState<any>(null);
   const [loadingPricing, setLoadingPricing] = useState(false);
 
@@ -109,12 +108,17 @@ const PaymentPage = () => {
     return 0;
   }, [type, items, product, cartData]);
 
-  const orderItems = useMemo(() => {
+  // ✅ UPDATED: Better typed orderItems
+  const orderItems = useMemo((): Array<{
+    productId: string;
+    variantId: string;
+    quantity: number;
+  }> => {
     if (type === "direct_purchase" && items.length) {
       return [
         {
           productId: items[0].productId,
-          variantId: items[0].variantId,
+          variantId: items[0].variantId || "",
           quantity: items[0].quantity,
         },
       ];
@@ -129,7 +133,7 @@ const PaymentPage = () => {
     return [];
   }, [type, items, cartData]);
 
-  // ✅ BACKEND-DRIVEN: Fetch complete pricing (NO HARDCODED FALLBACKS)
+  // ✅ BACKEND-DRIVEN: Fetch complete pricing
   useEffect(() => {
     if (!shippingAddress?.pincode || !orderItems.length) return;
 
@@ -141,7 +145,6 @@ const PaymentPage = () => {
           pincode: shippingAddress.pincode,
         }).unwrap();
 
-        // ✅ USE BACKEND DATA ONLY
         const safePricingData = {
           subtotal: safeNumber(response.subtotal),
           packagingFee: safeNumber(response.packagingFee),
@@ -158,9 +161,10 @@ const PaymentPage = () => {
 
         setPricingData(safePricingData);
         console.log("💰 [PAYMENT] Backend pricing:", safePricingData);
-      } catch (error) {
+      } catch (error: any) {
         console.error("❌ [PAYMENT] Pricing fetch failed:", error);
-        alert("Failed to load pricing. Please refresh the page.");
+        const errorMessage = error?.data?.message || error?.message || "Failed to load pricing";
+        alert(`${errorMessage}. Please refresh the page.`);
       } finally {
         setLoadingPricing(false);
       }
@@ -169,7 +173,7 @@ const PaymentPage = () => {
     fetchPricing();
   }, [shippingAddress?.pincode, orderItems, getCheckoutPricing]);
 
-  // ✅ BACKEND-DRIVEN CALCULATIONS (NO HARDCODED VALUES)
+  // ✅ BACKEND-DRIVEN CALCULATIONS
   const calculateTotalAmount = useMemo(() => {
     if (!pricingData) return 0;
 
@@ -179,10 +183,9 @@ const PaymentPage = () => {
     const baseAmount = subtotalSafe + packagingFeeSafe + deliveryChargeSafe;
 
     switch (selectedMethod) {
-      case "ONLINE":
+      case "RAZORPAY":
         return baseAmount;
       case "ADVANCE":
-        // ✅ ADVANCE: Pay advance amount + fees, rest on delivery
         const advanceAmountSafe = safeNumber(pricingData.advanceAmount);
         return advanceAmountSafe + packagingFeeSafe + deliveryChargeSafe;
       case "COD":
@@ -207,6 +210,19 @@ const PaymentPage = () => {
       script.onerror = () => resolve(false);
       document.body.appendChild(script);
     });
+
+  // ✅ ENHANCED: Better success redirect
+  const redirectToSuccess = (orderData: OrderCreationResponse) => {
+    const orderId = orderData?.orderId || orderData?.data?.orderId;
+    
+    if (orderId) {
+      console.log("✅ Redirecting to success page with orderId:", orderId);
+      router.push(`/order-success?orderId=${orderId}&status=success`);
+    } else {
+      console.error("⚠️ Order ID missing in response:", orderData);
+      router.push("/order-success?status=success");
+    }
+  };
 
   const handlePayment = async () => {
     if (!selectedMethod) return alert("Please select a payment method.");
@@ -233,29 +249,26 @@ const PaymentPage = () => {
         if (orderData.isExisting) {
           alert(`Order already exists! Order ID: ${orderData.orderId}`);
           dispatch(resetCheckout());
-          router.push(`/order-success?orderId=${orderData.orderId}`);
+          redirectToSuccess(orderData);
           return;
         }
 
         alert("COD Order placed successfully!");
         dispatch(resetCheckout());
-        const orderId = orderData?.orderId || orderData?.data?.orderId;
-        router.push(
-          orderId ? `/order-success?orderId=${orderId}` : "/order-success"
-        );
+        redirectToSuccess(orderData);
       } catch (error: any) {
-        alert(error?.data?.message || "Failed to place COD order.");
+        console.error("❌ COD Order Error:", error);
+        const errorMessage = error?.data?.message || error?.message || "Failed to place COD order";
+        alert(errorMessage);
       }
       return;
     }
 
     // Online/Advance Payment
-    if (selectedMethod === "ONLINE" || selectedMethod === "ADVANCE") {
+    if (selectedMethod === "RAZORPAY" || selectedMethod === "ADVANCE") {
       const razorpayLoaded = await loadRazorpayScript();
       if (!razorpayLoaded) {
-        return alert(
-          "Failed to load payment system. Please refresh and try again."
-        );
+        return alert("Failed to load payment system. Please refresh and try again.");
       }
 
       try {
@@ -292,11 +305,9 @@ const PaymentPage = () => {
               }).unwrap();
 
               if (orderData.isExisting) {
-                alert(
-                  `Order already processed! Order ID: ${orderData.orderId}`
-                );
+                alert(`Order already processed! Order ID: ${orderData.orderId}`);
                 dispatch(resetCheckout());
-                router.push(`/order-success?orderId=${orderData.orderId}`);
+                redirectToSuccess(orderData);
                 return;
               }
 
@@ -310,14 +321,11 @@ const PaymentPage = () => {
 
               alert(successMessage);
               dispatch(resetCheckout());
-              const orderId = orderData?.orderId || orderData?.data?.orderId;
-              router.push(
-                orderId ? `/order-success?orderId=${orderId}` : "/order-success"
-              );
+              redirectToSuccess(orderData);
             } catch (e: any) {
-              alert(
-                e?.data?.message || "Failed to record order after payment."
-              );
+              console.error("❌ Order Creation Error:", e);
+              const errorMessage = e?.data?.message || e?.message || "Failed to record order after payment";
+              alert(errorMessage);
             }
           },
 
@@ -327,24 +335,20 @@ const PaymentPage = () => {
           },
           theme: { color: "#6366f1" },
           modal: {
-            ondismiss: () => console.log("Payment cancelled by user"),
+            ondismiss: () => console.log("💡 Payment cancelled by user"),
           },
         };
 
         const rzp = new (window as any).Razorpay(options);
-        rzp.on("payment.failed", (response: any) =>
-          alert(
-            `Payment failed: ${
-              response.error.description || "Please try again"
-            }`
-          )
-        );
+        rzp.on("payment.failed", (response: any) => {
+          console.error("❌ Payment Failed:", response.error);
+          alert(`Payment failed: ${response.error.description || "Please try again"}`);
+        });
         rzp.open();
       } catch (error: any) {
-        alert(
-          error?.data?.message ||
-            "Failed to initiate payment. Please try again."
-        );
+        console.error("❌ Payment Initiation Error:", error);
+        const errorMessage = error?.data?.message || error?.message || "Failed to initiate payment";
+        alert(`${errorMessage}. Please try again.`);
       }
     }
   };
@@ -428,7 +432,6 @@ const PaymentPage = () => {
                 : `${orderItems.length} products`}
             </p>
             <p className="text-lg font-semibold text-blue-600">
-              {/* ✅ SAFE: Using helper function */}
               Order Total: ₹{safeToFixed(pricingData?.subtotal)}
             </p>
           </div>
@@ -439,7 +442,7 @@ const PaymentPage = () => {
               {/* Online Payment */}
               <label
                 className={`block p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-                  selectedMethod === "ONLINE"
+                  selectedMethod === "RAZORPAY"
                     ? "border-blue-500 bg-blue-50 shadow-md"
                     : "border-gray-200 hover:bg-gray-50 hover:border-gray-300"
                 }`}
@@ -447,9 +450,9 @@ const PaymentPage = () => {
                 <input
                   type="radio"
                   name="payment_method"
-                  value="ONLINE"
-                  checked={selectedMethod === "ONLINE"}
-                  onChange={() => setSelectedMethod("ONLINE")}
+                  value="RAZORPAY"
+                  checked={selectedMethod === "RAZORPAY"}
+                  onChange={() => setSelectedMethod("RAZORPAY")}
                   className="sr-only"
                 />
                 <div className="flex items-start">
@@ -469,8 +472,7 @@ const PaymentPage = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-xl font-bold text-blue-600">
-                          {/* ✅ SAFE: Using backend data */}₹
-                          {safeToFixed(
+                          ₹{safeToFixed(
                             safeNumber(pricingData?.subtotal) +
                               safeNumber(pricingData?.packagingFee) +
                               safeNumber(pricingData?.deliveryCharge)
@@ -480,13 +482,13 @@ const PaymentPage = () => {
                       </div>
                     </div>
                   </div>
-                  {selectedMethod === "ONLINE" && (
+                  {selectedMethod === "RAZORPAY" && (
                     <span className="text-blue-500 text-xl ml-2">✓</span>
                   )}
                 </div>
               </label>
 
-              {/* ✅ FIXED: Advance Payment */}
+              {/* Advance Payment */}
               {isAdvanceEligible && (
                 <label
                   className={`block p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
@@ -509,28 +511,21 @@ const PaymentPage = () => {
                       <div className="flex justify-between items-center">
                         <div>
                           <h4 className="font-semibold text-gray-800">
-                            {/* ✅ FIXED: Show backend percentage */}
-                            {safeNumber(pricingData?.advancePercentage)}%
-                            Advance Payment
+                            {safeNumber(pricingData?.advancePercentage)}% Advance Payment
                           </h4>
                           <p className="text-sm text-gray-600 mt-1">
-                            {/* ✅ FIXED: Show correct advance logic */}
-                            Pay ₹{safeToFixed(pricingData?.advanceAmount)} of
-                            product cost now
+                            Pay ₹{safeToFixed(pricingData?.advanceAmount)} of product cost now
                           </p>
                           <p className="text-sm text-gray-600">
-                            Rest ₹{safeToFixed(pricingData?.remainingAmount)} +
-                            delivery charges on delivery
+                            Rest ₹{safeToFixed(pricingData?.remainingAmount)} + delivery charges on delivery
                           </p>
                           <p className="text-xs text-green-600 mt-1">
-                            ✅ Secure & 💰 Save ₹
-                            {safeToFixed(pricingData?.codHandlingFee)} COD fee!
+                            ✅ Secure & 💰 Save ₹{safeToFixed(pricingData?.codHandlingFee)} COD fee!
                           </p>
                         </div>
                         <div className="text-right">
                           <div className="text-xl font-bold text-green-600">
-                            {/* ✅ FIXED: Show advance + fees */}₹
-                            {safeToFixed(
+                            ₹{safeToFixed(
                               safeNumber(pricingData?.advanceAmount) +
                                 safeNumber(pricingData?.packagingFee) +
                                 safeNumber(pricingData?.deliveryCharge)
@@ -538,8 +533,7 @@ const PaymentPage = () => {
                           </div>
                           <div className="text-xs text-gray-500">Pay now</div>
                           <div className="text-xs text-orange-600 mt-1">
-                            + ₹{safeToFixed(pricingData?.remainingAmount)} on
-                            delivery
+                            + ₹{safeToFixed(pricingData?.remainingAmount)} on delivery
                           </div>
                         </div>
                       </div>
@@ -579,23 +573,19 @@ const PaymentPage = () => {
                           Pay when order arrives
                         </p>
                         <p className="text-xs text-orange-600 mt-1">
-                          + ₹{safeToFixed(pricingData?.codHandlingFee)} handling
-                          fee
+                          + ₹{safeToFixed(pricingData?.codHandlingFee)} handling fee
                         </p>
                       </div>
                       <div className="text-right">
                         <div className="text-xl font-bold text-orange-600">
-                          {/* ✅ SAFE: Using backend data */}₹
-                          {safeToFixed(
+                          ₹{safeToFixed(
                             safeNumber(pricingData?.subtotal) +
                               safeNumber(pricingData?.packagingFee) +
                               safeNumber(pricingData?.deliveryCharge) +
                               safeNumber(pricingData?.codHandlingFee)
                           )}
                         </div>
-                        <div className="text-xs text-gray-500">
-                          Pay on delivery
-                        </div>
+                        <div className="text-xs text-gray-500">Pay on delivery</div>
                       </div>
                     </div>
                   </div>
@@ -606,12 +596,10 @@ const PaymentPage = () => {
               </label>
             </div>
 
-            {/* ✅ SAFE: Price Breakdown */}
+            {/* Price Breakdown */}
             {selectedMethod && (
               <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                <h5 className="font-semibold text-gray-800 mb-3">
-                  Price Breakdown:
-                </h5>
+                <h5 className="font-semibold text-gray-800 mb-3">Price Breakdown:</h5>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Product Total:</span>
@@ -634,28 +622,19 @@ const PaymentPage = () => {
                   {selectedMethod === "ADVANCE" && (
                     <>
                       <div className="flex justify-between text-green-600">
-                        <span>
-                          Advance ({safeNumber(pricingData?.advancePercentage)}%
-                          of product):
-                        </span>
+                        <span>Advance ({safeNumber(pricingData?.advancePercentage)}% of product):</span>
                         <span>₹{safeToFixed(pricingData?.advanceAmount)}</span>
                       </div>
                       <div className="flex justify-between text-gray-600">
                         <span>Remaining product amount:</span>
-                        <span>
-                          ₹{safeToFixed(pricingData?.remainingAmount)}
-                        </span>
+                        <span>₹{safeToFixed(pricingData?.remainingAmount)}</span>
                       </div>
                     </>
                   )}
                   <hr className="my-2" />
                   <div className="flex justify-between font-bold text-lg">
-                    <span>
-                      Total to Pay {selectedMethod === "ADVANCE" ? "Now" : ""}:
-                    </span>
-                    <span className="text-green-600">
-                      ₹{safeToFixed(calculateTotalAmount)}
-                    </span>
+                    <span>Total to Pay {selectedMethod === "ADVANCE" ? "Now" : ""}:</span>
+                    <span className="text-green-600">₹{safeToFixed(calculateTotalAmount)}</span>
                   </div>
                 </div>
               </div>
@@ -686,7 +665,7 @@ const PaymentPage = () => {
                 `Place COD Order`
               ) : selectedMethod === "ADVANCE" ? (
                 `Pay Advance ₹${safeToFixed(calculateTotalAmount)}`
-              ) : selectedMethod === "ONLINE" ? (
+              ) : selectedMethod === "RAZORPAY" ? (
                 `Pay ₹${safeToFixed(calculateTotalAmount)}`
               ) : (
                 "Select Payment Method"

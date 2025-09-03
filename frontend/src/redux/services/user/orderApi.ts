@@ -2,7 +2,8 @@ import { axiosBaseQuery } from "@/redux/api/customBaseQuery";
 import { createApi } from "@reduxjs/toolkit/query/react";
 import {
   Order,
-  OrderCreationResponse, // ✅ Import this
+  OrderListResponse, // ✅ Use pagination wrapper
+  OrderCreationResponse,
   PlaceOrderRequest,
   RazorpayOrderResponse,
   CheckoutPricingRequest,
@@ -16,46 +17,37 @@ export const orderApi = createApi({
   baseQuery: axiosBaseQuery(),
   tagTypes: ["Orders"],
   endpoints: (builder) => ({
-    // ✅ FIXED: Return OrderCreationResponse instead of Order
     createOrder: builder.mutation<
-      OrderCreationResponse, // ✅ Changed from Order to OrderCreationResponse
+      OrderCreationResponse,
       { data: PlaceOrderRequest; idempotencyKey?: string }
     >({
       query: ({ data, idempotencyKey }) => ({
-        url: `/order/placeorder/`,
+        url: `/order/place-order`, // ✅ Updated URL
         method: "POST",
         data,
         headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
       }),
-      // ✅ FIXED: Transform response to match OrderCreationResponse
       transformResponse: (response: any) => {
-        // Assuming your backend returns something like:
-        // { success: true, message: "Order created", data: orderObject }
-        // Or { success: true, orderId: "123", isExisting: false, data: orderObject }
-        
         if (response.data) {
-          // If backend returns { success, data, message } format
           return {
             success: response.success || true,
             orderId: response.data.orderId || response.data._id,
             isExisting: response.isExisting || false,
             message: response.message,
-            data: response.data
+            data: response.data,
           };
         }
-        
-        // If backend returns direct order data, wrap it
+
         return {
           success: true,
           orderId: response.orderId || response._id,
           isExisting: false,
-          data: response
+          data: response,
         };
       },
       invalidatesTags: ["Orders"],
     }),
 
-    // Razorpay order creation
     createRazorpayOrder: builder.mutation<RazorpayOrderResponse, number>({
       query: (amount) => ({
         url: `/payment/create-order`,
@@ -65,7 +57,6 @@ export const orderApi = createApi({
       transformResponse: (response: any) => response.data,
     }),
 
-    // Checkout pricing
     getCheckoutPricing: builder.mutation<
       CheckoutPricingResponse,
       CheckoutPricingRequest
@@ -78,7 +69,6 @@ export const orderApi = createApi({
       transformResponse: (response: any) => response.data,
     }),
 
-    // Verify order amount before payment
     verifyOrderAmount: builder.mutation<
       VerifyAmountResponse,
       VerifyAmountRequest
@@ -91,20 +81,25 @@ export const orderApi = createApi({
       transformResponse: (response: any) => response.data,
     }),
 
-    // Get user's own orders
-    getMyOrders: builder.query<Order[], void>({
-      query: () => ({
-        url: `/order/myorders`,
+    // ✅ Updated with pagination support
+    getMyOrders: builder.query<
+      OrderListResponse, // ✅ Pagination wrapper type
+      { page?: number; limit?: number } | void
+    >({
+      query: ({ page = 1, limit = 10 } = {}) => ({
+        url: `/order/my-orders?page=${page}&limit=${limit}`, // ✅ Updated URL
         method: "GET",
       }),
-      transformResponse: (response: any) => response.data,
+      transformResponse: (response: any) => {
+        console.log("🔍 RTK Query - response.data:", response.data);
+        return response.data;
+      },
       providesTags: ["Orders"],
     }),
 
-    // Cancel order
     cancelOrder: builder.mutation<void, { orderId: string }>({
       query: ({ orderId }) => ({
-        url: `/order/cancel-order`,
+        url: `/order/cancel`, // ✅ Updated URL
         method: "POST",
         data: { orderId },
       }),

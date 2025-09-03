@@ -1,12 +1,14 @@
 import { Order } from "../models/order.models";
-import {
-  Return,
-  ReturnDocument,
-  ReturnStatus,
-  generateReturnId,
-} from "../models/return.models";
+import { Return, ReturnDocument, ReturnStatus } from "../models/return.models";
 import { AppError } from "../utils/AppError";
 import { Types } from "mongoose";
+
+// ✅ Import new utilities
+import { ValidationUtils } from "../utils/validators";
+import { IDGenerator } from "../utils/IDGenerator";
+import { StatusManager } from "../utils/statusManger";
+import { PaginationService } from "./PaginationService";
+import { BUSINESS_RULES } from "../constants/Bussiness";
 
 export interface CreateReturnInput {
   orderId: string;
@@ -21,12 +23,25 @@ export interface CreateReturnInput {
 }
 
 export class ReturnService {
+  // ✅ Return status transition rules
+  private allowedTransitions: Record<ReturnStatus, ReturnStatus[]> = {
+    [ReturnStatus.Requested]: [ReturnStatus.Approved, ReturnStatus.Rejected],
+    [ReturnStatus.Approved]: [ReturnStatus.PickedUp, ReturnStatus.Rejected],
+    [ReturnStatus.PickedUp]: [ReturnStatus.Received],
+    [ReturnStatus.Received]: [ReturnStatus.Processed],
+    [ReturnStatus.Processed]: [],
+    [ReturnStatus.Rejected]: [],
+  };
+
   // ✅ 1. Create Return Request
   async createReturnRequest(returnData: CreateReturnInput): Promise<{
     return: ReturnDocument;
     refundAmount: number;
   }> {
     try {
+      // ✅ Use ValidationUtils
+      ValidationUtils.validateObjectId(returnData.userId.toString(), "User ID");
+
       // Validate order exists and belongs to user
       const order = await Order.findOne({
         orderId: returnData.orderId,
@@ -42,13 +57,18 @@ export class ReturnService {
         throw new AppError("Only delivered orders can be returned", 400);
       }
 
-      // Check if return window is still open (e.g., 7 days)
-      const returnWindow = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+      // ✅ Use BUSINESS_RULES constant and ValidationUtils
       const deliveryDate = order.trackingInfo?.actualDelivery || order.placedAt;
-      const currentDate = new Date();
-
-      if (currentDate.getTime() - deliveryDate.getTime() > returnWindow) {
-        throw new AppError("Return window has expired", 400);
+      if (
+        !ValidationUtils.validateReturnWindow(
+          deliveryDate,
+          BUSINESS_RULES.RETURN_WINDOW_DAYS
+        )
+      ) {
+        throw new AppError(
+          `Return window of ${BUSINESS_RULES.RETURN_WINDOW_DAYS} days has expired`,
+          400
+        );
       }
 
       // Validate return items and calculate refund amount
@@ -82,8 +102,8 @@ export class ReturnService {
         throw new AppError("Return request already exists for this order", 400);
       }
 
-      // Generate return ID
-      const returnId = await generateReturnId();
+      // ✅ Use IDGenerator
+      const returnId = await IDGenerator.generateReturnId(Return);
 
       // Create return request
       const returnRequest = new Return({
@@ -111,32 +131,31 @@ export class ReturnService {
     }
   }
 
-  // ✅ 2. Get User Returns
+  // ✅ 2. Get User Returns with PaginationService
   async getUserReturns(
     userId: Types.ObjectId,
     page: number = 1,
     limit: number = 10
   ) {
     try {
-      const skip = (page - 1) * limit;
+      // ✅ Use ValidationUtils
+      const { page: validPage, limit: validLimit } =
+        ValidationUtils.validatePagination(page, limit);
 
-      const returns = await Return.find({ user: userId })
-        .sort({ requestedAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .populate("order", "orderId totalAmount placedAt")
-        .lean();
-
-      const total = await Return.countDocuments({ user: userId });
+      const result = await PaginationService.paginate(
+        Return,
+        { user: userId },
+        validPage,
+        validLimit,
+        {
+          populate: "order",
+          sort: { requestedAt: -1 },
+        }
+      );
 
       return {
-        returns,
-        pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit),
-        },
+        returns: result.data,
+        pagination: result.pagination,
       };
     } catch (error: any) {
       throw new AppError(`Failed to fetch user returns: ${error.message}`, 500);
@@ -151,7 +170,7 @@ export class ReturnService {
     try {
       const query: any = { returnId };
       if (userId) {
-        query.user = userId; // Ensure user can only see their own returns
+        query.user = userId;
       }
 
       const returnDoc = await Return.findOne(query)
@@ -169,7 +188,7 @@ export class ReturnService {
     }
   }
 
-  // ✅ 4. Update Return Status (Admin)
+  // ✅ 4. Update Return Status (Admin) with StatusManager
   async updateReturnStatus(
     returnId: string,
     status: ReturnStatus,
@@ -181,6 +200,14 @@ export class ReturnService {
       if (!returnDoc) {
         throw new AppError("Return not found", 404);
       }
+
+      // ✅ Use StatusManager for validation
+      StatusManager.validateTransition(
+        returnDoc.status,
+        status,
+        this.allowedTransitions,
+        "Return"
+      );
 
       returnDoc.status = status;
 
@@ -204,38 +231,36 @@ export class ReturnService {
     }
   }
 
-  // ✅ 5. Get All Returns (Admin)
+  // ✅ 5. Get All Returns (Admin) with PaginationService
   async getAllReturns(
     page: number = 1,
     limit: number = 10,
     status?: ReturnStatus
   ) {
     try {
-      const skip = (page - 1) * limit;
-      const query: any = {};
+      // ✅ Use ValidationUtils
+      const { page: validPage, limit: validLimit } =
+        ValidationUtils.validatePagination(page, limit);
 
+      const query: any = {};
       if (status) {
         query.status = status;
       }
 
-      const returns = await Return.find(query)
-        .sort({ requestedAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .populate("user", "name email")
-        .populate("order", "orderId totalAmount")
-        .lean();
-
-      const total = await Return.countDocuments(query);
+      const result = await PaginationService.paginate(
+        Return,
+        query,
+        validPage,
+        validLimit,
+        {
+          populate: ["user", "order"],
+          sort: { requestedAt: -1 },
+        }
+      );
 
       return {
-        returns,
-        pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit),
-        },
+        returns: result.data,
+        pagination: result.pagination,
       };
     } catch (error: any) {
       throw new AppError(`Failed to fetch returns: ${error.message}`, 500);
@@ -300,5 +325,13 @@ export class ReturnService {
         500
       );
     }
+  }
+
+  // ✅ 8. Get Next Allowed Statuses (Admin Helper)
+  getNextAllowedStatuses(currentStatus: ReturnStatus): ReturnStatus[] {
+    return StatusManager.getNextAllowedStatuses(
+      currentStatus,
+      this.allowedTransitions
+    );
   }
 }

@@ -13,7 +13,6 @@ export const placeOrder = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const userId = req.userId;
     if (!userId) {
-      // Throwing AppError lets your error middleware format the error
       throw new AppError("Unauthorized", 401);
     }
     const idempotencyKey = req.headers["idempotency-key"] as string;
@@ -27,7 +26,6 @@ export const placeOrder = catchAsync(
       idempotencyKey
     );
 
-    // Use ApiResponse for consistent, structured success output
     return res.status(201).json(
       new ApiResponse(
         201,
@@ -44,6 +42,7 @@ export const placeOrder = catchAsync(
   }
 );
 
+// ✅ UPDATED: getMyOrders with pagination support
 export const getMyOrders = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const userId = req.userId;
@@ -51,11 +50,17 @@ export const getMyOrders = catchAsync(
       throw new AppError("Unauthorized", 401);
     }
 
-    const orders = await orderService.getMyOrders(userId);
+    // ✅ ADD: Pagination parameters
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+
+    // ✅ UPDATED: Service now returns pagination data
+    const result = await orderService.getMyOrders(userId, page, limit);
+    console.log(result);
 
     return res
       .status(200)
-      .json(new ApiResponse(200, orders, "Fetched user orders successfully"));
+      .json(new ApiResponse(200, result, "Fetched user orders successfully"));
   }
 );
 
@@ -80,11 +85,11 @@ export const cancelOrderController = catchAsync(
   }
 );
 
-// New: Update Order Status Controller
+// ✅ UPDATED: Add tracking info support
 export const updateOrderStatusController = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const { orderId } = req.params;
-    const { status } = req.body;
+    const { status, trackingInfo } = req.body; // ✅ ADD: trackingInfo
 
     if (!orderId || !status) {
       throw new AppError("Order ID and status are required", 400);
@@ -94,9 +99,11 @@ export const updateOrderStatusController = catchAsync(
       throw new AppError("Invalid order status", 400);
     }
 
+    // ✅ UPDATED: Pass trackingInfo to service
     const updatedOrder = await orderService.updateOrderStatus(
       orderId,
-      status as OrderStatus
+      status as OrderStatus,
+      trackingInfo // ✅ ADD: trackingInfo parameter
     );
 
     return res.status(200).json(
@@ -105,6 +112,14 @@ export const updateOrderStatusController = catchAsync(
         {
           orderId: updatedOrder._id,
           status: updatedOrder.status,
+          trackingInfo: updatedOrder.deliverySnapshot?.trackingId
+            ? {
+                trackingId: updatedOrder.deliverySnapshot.trackingId,
+                courierPartner: updatedOrder.deliverySnapshot.courierPartner,
+                estimatedDelivery:
+                  updatedOrder.deliverySnapshot.estimatedDelivery,
+              }
+            : null,
         },
         `Order status updated to ${updatedOrder.status}`
       )
@@ -124,14 +139,12 @@ export const getCheckoutPricing = catchAsync(
       throw new AppError("Pincode required", 400);
     }
 
-    // ✅ यहाँ try-catch add किया है extra safety के लिए
     try {
       const pricingData = await orderService.calculateDisplayPricing(
         items,
         pincode
       );
 
-      // ✅ हमेशा success response return करेंगे - crash नहीं होगा
       return res
         .status(200)
         .json(
@@ -146,14 +159,12 @@ export const getCheckoutPricing = catchAsync(
     } catch (error: any) {
       console.error("Pricing calculation error:", error.message);
 
-      // ✅ अगर कोई error आए तो proper response भेजेंगे
       if (error instanceof AppError) {
         return res
           .status(error.statusCode)
           .json(new ApiResponse(error.statusCode, null, error.message));
       }
 
-      // Unexpected errors के लिए
       return res
         .status(500)
         .json(new ApiResponse(500, null, "Internal server error"));

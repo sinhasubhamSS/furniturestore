@@ -113,7 +113,7 @@ export interface IProduct extends Document {
   category: Types.ObjectId;
 
   price: number; // Lowest variant price
-  lowestDiscountedPrice: number;
+  lowestDiscountedPrice: number; // Lowest discounted price among variants
   maxSavings: number;
 
   createdBy: Types.ObjectId;
@@ -195,7 +195,7 @@ const productSchema = new Schema<IProduct, IProductModel>(
     category: { type: Schema.Types.ObjectId, ref: "Category", required: true },
 
     price: { type: Number, required: true },
-    lowestDiscountedPrice: { type: Number, required: true },
+    lowestDiscountedPrice: { type: Number, required: false },
     maxSavings: { type: Number, default: 0 },
 
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },

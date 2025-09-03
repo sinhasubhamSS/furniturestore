@@ -1,18 +1,19 @@
 import { Schema, model, Document, Types } from "mongoose";
+import { IDGenerator } from "../utils/IDGenerator";
 
 // Enum for order status
 export enum OrderStatus {
   Pending = "pending",
   Confirmed = "confirmed",
   Shipped = "shipped",
-  OutForDelivery = "out_for_delivery", // optional
+  OutForDelivery = "out_for_delivery",
   Delivered = "delivered",
   Cancelled = "cancelled",
   Refunded = "refunded",
-  Failed = "failed", // delivery failed add kar sakte hain
+  Failed = "failed",
 }
 
-// Enum for payment method (optional but good practice)
+// Enum for payment method
 export enum PaymentMethod {
   COD = "COD",
   RAZORPAY = "RAZORPAY",
@@ -22,15 +23,13 @@ export enum PaymentMethod {
 }
 
 // Order Item snapshot interface
-// ✅ Clean interface - only what matters for user
 export interface OrderItemSnapshot {
   productId: Types.ObjectId;
   variantId: Types.ObjectId;
-
   name: string;
   image?: string;
   quantity: number;
-  price: number; // ✅ Final price that user paid (either price or discountedPrice)
+  price: number;
   hasDiscount: boolean;
   discountPercent?: number;
   color?: string;
@@ -51,6 +50,7 @@ export interface ShippingAddressSnapshot {
   pincode: string;
   country: string;
 }
+
 export interface DeliverySnapshot {
   zone: "Zone1" | "Zone2" | "Zone3";
   deliveryCharge: number;
@@ -68,6 +68,7 @@ export interface DeliverySnapshot {
   trackingId?: string;
   estimatedDelivery?: Date;
 }
+
 // Payment Snapshot interface
 export interface PaymentSnapshot {
   method?: PaymentMethod;
@@ -81,28 +82,7 @@ export interface PaymentSnapshot {
   remainingAmount?: number;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
-  razorpaySignature?: string; // For verification
-}
-
-async function getTodayOrderCount(): Promise<number> {
-  const today = new Date();
-  const todayStart = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate()
-  );
-  const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
-
-  return await Order.countDocuments({
-    createdAt: { $gte: todayStart, $lt: todayEnd },
-  });
-}
-
-export async function generateStandardOrderId(): Promise<string> {
-  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const todayCount = await getTodayOrderCount();
-  const sequence = (todayCount + 1).toString().padStart(5, "0");
-  return `SUVI-${dateStr}-${sequence}`;
+  razorpaySignature?: string;
 }
 
 // Final Order Document interface
@@ -121,7 +101,6 @@ export interface OrderDocument extends Document {
   isAdvancePayment: boolean;
   advancePaymentAmount: number;
   remainingAmount: number;
-
   trackingInfo?: {
     trackingNumber?: string;
     courierPartner?: string;
@@ -153,13 +132,13 @@ const orderSchema = new Schema<OrderDocument>(
         name: { type: String, required: true },
         image: String,
         quantity: { type: Number, required: true },
-        price: { type: Number, required: true }, // ✅ Only this price
+        price: { type: Number, required: true },
         hasDiscount: { type: Boolean, default: false },
         discountPercent: { type: Number, default: 0 },
         color: String,
         size: String,
         sku: String,
-        // No basePrice field
+        weight: { type: Number, required: true },
       },
     ],
 
@@ -174,6 +153,7 @@ const orderSchema = new Schema<OrderDocument>(
       pincode: { type: String, required: true },
       country: { type: String, required: true },
     },
+
     deliverySnapshot: {
       zone: { type: String, enum: ["Zone1", "Zone2", "Zone3"] },
       deliveryCharge: { type: Number, required: true },
@@ -184,14 +164,10 @@ const orderSchema = new Schema<OrderDocument>(
       courierPartner: String,
       codAvailable: { type: Boolean, default: true },
       totalWeight: Number,
-
-      // ✅ New fee fields in snapshot
       packagingFee: { type: Number, default: 29 },
       codHandlingFee: { type: Number, default: 0 },
       advancePaymentAmount: { type: Number, default: 0 },
       remainingAmount: { type: Number, default: 0 },
-
-      // Tracking fields
       trackingId: String,
       estimatedDelivery: Date,
     },
@@ -209,13 +185,9 @@ const orderSchema = new Schema<OrderDocument>(
       transactionId: String,
       provider: String,
       paidAt: Date,
-
-      // Razorpay fields
       razorpayOrderId: String,
       razorpayPaymentId: String,
       razorpaySignature: String,
-
-      // ✅ New advance payment fields
       isAdvancePayment: { type: Boolean, default: false },
       advancePercentage: { type: Number, default: 0 },
       advanceAmount: { type: Number, default: 0 },
@@ -242,27 +214,20 @@ const orderSchema = new Schema<OrderDocument>(
     advancePaymentAmount: { type: Number, default: 0 },
     remainingAmount: { type: Number, default: 0 },
   },
-
   { timestamps: true }
 );
 
-// ✅ ADD PRE-SAVE HOOK
-// Order model में temporarily यह test करें
-orderSchema.pre("save", function (next) {
-  console.log("🚀 PRE-SAVE HOOK CALLED!");
-  console.log("Current orderId:", this.orderId);
-
+// ✅ Updated PRE-SAVE HOOK with new ID generator
+orderSchema.pre("save", async function (next) {
   if (!this.orderId) {
-    console.log("⚙️ Setting test OrderID...");
-    this.orderId = "TEST-ORDER-ID-12345";
-    console.log("✅ Test OrderID set:", this.orderId);
+    this.orderId = await IDGenerator.generateOrderId(Order);
   }
-
   next();
 });
 
-// Index for recent user orders
+// Indexes
 orderSchema.index({ user: 1, placedAt: -1 });
-// ✅ ADD ORDERID INDEX
+orderSchema.index({ status: 1, placedAt: -1 });
+
 
 export const Order = model<OrderDocument>("Order", orderSchema);

@@ -7,15 +7,95 @@ import { Types } from "mongoose";
 import { ReturnStatus } from "../models/return.models";
 import { AuthRequest } from "../types/app-request";
 import { Order } from "../models/order.models";
+// ✅ ADD: Import BUSINESS_RULES
+import { BUSINESS_RULES } from "../constants/Bussiness";
 
 const returnService = new ReturnService();
 
 export class ReturnController {
-  // ✅ 1. Create Return Request
+  // ✅ All other methods remain same...
+
+  // ✅ UPDATED: checkReturnEligibility with BUSINESS_RULES
+  checkReturnEligibility = catchAsync(
+    async (req: AuthRequest, res: Response): Promise<void> => {
+      const { orderId } = req.params;
+      const userId = req.userId;
+
+      if (!userId) {
+        throw new AppError("Authentication required", 401);
+      }
+
+      const order = await Order.findOne({
+        orderId,
+        user: new Types.ObjectId(userId),
+      });
+
+      if (!order) {
+        throw new AppError("Order not found", 404);
+      }
+
+      const isEligible = order.status === "delivered";
+
+      // ✅ UPDATED: Use BUSINESS_RULES constant instead of hardcoded 7 days
+      const returnWindowMs =
+        BUSINESS_RULES.RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+      const deliveryDate = order.trackingInfo?.actualDelivery || order.placedAt;
+      const timeRemaining =
+        returnWindowMs - (new Date().getTime() - deliveryDate.getTime());
+      const isWithinWindow = timeRemaining > 0;
+
+      res.status(200).json(
+        new ApiResponse(
+          200,
+          {
+            isEligible: isEligible && isWithinWindow,
+            order,
+            timeRemaining: Math.max(0, timeRemaining),
+            returnWindowDays: BUSINESS_RULES.RETURN_WINDOW_DAYS, // ✅ ADD: Show return window
+            reason: !isEligible
+              ? "Order must be delivered to be eligible for return"
+              : !isWithinWindow
+              ? `Return window of ${BUSINESS_RULES.RETURN_WINDOW_DAYS} days has expired`
+              : "Order is eligible for return",
+          },
+          "Return eligibility checked"
+        )
+      );
+    }
+  );
+
+  // ✅ ADD: Get Next Allowed Statuses (Admin Helper)
+  getNextAllowedStatuses = catchAsync(
+    async (req: AuthRequest, res: Response): Promise<void> => {
+      const { returnId } = req.params;
+
+      if (req.user?.role !== "admin") {
+        throw new AppError("Admin access required", 403);
+      }
+
+      const returnDoc = await returnService.getReturnById(returnId);
+      const nextStatuses = returnService.getNextAllowedStatuses(
+        returnDoc.status
+      );
+
+      res.status(200).json(
+        new ApiResponse(
+          200,
+          {
+            currentStatus: returnDoc.status,
+            nextAllowedStatuses: nextStatuses,
+          },
+          "Next allowed statuses fetched successfully"
+        )
+      );
+    }
+  );
+
+  // All other methods remain exactly the same...
   createReturnRequest = catchAsync(
     async (req: AuthRequest, res: Response): Promise<void> => {
       const { orderId, returnItems, returnReason } = req.body;
-      const userId = req.userId; // Assuming auth middleware sets req.user
+      const userId = req.userId;
 
       if (!userId) {
         throw new AppError("Authentication required", 401);
@@ -32,7 +112,6 @@ export class ReturnController {
         throw new AppError("At least one return item is required", 400);
       }
 
-      // Validate return items structure
       for (const item of returnItems) {
         if (
           typeof item.orderItemIndex !== "number" ||
@@ -66,7 +145,6 @@ export class ReturnController {
     }
   );
 
-  // ✅ 2. Get User Returns
   getUserReturns = catchAsync(
     async (req: AuthRequest, res: Response): Promise<void> => {
       const userId = req.userId;
@@ -91,7 +169,6 @@ export class ReturnController {
     }
   );
 
-  // ✅ 3. Get Return by ID
   getReturnById = catchAsync(
     async (req: AuthRequest, res: Response): Promise<void> => {
       const { returnId } = req.params;
@@ -101,7 +178,6 @@ export class ReturnController {
         throw new AppError("Return ID is required", 400);
       }
 
-      // For regular users, restrict to their own returns
       const userIdFilter =
         req.user?.role === "admin" ? undefined : new Types.ObjectId(userId);
 
@@ -122,13 +198,11 @@ export class ReturnController {
     }
   );
 
-  // ✅ 4. Update Return Status (Admin only)
   updateReturnStatus = catchAsync(
     async (req: AuthRequest, res: Response): Promise<void> => {
       const { returnId } = req.params;
       const { status, adminNotes } = req.body;
 
-      // Check admin role (assuming role-based auth)
       if (req.user?.role !== "admin") {
         throw new AppError("Admin access required", 403);
       }
@@ -137,7 +211,6 @@ export class ReturnController {
         throw new AppError("Return ID and status are required", 400);
       }
 
-      // Validate status
       if (!Object.values(ReturnStatus).includes(status)) {
         throw new AppError("Invalid return status", 400);
       }
@@ -160,10 +233,8 @@ export class ReturnController {
     }
   );
 
-  // ✅ 5. Get All Returns (Admin only)
   getAllReturns = catchAsync(
     async (req: AuthRequest, res: Response): Promise<void> => {
-      // Check admin role
       if (req.user?.role !== "admin") {
         throw new AppError("Admin access required", 403);
       }
@@ -180,7 +251,6 @@ export class ReturnController {
     }
   );
 
-  // ✅ 6. Cancel Return Request
   cancelReturnRequest = catchAsync(
     async (req: AuthRequest, res: Response): Promise<void> => {
       const { returnId } = req.params;
@@ -207,10 +277,8 @@ export class ReturnController {
     }
   );
 
-  // ✅ 7. Get Return Analytics (Admin only)
   getReturnAnalytics = catchAsync(
     async (req: AuthRequest, res: Response): Promise<void> => {
-      // Check admin role
       if (req.user?.role !== "admin") {
         throw new AppError("Admin access required", 403);
       }
@@ -226,53 +294,6 @@ export class ReturnController {
             "Return analytics fetched successfully"
           )
         );
-    }
-  );
-
-  // ✅ 8. Check Return Eligibility
-  checkReturnEligibility = catchAsync(
-    async (req: AuthRequest, res: Response): Promise<void> => {
-      const { orderId } = req.params;
-      const userId = req.userId;
-      console.log(orderId);
-      console.log(userId);
-      if (!userId) {
-        throw new AppError("Authentication required", 401);
-      }
-
-      // This could be part of OrderService, but for simplicity keeping here
-      const order = await Order.findOne({
-        orderId,
-        user: new Types.ObjectId(userId),
-      });
-
-      if (!order) {
-        throw new AppError("Order not found", 404);
-      }
-
-      const isEligible = order.status === "delivered";
-      const returnWindow = 7 * 24 * 60 * 60 * 1000; // 7 days
-      const deliveryDate = order.trackingInfo?.actualDelivery || order.placedAt;
-      const timeRemaining =
-        returnWindow - (new Date().getTime() - deliveryDate.getTime());
-      const isWithinWindow = timeRemaining > 0;
-
-      res.status(200).json(
-        new ApiResponse(
-          200,
-          {
-            isEligible: isEligible && isWithinWindow,
-            order,
-            timeRemaining: Math.max(0, timeRemaining),
-            reason: !isEligible
-              ? "Order must be delivered to be eligible for return"
-              : !isWithinWindow
-              ? "Return window has expired"
-              : "Order is eligible for return",
-          },
-          "Return eligibility checked"
-        )
-      );
     }
   );
 }

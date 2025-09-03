@@ -8,7 +8,10 @@ const returnController = new ReturnController();
 
 // ✅ User Routes (Authentication Required)
 router.post("/", authVerify, returnController.createReturnRequest);
-router.get("/user/:userId", authVerify, returnController.getUserReturns);
+
+// ✅ FIX: Remove userId from URL - get from req.userId instead
+router.get("/my-returns", authVerify, returnController.getUserReturns);
+
 router.get(
   "/eligibility/:orderId",
   authVerify,
@@ -18,8 +21,15 @@ router.get("/:returnId", authVerify, returnController.getReturnById);
 router.delete("/:returnId", authVerify, returnController.cancelReturnRequest);
 
 // ✅ Admin Routes (Admin Authentication Required)
-router.put("/:returnId", isAdmin, returnController.updateReturnStatus);
+router.put("/:returnId/status", isAdmin, returnController.updateReturnStatus);
 router.get("/admin/all", isAdmin, returnController.getAllReturns);
 router.get("/admin/analytics", isAdmin, returnController.getReturnAnalytics);
+
+// ✅ NEW: Admin helper route for status transitions
+router.get(
+  "/:returnId/next-statuses",
+  isAdmin,
+  returnController.getNextAllowedStatuses
+);
 
 export default router;
