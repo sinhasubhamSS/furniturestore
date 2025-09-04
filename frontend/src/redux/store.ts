@@ -2,7 +2,7 @@ import { configureStore, combineReducers } from "@reduxjs/toolkit";
 import userReducer from "./slices/userSlice";
 // import cartReducer from "./slices/cartSlice";
 import checkoutReducer from "./slices/checkoutSlice"; // ✅ Import checkout reducer
-import wishlistReducer from "./slices/wishlistSlice"
+import wishlistReducer from "./slices/wishlistSlice";
 import {
   persistStore,
   persistReducer,
@@ -27,6 +27,7 @@ import productDetailReducer from "./slices/ProductDetailSlice";
 import { reviewsApi } from "./services/user/reviewApi";
 import { returnApi } from "./services/user/returnApi";
 import { deliveryApi } from "./services/user/deliveryApi";
+import { adminApi } from "./services/admin/adminOrderapi";
 
 const rootReducer = combineReducers({
   user: userReducer,
@@ -45,6 +46,7 @@ const rootReducer = combineReducers({
   [reviewsApi.reducerPath]: reviewsApi.reducer,
   [returnApi.reducerPath]: returnApi.reducer,
   [deliveryApi.reducerPath]: deliveryApi.reducer,
+  [adminApi.reducerPath]: adminApi.reducer,
 });
 
 // ✅ Updated persist config to include checkout
@@ -74,7 +76,8 @@ export const store = configureStore({
       adminDashboardApi.middleware,
       reviewsApi.middleware,
       returnApi.middleware,
-      deliveryApi.middleware
+      deliveryApi.middleware,
+      adminApi.middleware
     ),
 });
 

@@ -6,7 +6,8 @@ import { AppError } from "../utils/AppError";
 import { ApiResponse } from "../utils/ApiResponse";
 import { paymentService } from "../services/paymentService";
 import { OrderStatus } from "../models/order.models";
-
+import { Order } from "../models/order.models";
+import { Return } from "../models/return.models";
 const orderService = new OrderService();
 
 export const placeOrder = catchAsync(
@@ -168,6 +169,53 @@ export const getCheckoutPricing = catchAsync(
       return res
         .status(500)
         .json(new ApiResponse(500, null, "Internal server error"));
+    }
+  }
+);
+export const getAllOrdersAdmin = catchAsync(
+  async (req: AuthRequest, res: Response) => {
+    console.log("=== DEBUG: getAllOrdersAdmin called ===");
+    console.log("Query params:", req.query);
+
+    const {
+      page = 1,
+      limit = 20,
+      status,
+      search,
+      startDate,
+      endDate,
+    } = req.query;
+
+    try {
+      // ✅ Use OrderService instead of direct DB calls
+      const result = await orderService.getAllOrdersAdmin(
+        Number(page),
+        Number(limit),
+        status as string,
+        startDate as string,
+        endDate as string,
+        search as string
+      );
+
+      console.log("Service returned:", result);
+
+      return res.status(200).json(
+        new ApiResponse(
+          200,
+          result, // Service already returns { orders, pagination }
+          "Orders fetched successfully"
+        )
+      );
+    } catch (error: any) {
+      console.error("=== ERROR in getAllOrdersAdmin Controller ===");
+      console.error("Error:", error.message);
+      console.error("Stack:", error.stack);
+
+      return res
+        .status(500)
+        .json(
+          new ApiResponse(500, null, `Internal server error: ${error.message}`)
+        );
     }
   }
 );

@@ -277,23 +277,50 @@ export class ReturnController {
     }
   );
 
-  getReturnAnalytics = catchAsync(
-    async (req: AuthRequest, res: Response): Promise<void> => {
-      if (req.user?.role !== "admin") {
-        throw new AppError("Admin access required", 403);
-      }
-
-      const analytics = await returnService.getReturnAnalytics();
-
-      res
-        .status(200)
-        .json(
-          new ApiResponse(
-            200,
-            analytics,
-            "Return analytics fetched successfully"
-          )
-        );
+  getAllReturnsAdmin = catchAsync(async (req: AuthRequest, res: Response) => {
+    if (req.user?.role !== "admin") {
+      throw new AppError("Admin access required", 403);
     }
-  );
+
+    const {
+      page = 1,
+      limit = 20,
+      status,
+      search,
+      startDate,
+      endDate,
+    } = req.query;
+
+    const result = await returnService.getAllReturnsAdmin(
+      Number(page),
+      Number(limit),
+      status as ReturnStatus,
+      startDate as string,
+      endDate as string,
+      search as string
+    );
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, result, "Returns fetched successfully"));
+  });
+
+  getReturnAnalytics = catchAsync(async (req: AuthRequest, res: Response) => {
+    if (req.user?.role !== "admin") {
+      throw new AppError("Admin access required", 403);
+    }
+
+    const { startDate, endDate } = req.query;
+
+    const analytics = await returnService.getReturnAnalyticsByDate(
+      startDate as string,
+      endDate as string
+    );
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, analytics, "Return analytics fetched successfully")
+      );
+  });
 }

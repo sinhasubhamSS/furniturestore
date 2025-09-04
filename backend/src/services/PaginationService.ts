@@ -46,7 +46,15 @@ export class PaginationService {
           queryChain = queryChain.populate(pop);
         });
       } else {
-        queryChain = queryChain.populate(options.populate);
+        // ✅ Handle "user" populate specifically
+        if (options.populate === "user") {
+          queryChain = queryChain.populate({
+            path: "user",
+            select: "name email mobile",
+          });
+        } else {
+          queryChain = queryChain.populate(options.populate);
+        }
       }
     }
 

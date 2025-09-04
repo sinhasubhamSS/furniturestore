@@ -31,7 +31,7 @@ export const navItems = [
     label: "Orders",
     icon: FiFileText,
     children: [
-      { name: "all-orders", label: "All Orders", href: "/admin/orders" },
+      { name: "all-orders", label: "All Orders",href: "/admin/orders" },
       { name: "returns", label: "Returns", href: "/admin/orders/returns" },
     ],
   },

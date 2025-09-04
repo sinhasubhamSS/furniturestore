@@ -21,7 +21,7 @@ export interface CreateReturnInput {
   }[];
   returnReason: string;
 }
-
+export type ReturnStatusFilter = ReturnStatus | "all";
 export class ReturnService {
   // ✅ Return status transition rules
   private allowedTransitions: Record<ReturnStatus, ReturnStatus[]> = {
@@ -293,38 +293,92 @@ export class ReturnService {
     }
   }
 
-  // ✅ 7. Get Return Analytics (Admin)
-  async getReturnAnalytics() {
-    try {
-      const analytics = await Return.aggregate([
-        {
-          $group: {
-            _id: "$status",
-            count: { $sum: 1 },
-            totalRefundAmount: { $sum: "$refundAmount" },
-          },
-        },
-        {
-          $sort: { count: -1 },
-        },
-      ]);
+  // ReturnService में add करें:
 
-      const totalReturns = await Return.countDocuments();
-      const totalRefundAmount = await Return.aggregate([
-        { $group: { _id: null, total: { $sum: "$refundAmount" } } },
-      ]);
+  async getAllReturnsAdmin(
+    page: number = 1,
+    limit: number = 20,
+   status?: ReturnStatusFilter,
+    startDate?: string,
+    endDate?: string,
+    search?: string
+  ) {
+    const { page: validPage, limit: validLimit } =
+      ValidationUtils.validatePagination(page, limit);
 
-      return {
-        analytics,
-        totalReturns,
-        totalRefundAmount: totalRefundAmount[0]?.total || 0,
-      };
-    } catch (error: any) {
-      throw new AppError(
-        `Failed to fetch return analytics: ${error.message}`,
-        500
-      );
+   const filter: any = {};
+
+    if (status && status !== "all") {
+      filter.status = status;
     }
+
+    if (startDate && endDate) {
+      filter.requestedAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
+    }
+
+    if (search) {
+      filter.$or = [
+        { returnId: { $regex: search, $options: "i" } },
+        { orderId: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    return await PaginationService.paginate(
+      Return,
+      filter,
+      validPage,
+      validLimit,
+      {
+        populate: ["user", "order"],
+        sort: { requestedAt: -1 },
+      }
+    );
+  }
+
+  // Enhanced analytics with date filters
+  async getReturnAnalyticsByDate(startDate?: string, endDate?: string) {
+    const dateFilter:any = {};
+    if (startDate && endDate) {
+      dateFilter.requestedAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
+    }
+
+    const analytics = await Return.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+          totalRefundAmount: { $sum: "$refundAmount" },
+          averageRefund: { $avg: "$refundAmount" },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+
+    return {
+      analytics,
+      totalReturns: await Return.countDocuments(dateFilter),
+      summary: {
+        pendingReturns: await Return.countDocuments({
+          ...dateFilter,
+          status: "requested",
+        }),
+        approvedReturns: await Return.countDocuments({
+          ...dateFilter,
+          status: "approved",
+        }),
+        processedReturns: await Return.countDocuments({
+          ...dateFilter,
+          status: "processed",
+        }),
+      },
+    };
   }
 
   // ✅ 8. Get Next Allowed Statuses (Admin Helper)

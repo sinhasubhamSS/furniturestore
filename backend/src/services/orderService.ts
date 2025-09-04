@@ -32,7 +32,11 @@ class OrderService {
       OrderStatus.Cancelled,
       OrderStatus.Failed,
     ],
-    [OrderStatus.Shipped]: [OrderStatus.OutForDelivery, OrderStatus.Failed],
+    [OrderStatus.Shipped]: [
+      OrderStatus.OutForDelivery,
+      OrderStatus.Delivered, // ✅ ADDED: Direct delivery from shipped
+      OrderStatus.Failed,
+    ],
     [OrderStatus.OutForDelivery]: [OrderStatus.Delivered, OrderStatus.Failed],
     [OrderStatus.Delivered]: [],
     [OrderStatus.Cancelled]: [],
@@ -95,7 +99,8 @@ class OrderService {
       totalAmount += itemTotal;
 
       // ✅ Use BUSINESS_RULES constant
-      const productWeight = product.measurements?.weight ?? BUSINESS_RULES.DEFAULT_PRODUCT_WEIGHT;
+      const productWeight =
+        product.measurements?.weight ?? BUSINESS_RULES.DEFAULT_PRODUCT_WEIGHT;
       totalWeight += productWeight * item.quantity;
 
       orderItemsSnapshot.push({
@@ -123,7 +128,54 @@ class OrderService {
 
     return { orderItemsSnapshot, totalAmount, totalWeight };
   }
+  private async fetchOrdersWithReturns(
+    filter: any,
+    page: number = 1,
+    limit: number = 10,
+    populateFields?: string
+  ) {
+    const { page: validPage, limit: validLimit } =
+      ValidationUtils.validatePagination(page, limit);
 
+    const result = await PaginationService.paginate(
+      Order,
+      filter,
+      validPage,
+      validLimit,
+      {
+        populate: populateFields || "",
+        sort: { placedAt: -1 },
+      }
+    );
+
+    // ✅ Common return checking logic
+    const orderIds = result.data.map((order: any) => order.orderId);
+    const activeReturns = await Return.find({
+      orderId: { $in: orderIds },
+      status: { $nin: ["processed", "rejected"] },
+    }).select("orderId status returnId requestedAt");
+
+    const returnMap = new Map();
+    activeReturns.forEach((ret: any) => {
+      returnMap.set(ret.orderId, {
+        hasActiveReturn: true,
+        returnStatus: ret.status,
+        returnId: ret.returnId,
+        returnRequestedAt: ret.requestedAt,
+      });
+    });
+
+    const formattedOrders = result.data.map((order: any) => ({
+      ...order,
+      hasActiveReturn: returnMap.has(order.orderId),
+      returnInfo: returnMap.get(order.orderId) || null,
+    }));
+
+    return {
+      orders: formattedOrders,
+      pagination: result.pagination,
+    };
+  }
   /**
    * Calculate delivery charges based on pincode, weight, and order value
    */
@@ -227,7 +279,8 @@ class OrderService {
   ) {
     // ✅ Use BUSINESS_RULES constants
     const packagingFee = BUSINESS_RULES.PACKAGING_FEE;
-    const isEligibleForAdvance = orderValue >= BUSINESS_RULES.ADVANCE_PAYMENT_THRESHOLD;
+    const isEligibleForAdvance =
+      orderValue >= BUSINESS_RULES.ADVANCE_PAYMENT_THRESHOLD;
     const isAdvancePayment = payment.isAdvance === true;
 
     if (isAdvancePayment && !isEligibleForAdvance) {
@@ -238,12 +291,14 @@ class OrderService {
     }
 
     const codHandlingFee =
-      payment.method === "COD" && !isAdvancePayment ? BUSINESS_RULES.COD_HANDLING_FEE : 0;
+      payment.method === "COD" && !isAdvancePayment
+        ? BUSINESS_RULES.COD_HANDLING_FEE
+        : 0;
 
-    const advanceAmount = isAdvancePayment 
-      ? Math.round(orderValue * BUSINESS_RULES.ADVANCE_PAYMENT_PERCENTAGE) 
+    const advanceAmount = isAdvancePayment
+      ? Math.round(orderValue * BUSINESS_RULES.ADVANCE_PAYMENT_PERCENTAGE)
       : 0;
-    
+
     const remainingAmount = isAdvancePayment
       ? orderValue + packagingFee + deliveryCharges.finalCharge - advanceAmount
       : 0;
@@ -420,7 +475,9 @@ class OrderService {
                 status: paymentStatus,
                 provider,
                 isAdvancePayment: feeBreakdown.isAdvancePayment,
-                advancePercentage: feeBreakdown.isAdvancePayment ? BUSINESS_RULES.ADVANCE_PAYMENT_PERCENTAGE * 100 : 0,
+                advancePercentage: feeBreakdown.isAdvancePayment
+                  ? BUSINESS_RULES.ADVANCE_PAYMENT_PERCENTAGE * 100
+                  : 0,
                 advanceAmount: feeBreakdown.advanceAmount,
                 remainingAmount: feeBreakdown.remainingAmount,
                 razorpayOrderId: payment.razorpayOrderId || null,
@@ -507,44 +564,17 @@ class OrderService {
 
   // ✅ Updated getMyOrders with PaginationService
   async getMyOrders(userId: string, page: number = 1, limit: number = 10) {
-    const { page: validPage, limit: validLimit } = 
-      ValidationUtils.validatePagination(page, limit);
+    const filter = { user: userId };
+    const result = await this.fetchOrdersWithReturns(filter, page, limit);
 
-    const result = await PaginationService.paginate(
-      Order,
-      { user: userId },
-      validPage,
-      validLimit,
-      {
-        select: "-__v",
-        sort: { createdAt: -1 }
-      }
-    );
-
-    const orderIds = result.data.map((order: any) => order.orderId);
-    const activeReturns = await Return.find({
-      orderId: { $in: orderIds },
-      user: new Types.ObjectId(userId),
-      status: { $nin: ["cancelled"] },
-    }).select("orderId status returnId requestedAt");
-
-    const returnStatusMap = new Map();
-    activeReturns.forEach((returnDoc) => {
-      returnStatusMap.set(returnDoc.orderId, {
-        hasActiveReturn: true,
-        returnStatus: returnDoc.status,
-        returnId: returnDoc.returnId,
-        returnRequestedAt: returnDoc.requestedAt,
-      });
-    });
-
-    const formattedOrders = result.data.map((order: any) => ({
+    // ✅ User-specific formatting (keep your existing detailed formatting)
+    const userFormattedOrders = result.orders.map((order: any) => ({
       orderId: order.orderId,
       placedAt: order.placedAt,
       totalAmount: order.totalAmount,
       status: order.status,
-      hasActiveReturn: returnStatusMap.has(order.orderId),
-      returnInfo: returnStatusMap.get(order.orderId) || null,
+      hasActiveReturn: order.hasActiveReturn,
+      returnInfo: order.returnInfo,
 
       deliveryInfo: {
         pincode: order.shippingAddressSnapshot.pincode,
@@ -577,50 +607,90 @@ class OrderService {
     }));
 
     return {
-      orders: formattedOrders,
-      pagination: result.pagination
+      orders: userFormattedOrders,
+      pagination: result.pagination,
     };
   }
+  async getAllOrdersAdmin(
+    page: number = 1,
+    limit: number = 20,
+    status?: string,
+    startDate?: string,
+    endDate?: string,
+    search?: string
+  ) {
+    // ✅ Build admin-specific filter
+    const filter: any = {};
 
-  async cancelOrder(userId: string, orderId: string) {
-    const order = await Order.findOne({ user: userId, _id: orderId });
-    if (!order) throw new AppError("Order not found", 404);
-
-    if (order.status === OrderStatus.Cancelled) {
-      throw new AppError("Order is already cancelled", 400);
+    if (status && status !== "all") {
+      filter.status = status;
     }
 
-    const now = new Date();
-    const orderCreatedAt = order.placedAt;
-    const hoursSinceOrder =
-      (now.getTime() - orderCreatedAt.getTime()) / (1000 * 60 * 60);
-
-    // ✅ Use BUSINESS_RULES constant
-    if (hoursSinceOrder > BUSINESS_RULES.ORDER_CANCELLATION_WINDOW_HOURS) {
-      throw new AppError(
-        `Order cannot be cancelled after ${BUSINESS_RULES.ORDER_CANCELLATION_WINDOW_HOURS} hours`,
-        400
-      );
+    if (startDate && endDate) {
+      filter.placedAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
     }
 
-    const session = await mongoose.startSession();
-    try {
-      await session.withTransaction(async () => {
-        order.status = OrderStatus.Cancelled;
-        await order.save({ session });
-
-        await this.releaseReservation(orderId, session);
-      });
-    } finally {
-      await session.endSession();
+    if (search) {
+      filter.$or = [
+        { orderId: { $regex: search, $options: "i" } },
+        {
+          "shippingAddressSnapshot.fullName": { $regex: search, $options: "i" },
+        },
+        { "shippingAddressSnapshot.mobile": { $regex: search, $options: "i" } },
+      ];
     }
 
-    return {
-      success: true,
-      message: "Order cancelled successfully",
-      orderId: order._id,
-    };
+    // ✅ Use helper with admin-specific population
+    return await this.fetchOrdersWithReturns(filter, page, limit, "user");
   }
+async cancelOrder(userId: string, orderId: string) {
+  // ✅ CORRECT: orderId field use करें
+  const order = await Order.findOne({ 
+    user: userId, 
+    orderId: orderId  // Custom orderId field
+  });
+  
+  if (!order) throw new AppError("Order not found", 404);
+
+  if (order.status === OrderStatus.Cancelled) {
+    throw new AppError("Order is already cancelled", 400);
+  }
+
+  const now = new Date();
+  const orderCreatedAt = order.placedAt;
+  const hoursSinceOrder =
+    (now.getTime() - orderCreatedAt.getTime()) / (1000 * 60 * 60);
+
+  if (hoursSinceOrder > BUSINESS_RULES.ORDER_CANCELLATION_WINDOW_HOURS) {
+    throw new AppError(
+      `Order cannot be cancelled after ${BUSINESS_RULES.ORDER_CANCELLATION_WINDOW_HOURS} hours`,
+      400
+    );
+  }
+
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      order.status = OrderStatus.Cancelled;
+      await order.save({ session });
+
+      // ✅ FIX: MongoDB _id pass करें, orderId नहीं
+      await this.releaseReservation((order as any)._id.toString(), session);
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  return {
+    success: true,
+    message: "Order cancelled successfully",
+    orderId: order.orderId, // ✅ Custom orderId return करें
+  };
+}
+
 
   async updateOrderStatus(
     orderId: string,
@@ -757,13 +827,16 @@ class OrderService {
     const packagingFee = BUSINESS_RULES.PACKAGING_FEE;
     const deliveryCharge = isServiceable ? deliveryCharges.finalCharge : 0;
     const codHandlingFee = BUSINESS_RULES.COD_HANDLING_FEE;
-    const isAdvanceEligible = isServiceable && subtotal >= BUSINESS_RULES.ADVANCE_PAYMENT_THRESHOLD;
+    const isAdvanceEligible =
+      isServiceable && subtotal >= BUSINESS_RULES.ADVANCE_PAYMENT_THRESHOLD;
 
     let advanceAmount = 0;
     let remainingAmount = 0;
 
     if (isAdvanceEligible) {
-      advanceAmount = Math.round(subtotal * BUSINESS_RULES.ADVANCE_PAYMENT_PERCENTAGE);
+      advanceAmount = Math.round(
+        subtotal * BUSINESS_RULES.ADVANCE_PAYMENT_PERCENTAGE
+      );
       remainingAmount = subtotal - advanceAmount;
     }
 
@@ -780,7 +853,9 @@ class OrderService {
       advanceEligible: isAdvanceEligible,
       advanceAmount,
       remainingAmount,
-      advancePercentage: isAdvanceEligible ? BUSINESS_RULES.ADVANCE_PAYMENT_PERCENTAGE * 100 : 0,
+      advancePercentage: isAdvanceEligible
+        ? BUSINESS_RULES.ADVANCE_PAYMENT_PERCENTAGE * 100
+        : 0,
 
       deliveryInfo: {
         codAvailable: isServiceable ? deliveryCharges.codAvailable : false,

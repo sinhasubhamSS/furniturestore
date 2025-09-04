@@ -31,5 +31,5 @@ router.get(
   isAdmin,
   returnController.getNextAllowedStatuses
 );
-
+router.get("/admin/all", authVerify, isAdmin, returnController.getAllReturnsAdmin);
 export default router;
