@@ -1,4 +1,4 @@
-import { Order, OrderListResponse } from "./order";
+import { Order, OrderListResponse, OrderStatus } from "./order";
 
 // ✅ Admin-enhanced Order type
 export interface AdminOrder extends Order {
@@ -34,7 +34,7 @@ export interface AdminReturn {
   };
   returnReason: string;
   refundAmount: number;
-  status: "requested" | "approved" | "picked_up" | "received" | "processed" | "rejected";
+  status: OrderStatus;
   requestedAt: string;
   processedAt?: string;
   adminNotes?: string;

@@ -203,21 +203,43 @@ export class ReturnController {
       const { returnId } = req.params;
       const { status, adminNotes } = req.body;
 
+      // ✅ Admin check
       if (req.user?.role !== "admin") {
         throw new AppError("Admin access required", 403);
       }
 
-      if (!returnId || !status) {
-        throw new AppError("Return ID and status are required", 400);
+      // ✅ Enhanced validation
+      if (!returnId?.trim()) {
+        throw new AppError("Valid return ID is required", 400);
       }
 
-      if (!Object.values(ReturnStatus).includes(status)) {
-        throw new AppError("Invalid return status", 400);
+      if (!status?.trim()) {
+        throw new AppError("Return status is required", 400);
       }
+
+      // ✅ Type-safe enum validation
+      if (!Object.values(ReturnStatus).includes(status as ReturnStatus)) {
+        throw new AppError(
+          `Invalid return status. Valid values: ${Object.values(
+            ReturnStatus
+          ).join(", ")}`,
+          400
+        );
+      }
+
+      // ✅ Optional: Admin notes validation
+      if (adminNotes && typeof adminNotes !== "string") {
+        throw new AppError("Admin notes must be a string", 400);
+      }
+
+      // ✅ Add audit logging
+      console.log(
+        `Admin ${req.user.email} updating return ${returnId} status to ${status}`
+      );
 
       const updatedReturn = await returnService.updateReturnStatus(
         returnId,
-        status,
+        status as ReturnStatus, // ✅ Type assertion
         adminNotes
       );
 

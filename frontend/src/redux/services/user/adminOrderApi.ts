@@ -1,44 +1,26 @@
 // redux/services/admin/adminReturnApi.ts
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { axiosBaseQuery } from "@/redux/api/customBaseQuery";
-import { ReturnStatus, ReturnItem } from "@/types/return";
+import { ReturnStatus } from "@/types/return";
 
-// ✅ CORRECT - Define union type first
-export type ReturnStatusFilter = ReturnStatus | 'all';
+export type ReturnStatusFilter = ReturnStatus | "all";
 
-// ✅ AdminReturn interface
 export interface AdminReturn {
   _id: string;
   returnId: string;
   orderId: string;
-  
   user: {
-    _id: string;
     name: string;
     email: string;
     mobile?: string;
   };
-  
-  order: {
-    orderId: string;
-    totalAmount: number;
-    placedAt?: string;
-  };
-  
-  returnItems: ReturnItem[];
+  returnItems: any[];
   returnReason: string;
   refundAmount: number;
-  status: ReturnStatus;         // ✅ CORRECT - Only ReturnStatus (no 'all' in actual data)
+  status: ReturnStatus;
   requestedAt: string;
   processedAt?: string;
   refundProcessedAt?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  
-  adminNotes?: string;
-  adminUpdatedBy?: string;
-  adminUpdatedAt?: string;
-  internalPriority?: "low" | "medium" | "high";
 }
 
 export interface AdminReturnListResponse {
@@ -63,7 +45,7 @@ export const adminReturnApi = createApi({
       {
         page?: number;
         limit?: number;
-        status?: ReturnStatusFilter;    // ✅ CORRECT - Union type for filter
+        status?: ReturnStatusFilter;
         startDate?: string;
         endDate?: string;
         search?: string;
@@ -92,26 +74,10 @@ export const adminReturnApi = createApi({
       }),
       invalidatesTags: ["AdminReturns"],
     }),
-
-    getReturnAnalytics: builder.query<
-      any, 
-      { startDate?: string; endDate?: string }
-    >({
-      query: ({ startDate, endDate }) => {
-        let url = `/returns/admin/analytics`;
-        const params = new URLSearchParams();
-        if (startDate) params.append('startDate', startDate);
-        if (endDate) params.append('endDate', endDate);
-        if (params.toString()) url += `?${params.toString()}`;
-        return { url, method: "GET" };
-      },
-      transformResponse: (response: any) => response.data,
-    }),
   }),
 });
 
 export const {
   useGetAllReturnsQuery,
   useUpdateReturnStatusMutation,
-  useGetReturnAnalyticsQuery,
 } = adminReturnApi;

@@ -21,9 +21,9 @@ router.get("/:returnId", authVerify, returnController.getReturnById);
 router.delete("/:returnId", authVerify, returnController.cancelReturnRequest);
 
 // ✅ Admin Routes (Admin Authentication Required)
-router.put("/:returnId/status", isAdmin, returnController.updateReturnStatus);
-router.get("/admin/all", isAdmin, returnController.getAllReturns);
-router.get("/admin/analytics", isAdmin, returnController.getReturnAnalytics);
+router.put("/:returnId/status", authVerify,isAdmin, returnController.updateReturnStatus);
+router.get("/admin/all",authVerify, isAdmin, returnController.getAllReturns);
+router.get("/admin/analytics", authVerify,isAdmin, returnController.getReturnAnalytics);
 
 // ✅ NEW: Admin helper route for status transitions
 router.get(

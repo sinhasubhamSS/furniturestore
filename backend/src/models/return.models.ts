@@ -31,6 +31,9 @@ export interface ReturnDocument extends Document {
   requestedAt: Date;
   processedAt?: Date;
   refundProcessedAt?: Date;
+  adminNotes?: string;
+  adminUpdatedBy?: string;
+  adminUpdatedAt?: Date;
 }
 
 // ✅ Return item schema
@@ -102,6 +105,18 @@ const returnSchema = new Schema<ReturnDocument>(
     },
     processedAt: Date,
     refundProcessedAt: Date,
+    
+    // ✅ Admin fields
+    adminNotes: {
+      type: String,
+      maxlength: 2000,
+    },
+    adminUpdatedBy: {
+      type: String,
+    },
+    adminUpdatedAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true,
@@ -122,7 +137,10 @@ returnSchema.virtual("order", {
   justOne: true,
 });
 
-// ✅ Updated PRE-SAVE HOOK with new ID generator
+// ✅ Create model first
+const Return = model<ReturnDocument>("Return", returnSchema);
+
+// ✅ PRE-SAVE HOOK after model creation
 returnSchema.pre("save", async function (next) {
   if (!this.returnId) {
     this.returnId = await IDGenerator.generateReturnId(Return);
@@ -130,4 +148,5 @@ returnSchema.pre("save", async function (next) {
   next();
 });
 
-export const Return = model<ReturnDocument>("Return", returnSchema);
+// ✅ Export the model (single declaration)
+export { Return };

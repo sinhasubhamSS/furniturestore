@@ -59,17 +59,47 @@ class WishlistService {
 
     return { isWishlisted };
   }
+  // wishlistService.ts में enhanced getWishlistWithProducts method:
+  // wishlistService.ts में getWishlistWithProducts को update करें:
   async getWishlistWithProducts(userId: string) {
+    console.log("🔍 Fetching wishlist for user:", userId);
+
     const wishlist = await Wishlist.findOne({ user: userId }).populate({
       path: "products",
-      select: "name price images slug title",
+      select: "name price images slug title variants category", // ✅ Added variants and category
+      populate: {
+        path: "variants", // ✅ Populate variants sub-documents
+        select:
+          "_id color size price discountedPrice hasDiscount discountPercent images",
+      },
     });
 
+    console.log("📦 Raw wishlist data:", wishlist);
+
+    // ✅ Return empty array instead of throwing error
     if (!wishlist) {
-      throw new AppError("Wishlist not found", 404);
+      console.log("📋 No wishlist found, returning empty array");
+      return [];
     }
 
-    return wishlist.products;
+    console.log("🔍 Wishlist products array length:", wishlist.products.length);
+
+    // ✅ Log variant information for debugging
+    wishlist.products.forEach((product: any, index: number) => {
+      console.log(
+        `📦 Product ${index}: ${product.name} - Variants: ${
+          product.variants?.length || 0
+        }`
+      );
+    });
+
+    // ✅ Filter out any null/undefined products (safety check)
+    const validProducts = wishlist.products.filter(
+      (product) => product != null
+    );
+
+    console.log("✅ Returning products:", validProducts.length);
+    return validProducts;
   }
 }
 export const wishlistService = new WishlistService();

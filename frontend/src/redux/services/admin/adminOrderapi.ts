@@ -5,7 +5,7 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import { OrderStatus } from "@/types/order";
 import { AdminOrder, AdminOrderListResponse } from "@/types/adminorder";
 
-export const adminApi = createApi({
+export const orderadminApi = createApi({
   reducerPath: "adminApi",
   baseQuery: axiosBaseQuery(),
   tagTypes: ["AdminOrders"],
@@ -51,4 +51,4 @@ export const adminApi = createApi({
 export const {
   useGetAllOrdersQuery,
   useUpdateOrderStatusMutation,
-} = adminApi;
+} = orderadminApi;

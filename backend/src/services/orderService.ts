@@ -34,13 +34,18 @@ class OrderService {
     ],
     [OrderStatus.Shipped]: [
       OrderStatus.OutForDelivery,
-      OrderStatus.Delivered, // ✅ ADDED: Direct delivery from shipped
+      OrderStatus.Delivered,
       OrderStatus.Failed,
     ],
     [OrderStatus.OutForDelivery]: [OrderStatus.Delivered, OrderStatus.Failed],
-    [OrderStatus.Delivered]: [],
+
+    // ✅ ENHANCED: Delivered के बाद Refunded allow करें
+    [OrderStatus.Delivered]: [
+      OrderStatus.Refunded, // ✅ Return process complete होने पर
+    ],
+
     [OrderStatus.Cancelled]: [],
-    [OrderStatus.Refunded]: [],
+    [OrderStatus.Refunded]: [], // ✅ Final state - no further transitions
     [OrderStatus.Failed]: [],
   };
 
@@ -646,51 +651,50 @@ class OrderService {
     // ✅ Use helper with admin-specific population
     return await this.fetchOrdersWithReturns(filter, page, limit, "user");
   }
-async cancelOrder(userId: string, orderId: string) {
-  // ✅ CORRECT: orderId field use करें
-  const order = await Order.findOne({ 
-    user: userId, 
-    orderId: orderId  // Custom orderId field
-  });
-  
-  if (!order) throw new AppError("Order not found", 404);
-
-  if (order.status === OrderStatus.Cancelled) {
-    throw new AppError("Order is already cancelled", 400);
-  }
-
-  const now = new Date();
-  const orderCreatedAt = order.placedAt;
-  const hoursSinceOrder =
-    (now.getTime() - orderCreatedAt.getTime()) / (1000 * 60 * 60);
-
-  if (hoursSinceOrder > BUSINESS_RULES.ORDER_CANCELLATION_WINDOW_HOURS) {
-    throw new AppError(
-      `Order cannot be cancelled after ${BUSINESS_RULES.ORDER_CANCELLATION_WINDOW_HOURS} hours`,
-      400
-    );
-  }
-
-  const session = await mongoose.startSession();
-  try {
-    await session.withTransaction(async () => {
-      order.status = OrderStatus.Cancelled;
-      await order.save({ session });
-
-      // ✅ FIX: MongoDB _id pass करें, orderId नहीं
-      await this.releaseReservation((order as any)._id.toString(), session);
+  async cancelOrder(userId: string, orderId: string) {
+    // ✅ CORRECT: orderId field use करें
+    const order = await Order.findOne({
+      user: userId,
+      orderId: orderId, // Custom orderId field
     });
-  } finally {
-    await session.endSession();
+
+    if (!order) throw new AppError("Order not found", 404);
+
+    if (order.status === OrderStatus.Cancelled) {
+      throw new AppError("Order is already cancelled", 400);
+    }
+
+    const now = new Date();
+    const orderCreatedAt = order.placedAt;
+    const hoursSinceOrder =
+      (now.getTime() - orderCreatedAt.getTime()) / (1000 * 60 * 60);
+
+    if (hoursSinceOrder > BUSINESS_RULES.ORDER_CANCELLATION_WINDOW_HOURS) {
+      throw new AppError(
+        `Order cannot be cancelled after ${BUSINESS_RULES.ORDER_CANCELLATION_WINDOW_HOURS} hours`,
+        400
+      );
+    }
+
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        order.status = OrderStatus.Cancelled;
+        await order.save({ session });
+
+        // ✅ FIX: MongoDB _id pass करें, orderId नहीं
+        await this.releaseReservation((order as any)._id.toString(), session);
+      });
+    } finally {
+      await session.endSession();
+    }
+
+    return {
+      success: true,
+      message: "Order cancelled successfully",
+      orderId: order.orderId, // ✅ Custom orderId return करें
+    };
   }
-
-  return {
-    success: true,
-    message: "Order cancelled successfully",
-    orderId: order.orderId, // ✅ Custom orderId return करें
-  };
-}
-
 
   async updateOrderStatus(
     orderId: string,

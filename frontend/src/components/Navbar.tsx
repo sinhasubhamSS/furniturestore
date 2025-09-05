@@ -8,6 +8,7 @@ import {
   FiChevronDown,
   FiX,
   FiHelpCircle,
+  FiHeart,
 } from "react-icons/fi";
 import { RiLoginCircleLine } from "react-icons/ri";
 import type { RootState } from "@/redux/store";
@@ -19,16 +20,15 @@ import { useGetCartCountQuery } from "@/redux/services/user/cartApi";
 
 const Navbar = () => {
   const activeUser = useSelector((state: RootState) => state.user.activeUser);
+  const wishlistCount = useSelector((state: RootState) => state.wishlist.count || 0);
+  
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch();
   const router = useRouter();
   
-  // ✅ Updated to handle new API response structure
   const { data: cartCountData, isLoading: cartCountLoading } = useGetCartCountQuery();
-  
-  // ✅ Extract count from response data
   const cartCount = cartCountData?.count || 0;
 
   const handleSignOut = () => {
@@ -53,7 +53,8 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 w-full z-[1000] bg-[var(--color-secondary)] backdrop-blur border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between py-3 gap-4">
-          {/* Left */}
+          
+          {/* Left - Brand */}
           <div className="flex items-center gap-4">
             <Link
               href="/"
@@ -74,7 +75,7 @@ const Navbar = () => {
             </button>
           </div>
 
-          {/* Search (Desktop) */}
+          {/* Center - Search (Desktop) */}
           <div className="hidden sm:flex flex-1 max-w-xl mx-4">
             <div className="relative group w-full">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -93,32 +94,49 @@ const Navbar = () => {
             </div>
           </div>
 
-          {/* Right: Cart + User */}
-          <div className="flex items-center gap-4">
-            <Link href="/cart">
-              <button className="relative p-2 group">
-                <FiShoppingCart className="h-6 w-6 text-[var(--foreground)] group-hover:text-[var(--color-accent)] transition-colors" />
-
-                {/* ✅ Updated cart count display */}
-                {!cartCountLoading && cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[var(--color-accent)] text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-bounce">
-                    {cartCount > 99 ? '99+' : cartCount} {/* ✅ Handle large numbers */}
+          {/* Right - Icons & User */}
+          <div className="flex items-center gap-3">
+            
+            {/* ✅ FIXED: Wishlist Icon with Non-clickable Badge */}
+            <Link href="/wishlist">
+              <button className="relative p-2 group hover:bg-[var(--color-primary)] rounded-lg transition-colors">
+                <FiHeart className="h-6 w-6 text-[var(--foreground)] group-hover:text-red-500 transition-colors" />
+                
+                {/* ✅ Badge with pointer-events-none and cursor-default */}
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center pointer-events-none cursor-default">
+                    {wishlistCount > 99 ? '99+' : wishlistCount}
                   </span>
-                )}
-
-                {/* ✅ Loading state for cart count */}
-                {cartCountLoading && (
-                  <span className="absolute -top-1 -right-1 bg-gray-400 text-white text-xs rounded-full h-3 w-3 animate-pulse"></span>
                 )}
               </button>
             </Link>
 
+            {/* ✅ FIXED: Cart Icon with Non-clickable Badge */}
+            <Link href="/cart">
+              <button className="relative p-2 group hover:bg-[var(--color-primary)] rounded-lg transition-colors">
+                <FiShoppingCart className="h-6 w-6 text-[var(--foreground)] group-hover:text-[var(--color-accent)] transition-colors" />
+
+                {/* ✅ Fixed cart badge - no click cursor */}
+                {!cartCountLoading && cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-[var(--color-accent)] text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center pointer-events-none cursor-default">
+                    {cartCount > 99 ? '99+' : cartCount}
+                  </span>
+                )}
+
+                {/* ✅ Fixed loading indicator */}
+                {cartCountLoading && (
+                  <span className="absolute -top-1 -right-1 bg-gray-400 text-white text-xs rounded-full h-3 w-3 animate-pulse pointer-events-none"></span>
+                )}
+              </button>
+            </Link>
+
+            {/* User Dropdown */}
             <div ref={dropdownRef} className="relative">
               {activeUser ? (
                 <>
                   <button
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    className="flex items-center gap-2 group"
+                    className="flex items-center gap-2 group hover:bg-[var(--color-primary)] p-2 rounded-lg transition-colors"
                   >
                     {activeUser.avatar ? (
                       <img
@@ -127,69 +145,89 @@ const Navbar = () => {
                         className="h-8 w-8 rounded-full object-cover border-2 border-transparent group-hover:border-[var(--color-accent)] transition-colors"
                       />
                     ) : (
-                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[var(--color-accent)] to-purple-500 flex items-center justify-center text-white">
+                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[var(--color-accent)] to-purple-500 flex items-center justify-center text-white font-semibold">
                         <FiUser className="h-4 w-4" />
                       </div>
                     )}
                     <FiChevronDown
-                      className={`h-4 w-4 text-[var(--foreground)] transition-transform ${
+                      className={`h-4 w-4 text-[var(--foreground)] transition-transform duration-200 ${
                         isDropdownOpen ? "rotate-180" : ""
                       }`}
                     />
                   </button>
 
                   {isDropdownOpen && (
-                    <div className="absolute right-0 mt-4 w-56 rounded-md bg-[var(--color-secondary)] backdrop-blur-lg shadow-lg ring-1 ring-black ring-opacity-10 border border-white/20">
-                      <div className="px-4 py-3">
-                        <p className="text-sm text-[var(--foreground)]">
-                          Signed in as
-                        </p>
-                        <p className="text-sm truncate text-[var(--text-accent)]">
+                    <div className="absolute right-0 mt-2 w-64 rounded-lg bg-[var(--color-secondary)] backdrop-blur-lg shadow-xl ring-1 ring-black ring-opacity-10 border border-white/20 overflow-hidden">
+                      
+                      {/* User Info */}
+                      <div className="px-4 py-3 border-b border-white/10">
+                        <p className="text-sm text-[var(--foreground)] opacity-75">Signed in as</p>
+                        <p className="text-sm font-semibold text-[var(--text-accent)] truncate">
                           {activeUser.name}
                         </p>
                       </div>
 
+                      {/* Admin Link */}
                       {activeUser.role === "admin" && (
                         <div className="py-1">
                           <Link
                             href="/admin/dashboard"
-                            className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-accent)]/30 transition-colors duration-200 rounded"
+                            className="block px-4 py-3 text-sm text-[var(--foreground)] hover:bg-[var(--color-accent)]/20 transition-colors duration-200"
+                            onClick={() => setIsDropdownOpen(false)}
                           >
-                            Admin Dashboard
+                            🔧 Admin Dashboard
                           </Link>
                         </div>
                       )}
 
+                      {/* Navigation Links */}
                       <div className="py-1">
                         <Link
                           href="/profile"
-                          className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-accent)]/30 transition-colors duration-200 rounded"
+                          className="flex items-center px-4 py-3 text-sm text-[var(--foreground)] hover:bg-[var(--color-accent)]/20 transition-colors duration-200"
+                          onClick={() => setIsDropdownOpen(false)}
                         >
-                          Your Profile
+                          👤 Your Profile
                         </Link>
                         <Link
                           href="/my-orders"
-                          className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-accent)]/30 transition-colors duration-200 rounded"
+                          className="flex items-center px-4 py-3 text-sm text-[var(--foreground)] hover:bg-[var(--color-accent)]/20 transition-colors duration-200"
+                          onClick={() => setIsDropdownOpen(false)}
                         >
-                          My Orders
+                          📦 My Orders
+                        </Link>
+                        <Link
+                          href="/wishlist"
+                          className="flex items-center px-4 py-3 text-sm text-[var(--foreground)] hover:bg-[var(--color-accent)]/20 transition-colors duration-200"
+                          onClick={() => setIsDropdownOpen(false)}
+                        >
+                          ❤️ My Wishlist
+                          {wishlistCount > 0 && (
+                            <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full pointer-events-none">
+                              {wishlistCount}
+                            </span>
+                          )}
                         </Link>
                       </div>
 
-                      <div className="py-1">
-                        <div className="flex items-center justify-between px-4 py-2">
-                          <span className="text-sm text-[var(--foreground)]">
-                            Theme
-                          </span>
+                      {/* Theme Toggle */}
+                      <div className="py-1 border-t border-white/10">
+                        <div className="flex items-center justify-between px-4 py-3">
+                          <span className="text-sm text-[var(--foreground)]">🎨 Theme</span>
                           <Toggle />
                         </div>
                       </div>
 
-                      <div className="py-1">
+                      {/* Sign Out */}
+                      <div className="py-1 border-t border-white/10">
                         <button
-                          onClick={handleSignOut}
-                          className="block w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors duration-200 rounded"
+                          onClick={() => {
+                            handleSignOut();
+                            setIsDropdownOpen(false);
+                          }}
+                          className="block w-full text-left px-4 py-3 text-sm text-red-500 hover:bg-red-500/10 transition-colors duration-200"
                         >
-                          Sign out
+                          🚪 Sign out
                         </button>
                       </div>
                     </div>
@@ -199,7 +237,7 @@ const Navbar = () => {
                 <>
                   <button
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    className="flex items-center gap-2 group"
+                    className="flex items-center gap-2 group hover:bg-[var(--color-primary)] p-2 rounded-lg transition-colors"
                   >
                     <div className="h-8 w-8 rounded-full bg-[var(--color-secondary)] flex items-center justify-center">
                       <FiHelpCircle className="h-5 w-5 text-[var(--foreground)]" />
@@ -209,17 +247,14 @@ const Navbar = () => {
                   {isDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-56 rounded-lg bg-[var(--card-bg)] shadow-lg ring-1 ring-black ring-opacity-5 border border-white/10">
                       <div className="px-4 py-3">
-                        <p className="text-sm text-[var(--foreground)]">
-                          Guest User
-                        </p>
-                        <p className="text-sm text-[var(--text-accent)]">
-                          Please login for full access
-                        </p>
+                        <p className="text-sm text-[var(--foreground)]">Guest User</p>
+                        <p className="text-sm text-[var(--text-accent)]">Please login for full access</p>
                       </div>
                       <div className="py-1">
                         <Link
                           href="/auth/login"
                           className="px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--color-secondary)] flex items-center gap-2"
+                          onClick={() => setIsDropdownOpen(false)}
                         >
                           <RiLoginCircleLine className="h-4 w-4" />
                           Login / Register
@@ -227,9 +262,7 @@ const Navbar = () => {
                       </div>
                       <div className="py-1 border-t border-white/10">
                         <div className="flex items-center justify-between px-4 py-2">
-                          <span className="text-sm text-[var(--foreground)]">
-                            Theme
-                          </span>
+                          <span className="text-sm text-[var(--foreground)]">Theme</span>
                           <Toggle />
                         </div>
                       </div>

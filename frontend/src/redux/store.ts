@@ -27,7 +27,8 @@ import productDetailReducer from "./slices/ProductDetailSlice";
 import { reviewsApi } from "./services/user/reviewApi";
 import { returnApi } from "./services/user/returnApi";
 import { deliveryApi } from "./services/user/deliveryApi";
-import { adminApi } from "./services/admin/adminOrderapi";
+import { orderadminApi } from "./services/admin/adminOrderapi";
+import { adminReturnApi } from "./services/admin/adminReturnapi";
 
 const rootReducer = combineReducers({
   user: userReducer,
@@ -46,7 +47,8 @@ const rootReducer = combineReducers({
   [reviewsApi.reducerPath]: reviewsApi.reducer,
   [returnApi.reducerPath]: returnApi.reducer,
   [deliveryApi.reducerPath]: deliveryApi.reducer,
-  [adminApi.reducerPath]: adminApi.reducer,
+  [orderadminApi.reducerPath]: orderadminApi.reducer,
+  [adminReturnApi.reducerPath]: adminReturnApi.reducer,
 });
 
 // ✅ Updated persist config to include checkout
@@ -77,7 +79,8 @@ export const store = configureStore({
       reviewsApi.middleware,
       returnApi.middleware,
       deliveryApi.middleware,
-      adminApi.middleware
+      orderadminApi.middleware,
+      adminReturnApi.middleware
     ),
 });
 

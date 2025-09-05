@@ -1,44 +1,41 @@
-// components/admin/orders/OrdersTable.tsx
-import React from "react";
-import { AdminOrder } from "@/types/adminorder";
-import { OrderStatus } from "@/types/order";
-import StatusBadge from "@/components/admin/od&rt/common/StatusBadge";
+// components/admin/returns/ReturnTable.tsx
+import React from 'react';
+import { ReturnStatus } from '@/types/return';
+import { AdminReturn } from '@/redux/services/admin/adminReturnapi';
+import StatusBadge from '@/components/admin/od&rt/common/StatusBadge';
 
-interface OrdersTableProps {
-  orders: AdminOrder[];
-  onStatusUpdate: (orderId: string, status: OrderStatus) => void;
+interface ReturnTableProps {
+  returns: AdminReturn[];
+  onStatusUpdate: (returnId: string, status: ReturnStatus) => void;
   isUpdating: boolean;
 }
 
-const OrdersTable: React.FC<OrdersTableProps> = ({
-  orders,
-  onStatusUpdate,
-  isUpdating,
+const ReturnTable: React.FC<ReturnTableProps> = ({ 
+  returns, 
+  onStatusUpdate, 
+  isUpdating 
 }) => {
-  const statusOptions: OrderStatus[] = [
-    "pending",
-    "confirmed",
-    "shipped",
-    "out_for_delivery",
-    "delivered",
-    "refunded",
-    "cancelled",
+  const statusOptions: ReturnStatus[] = [
+    ReturnStatus.Requested,
+    ReturnStatus.Approved,
+    ReturnStatus.Rejected,
+    ReturnStatus.PickedUp,
+    ReturnStatus.Received,
+    ReturnStatus.Processed,
   ];
 
-  const handleStatusChange = (orderId: string, newStatus: string) => {
-    if (window.confirm(`Update order status to ${newStatus}?`)) {
-      onStatusUpdate(orderId, newStatus as OrderStatus);
+  const handleStatusChange = (returnId: string, newStatus: string) => {
+    if (window.confirm(`Update return status to ${newStatus}?`)) {
+      onStatusUpdate(returnId, newStatus as ReturnStatus);
     }
   };
 
-  if (orders.length === 0) {
+  if (returns.length === 0) {
     return (
       <div className="p-12 text-center">
-        <div className="text-gray-400 text-xl mb-2">📦</div>
-        <h3 className="text-lg font-medium text-gray-900 mb-1">
-          No orders found
-        </h3>
-        <p className="text-gray-500">No orders match your current filters.</p>
+        <div className="text-gray-400 text-xl mb-2">🔄</div>
+        <h3 className="text-lg font-medium text-gray-900 mb-1">No returns found</h3>
+        <p className="text-gray-500">No returns match your current filters.</p>
       </div>
     );
   }
@@ -49,13 +46,16 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
         <thead className="bg-gray-50">
           <tr>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Order Details
+              Return Details
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Customer
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Amount
+              Order ID
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Refund Amount
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Status
@@ -69,67 +69,64 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {orders.map((order) => (
-            <tr key={order._id} className="hover:bg-gray-50 transition-colors">
+          {returns.map((returnItem) => (
+            <tr key={returnItem._id} className="hover:bg-gray-50 transition-colors">
               <td className="px-6 py-4 whitespace-nowrap">
                 <div>
                   <div className="text-sm font-medium text-gray-900">
-                    {order.orderId}
+                    {returnItem.returnId}
                   </div>
-                  {order.hasActiveReturn && (
-                    <div className="text-xs text-orange-600 font-medium">
-                      🔄 Return: {order.returnInfo?.returnStatus}
-                    </div>
-                  )}
+                  <div className="text-xs text-gray-500">
+                    {returnItem.returnItems.length} item(s)
+                  </div>
                 </div>
               </td>
 
               <td className="px-6 py-4 whitespace-nowrap">
                 <div>
                   <div className="text-sm font-medium text-gray-900">
-                    {order.user?.name || "N/A"}
+                    {returnItem.user?.name || 'N/A'}
                   </div>
                   <div className="text-xs text-gray-500">
-                    {order.user?.email}
+                    {returnItem.user?.email}
                   </div>
-                  {order.user?.mobile && (
-                    <div className="text-xs text-gray-500">
-                      📞 {order.user.mobile}
-                    </div>
-                  )}
                 </div>
               </td>
 
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm font-medium text-gray-900">
-                  ₹{order.totalAmount?.toLocaleString("en-IN")}
+                  {returnItem.orderId}
                 </div>
               </td>
 
               <td className="px-6 py-4 whitespace-nowrap">
-                <StatusBadge status={order.status} type="order" />
+                <div className="text-sm font-medium text-gray-900">
+                  ₹{returnItem.refundAmount?.toLocaleString('en-IN')}
+                </div>
+              </td>
+
+              <td className="px-6 py-4 whitespace-nowrap">
+                <StatusBadge status={returnItem.status} type="return" />
               </td>
 
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {new Date(order.placedAt).toLocaleDateString("en-IN", {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
+                {new Date(returnItem.requestedAt).toLocaleDateString('en-IN', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric'
                 })}
               </td>
 
               <td className="px-6 py-4 whitespace-nowrap">
                 <select
-                  value={order.status}
-                  onChange={(e) =>
-                    handleStatusChange(order._id, e.target.value)
-                  }
+                  value={returnItem.status}
+                  onChange={(e) => handleStatusChange(returnItem.returnId, e.target.value)}
                   disabled={isUpdating}
                   className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
                 >
-                  {statusOptions.map((status) => (
+                  {statusOptions.map(status => (
                     <option key={status} value={status}>
-                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                      {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
                     </option>
                   ))}
                 </select>
@@ -142,4 +139,4 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
   );
 };
 
-export default OrdersTable;
+export default ReturnTable;

@@ -1,4 +1,4 @@
-import { Order } from "../models/order.models";
+import { Order, OrderStatus } from "../models/order.models";
 import { Return, ReturnDocument, ReturnStatus } from "../models/return.models";
 import { AppError } from "../utils/AppError";
 import { Types } from "mongoose";
@@ -189,47 +189,82 @@ export class ReturnService {
   }
 
   // ✅ 4. Update Return Status (Admin) with StatusManager
-  async updateReturnStatus(
-    returnId: string,
-    status: ReturnStatus,
-    adminNotes?: string
-  ): Promise<ReturnDocument> {
-    try {
-      const returnDoc = await Return.findOne({ returnId });
+async updateReturnStatus(
+  returnId: string,
+  status: ReturnStatus,
+  adminNotes?: string
+): Promise<ReturnDocument> {
+  try {
+    const returnDoc = await Return.findOne({ returnId });
 
-      if (!returnDoc) {
-        throw new AppError("Return not found", 404);
-      }
-
-      // ✅ Use StatusManager for validation
-      StatusManager.validateTransition(
-        returnDoc.status,
-        status,
-        this.allowedTransitions,
-        "Return"
-      );
-
-      returnDoc.status = status;
-
-      // Set timestamps based on status
-      if (status === ReturnStatus.Processed) {
-        returnDoc.processedAt = new Date();
-        returnDoc.refundProcessedAt = new Date();
-      } else if (status === ReturnStatus.Received) {
-        returnDoc.processedAt = new Date();
-      }
-
-      const updatedReturn = await returnDoc.save();
-
-      return updatedReturn;
-    } catch (error: any) {
-      if (error instanceof AppError) throw error;
-      throw new AppError(
-        `Failed to update return status: ${error.message}`,
-        500
-      );
+    if (!returnDoc) {
+      throw new AppError("Return not found", 404);
     }
+
+    // ✅ Use StatusManager for validation
+    StatusManager.validateTransition(
+      returnDoc.status,
+      status,
+      this.allowedTransitions,
+      "Return"
+    );
+
+    returnDoc.status = status;
+
+    // ✅ Add admin notes if provided
+    if (adminNotes) {
+      returnDoc.adminNotes= adminNotes;
+    }
+
+    // Set timestamps based on status
+    if (status === ReturnStatus.Processed) {
+      returnDoc.processedAt = new Date();
+      returnDoc.refundProcessedAt = new Date();
+      
+      // ✅ NEW: Update Order Status when return is processed
+      await this.updateOrderStatusOnReturn(returnDoc.orderId);
+      
+    } else if (status === ReturnStatus.Received) {
+      returnDoc.processedAt = new Date();
+    }
+
+    const updatedReturn = await returnDoc.save();
+
+    return updatedReturn;
+  } catch (error: any) {
+    if (error instanceof AppError) throw error;
+    throw new AppError(
+      `Failed to update return status: ${error.message}`,
+      500
+    );
   }
+}
+
+// ✅ NEW Helper Method: Update Order Status on Return Processing
+private async updateOrderStatusOnReturn(orderId: string): Promise<void> {
+  try {
+    const order = await Order.findOne({ orderId });
+    
+    if (!order) {
+      console.warn(`Order ${orderId} not found for return processing`);
+      return;
+    }
+
+    // Only update order status if it's currently delivered
+    if (order.status === OrderStatus.Delivered) {
+      order.status = OrderStatus.Refunded;
+      await order.save();
+      
+      console.log(`✅ Order ${orderId} marked as refunded after return processing`);
+    } else {
+      console.log(`⚠️ Order ${orderId} status is ${order.status}, not updating to refunded`);
+    }
+  } catch (error) {
+    console.error(`Error updating order status for ${orderId}:`, error);
+    // Don't throw error here - return processing should continue even if order update fails
+  }
+}
+
 
   // ✅ 5. Get All Returns (Admin) with PaginationService
   async getAllReturns(
