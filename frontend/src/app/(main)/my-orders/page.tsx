@@ -7,16 +7,13 @@ import {
   useCancelOrderMutation,
 } from "@/redux/services/user/orderApi";
 import { formatDate } from "../../../../utils/formatDate";
-// ✅ Use your existing types
+import Button from "@/components/ui/Button";
 import { Order } from "@/types/order";
 
 const MyOrders = () => {
   const router = useRouter();
-
-  // ✅ Simple pagination state
   const [currentPage, setCurrentPage] = React.useState(1);
 
-  // ✅ Updated query with pagination
   const { data, isLoading, error, refetch } = useGetMyOrdersQuery({
     page: currentPage,
     limit: 10,
@@ -52,177 +49,251 @@ const MyOrders = () => {
     router.push(`/return/${orderId}`);
   };
 
-  if (isLoading) return <p className="text-center mt-6">Loading orders...</p>;
-  if (error)
+  if (isLoading) {
     return (
-      <p className="text-center mt-6 text-red-500">Failed to load orders</p>
+      <div className="min-h-screen bg-[var(--color-primary)] flex items-center justify-center px-4">
+        <div className="text-center bg-[var(--color-card)] p-6 rounded-xl shadow-lg">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-4 border-[var(--color-accent)] mx-auto"></div>
+          <p className="mt-3 text-[var(--color-foreground)] font-medium text-sm">
+            Loading orders...
+          </p>
+        </div>
+      </div>
     );
+  }
 
-  // ✅ Simple data extraction
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[var(--color-primary)] flex items-center justify-center px-4">
+        <div className="text-center bg-[var(--color-card)] p-6 rounded-xl shadow-lg">
+          <div className="text-3xl mb-3">⚠️</div>
+          <p className="text-[var(--text-error)] font-semibold text-sm mb-3">
+            Failed to load orders
+          </p>
+          <Button onClick={() => refetch()} className="text-sm">
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const orders = data?.orders || [];
   const pagination = data?.pagination;
 
-  if (orders.length === 0)
-    return <p className="text-center mt-6">No orders found.</p>;
+  if (orders.length === 0) {
+    return (
+      <div className="min-h-screen bg-[var(--color-primary)] flex items-center justify-center px-4">
+        <div className="text-center bg-[var(--color-card)] p-6 rounded-xl shadow-lg max-w-sm">
+          <div className="text-6xl mb-4">📦</div>
+          <h2 className="text-xl font-bold mb-3 text-[var(--color-foreground)]">
+            No orders yet
+          </h2>
+          <p className="text-[var(--text-accent)] mb-4 text-sm">
+            Start shopping to see your orders here!
+          </p>
+          <Button
+            onClick={() => router.push("/products")}
+            className="w-full py-3"
+          >
+            Browse Products
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-4 max-w-4xl mx-auto">
-      <h2 className="text-xl font-semibold mb-6">My Orders</h2>
-
-      <div className="space-y-6">
-        {orders.map((order: Order) => {
-          const placedAtDate = new Date(order.placedAt);
-          const now = new Date();
-          const hoursSincePlaced =
-            (now.getTime() - placedAtDate.getTime()) / (1000 * 60 * 60);
-
-          const canCancel =
-            order.status !== "cancelled" &&
-            order.status !== "delivered" &&
-            hoursSincePlaced <= 12;
-          const canReturn = isReturnEligible(order);
-
-          return (
-            <div
-              key={order.orderId || order._id}
-              className="border rounded-xl p-4 shadow-md bg-white"
+    <div className="min-h-screen bg-[var(--color-primary)] pb-4">
+      <div className="max-w-4xl mx-auto px-4">
+        {/* Header */}
+        <div className="py-3">
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl sm:text-2xl font-bold text-[var(--color-foreground)]">
+              My Orders
+            </h1>
+            <Button
+              variant="ghost"
+              onClick={() => router.push("/products")}
+              className="hidden sm:flex items-center gap-1 text-sm"
             >
-              {/* Header */}
-              <div className="flex justify-between mb-2">
-                <div>
-                  <p className="font-medium text-gray-700">
-                    Order ID: {order.orderId}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Placed on: {formatDate(order.placedAt)}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">Status:</p>
-                  <p
-                    className={`text-sm font-medium ${
-                      order.status === "delivered"
-                        ? "text-green-600"
-                        : order.status === "cancelled"
-                        ? "text-red-600"
-                        : order.status === "shipped"
-                        ? "text-blue-600"
-                        : "text-orange-600"
-                    }`}
-                  >
-                    {order.status?.toUpperCase()}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">Payment:</p>
-                  <p className="text-sm font-medium text-green-600">
-                    {order.paymentStatus}
-                  </p>
-                </div>
-              </div>
+              ← Continue Shopping
+            </Button>
+          </div>
 
-              {/* Product Preview */}
-              <div className="flex items-center gap-4 mt-4">
-                <div className="w-16 h-16 rounded border overflow-hidden bg-gray-50 flex items-center justify-center">
-                  <img
-                    src={order.productPreview?.images || "/placeholder.png"}
-                    alt={order.productPreview?.name || "Product"}
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium">{order.productPreview?.name}</p>
-                  <p className="text-sm text-gray-500">
-                    Items: {order.productPreview?.quantity}
-                  </p>
-                </div>
-                <p className="font-semibold text-gray-700">
-                  ₹{order.totalAmount.toFixed(2)}
-                </p>
-              </div>
+          <Button
+            variant="outline"
+            onClick={() => router.push("/products")}
+            className="sm:hidden w-full mt-2 py-2 text-sm"
+          >
+            ← Continue Shopping
+          </Button>
+        </div>
 
-              {/* Return Status */}
-              {order.hasActiveReturn && order.returnInfo && (
-                <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                  <div className="flex items-center justify-between">
+        {/* Orders List */}
+        <div className="space-y-3">
+          {orders.map((order: Order) => {
+            const placedAtDate = new Date(order.placedAt);
+            const now = new Date();
+            const hoursSincePlaced =
+              (now.getTime() - placedAtDate.getTime()) / (1000 * 60 * 60);
+
+            const canCancel =
+              order.status !== "cancelled" &&
+              order.status !== "delivered" &&
+              hoursSincePlaced <= 12;
+            const canReturn = isReturnEligible(order);
+
+            return (
+              <div
+                key={order.orderId || order._id}
+                className="bg-[var(--color-card)] rounded-lg shadow-sm border border-[var(--color-border-custom)] hover:shadow-md transition-shadow"
+              >
+                <div className="p-3">
+                  {/* Header Info */}
+                  <div className="flex justify-between mb-2">
                     <div>
-                      <p className="text-sm font-medium text-yellow-800">
-                        Return Status:{" "}
-                        <span className="capitalize">
-                          {order.returnInfo.returnStatus}
-                        </span>
+                      <p className="font-semibold text-[var(--color-foreground)] text-sm">
+                        Order ID: {order.orderId}
                       </p>
-                      <p className="text-xs text-yellow-600">
-                        Return ID: {order.returnInfo.returnId}
+                      <p className="text-xs text-[var(--text-accent)]">
+                        {formatDate(order.placedAt)}
                       </p>
                     </div>
-                    <button
+                    <div className="text-right">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            order.status === "delivered"
+                              ? "bg-green-100 text-green-700"
+                              : order.status === "cancelled"
+                              ? "bg-red-100 text-red-700"
+                              : order.status === "shipped"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-orange-100 text-orange-700"
+                          }`}
+                        >
+                          {order.status.toUpperCase()}
+                        </span>
+                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-medium">
+                          {order.paymentStatus}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Product Info */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-[var(--color-secondary)] flex items-center justify-center border border-[var(--color-border-custom)] p-2">
+                      <img
+                        src={order.productPreview?.images || "/placeholder.png"}
+                        alt={order.productPreview?.name || "Product"}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-[var(--color-foreground)] text-sm truncate">
+                        {order.productPreview?.name}
+                      </p>
+                      <p className="text-xs text-[var(--text-accent)]">
+                        Items: {order.productPreview?.quantity}
+                      </p>
+                    </div>
+                    <p className="font-bold text-[var(--color-foreground)] text-base">
+                      ₹{order.totalAmount.toFixed(0)}
+                    </p>
+                  </div>
+
+                  {/* Return Status */}
+                  {order.hasActiveReturn && order.returnInfo && (
+                    <div className="mt-2 bg-yellow-100 border border-yellow-200 rounded p-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-medium text-yellow-800">
+                            Return Status:{" "}
+                            {order.returnInfo.returnStatus.toUpperCase()}
+                          </p>
+                          <p className="text-xs text-yellow-600">
+                            Return ID: {order.returnInfo.returnId}
+                          </p>
+                        </div>
+                        <Button
+                          onClick={() =>
+                            router.push(
+                              `/return-tracking/${order.returnInfo?.returnId}`
+                            )
+                          }
+                          className="text-xs px-2 py-1"
+                          variant="outline"
+                        >
+                          Track
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 justify-end mt-3 pt-2 border-t border-[var(--color-border-custom)]">
+                    <Button
                       onClick={() =>
-                        router.push(
-                          `/return-tracking/${order.returnInfo?.returnId}`
-                        )
+                        router.push(`/order-details/${order.orderId}`)
                       }
-                      className="text-xs bg-yellow-100 text-yellow-800 px-3 py-1 rounded hover:bg-yellow-200"
+                      variant="outline"
+                      className="text-xs px-3 py-1"
                     >
-                      Track Return
-                    </button>
+                      View Details
+                    </Button>
+
+                    {canReturn && !order.hasActiveReturn && (
+                      <Button
+                        onClick={() => handleReturn(order.orderId!)}
+                        className="text-xs px-3 py-1 bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        Return
+                      </Button>
+                    )}
+
+                    {canCancel && (
+                      <Button
+                        onClick={() => handleCancel(order.orderId!)}
+                        disabled={isCancelling}
+                        className="text-xs px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white"
+                      >
+                        {isCancelling ? "Cancelling..." : "Cancel"}
+                      </Button>
+                    )}
                   </div>
                 </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="mt-4 pt-4 border-t border-gray-200 flex gap-3 justify-end">
-                <button
-                  onClick={() => router.push(`/order-details/${order.orderId}`)}
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md text-sm"
-                >
-                  View Details
-                </button>
-
-                {canReturn && !order.hasActiveReturn && (
-                  <button
-                    onClick={() => handleReturn(order.orderId!)}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm"
-                  >
-                    Return Order
-                  </button>
-                )}
-
-                {canCancel && (
-                  <button
-                    onClick={() => handleCancel(order.orderId!)}
-                    disabled={isCancelling}
-                    className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50"
-                  >
-                    {isCancelling ? "Cancelling..." : "Cancel Order"}
-                  </button>
-                )}
               </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Pagination */}
-      {pagination && pagination.pages > 1 && (
-        <div className="flex justify-center items-center mt-8 space-x-4">
-          <button
-            onClick={() => setCurrentPage(currentPage - 1)}
-            disabled={!pagination.hasPrev}
-            className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <span>
-            Page {pagination.page} of {pagination.pages}
-          </span>
-          <button
-            onClick={() => setCurrentPage(currentPage + 1)}
-            disabled={!pagination.hasNext}
-            className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Next
-          </button>
+            );
+          })}
         </div>
-      )}
+
+        {/* Pagination */}
+        {pagination && pagination.pages > 1 && (
+          <div className="flex justify-center items-center gap-3 mt-6">
+            <Button
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={!pagination.hasPrev}
+              variant="outline"
+              className="text-sm px-3 py-2"
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-[var(--color-foreground)]">
+              Page {pagination.page} of {pagination.pages}
+            </span>
+            <Button
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={!pagination.hasNext}
+              variant="outline"
+              className="text-sm px-3 py-2"
+            >
+              Next
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

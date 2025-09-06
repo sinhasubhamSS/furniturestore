@@ -1,8 +1,7 @@
 "use client";
 
 import React from "react";
-import { DisplayProduct } from "@/types/Product"; // Assuming your types
-import { FaShippingFast, FaShieldAlt } from "react-icons/fa";
+import { DisplayProduct } from "@/types/Product";
 
 type Props = {
   product: DisplayProduct;
@@ -10,106 +9,131 @@ type Props = {
 
 const ProductInfo: React.FC<Props> = ({ product }) => {
   return (
-    <div className="mt-8 bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-      <h2 className="text-2xl font-bold text-gray-900 mb-4">Product Information</h2> {/* Updated heading for clarity */}
-      <p className="text-gray-700 mb-6 leading-relaxed">{product.description}</p>
+    <div className="bg-[var(--color-card)] rounded-xl shadow-lg border border-[var(--color-border-custom)] p-4">
+      <h2 className="text-xl font-bold text-[var(--color-foreground)] mb-3">
+        Product Details
+      </h2>
+      <p className="text-[var(--color-foreground)] mb-4 leading-relaxed text-sm">
+        {product.description}
+      </p>
 
-      {/* Specifications */}
+      {/* Specifications - Compact Grid */}
       {product.specifications && product.specifications.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-3">Specifications</h3>
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-[var(--color-foreground)] mb-3">
+            Specifications
+          </h3>
           {product.specifications.map((section, idx) => (
-            <div key={idx} className="mb-4">
-              <h4 className="text-lg font-medium text-gray-800 mb-2">{section.section}</h4>
-              <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div key={idx} className="mb-3">
+              <h4 className="text-base font-medium text-[var(--text-accent)] mb-2">
+                {section.section}
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {section.specs.map((spec, i) => (
-                  <li key={i} className="flex justify-between border-b border-gray-100 pb-2">
-                    <span className="text-gray-600">{spec.key}</span>
-                    <span className="text-gray-900 font-medium">{spec.value}</span>
-                  </li>
+                  <div
+                    key={i}
+                    className="flex justify-between border-b border-[var(--color-border-custom)] pb-1"
+                  >
+                    <span className="text-[var(--text-accent)] text-sm">
+                      {spec.key}
+                    </span>
+                    <span className="text-[var(--color-foreground)] font-medium text-sm">
+                      {spec.value}
+                    </span>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Measurements */}
+      {/* Measurements - Compact Cards */}
       {product.measurements && (
-        <div className="mb-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-3">Measurements</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-[var(--color-foreground)] mb-3">
+            Measurements
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {product.measurements.width && (
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="text-gray-600 text-sm">Width</p>
-                <p className="font-medium">{product.measurements.width} cm</p>
+              <div className="bg-[var(--color-secondary)] p-3 rounded-lg border border-[var(--color-border-custom)]">
+                <p className="text-[var(--text-accent)] text-xs">Width</p>
+                <p className="font-semibold text-[var(--color-foreground)]">
+                  {product.measurements.width} cm
+                </p>
               </div>
             )}
             {product.measurements.height && (
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="text-gray-600 text-sm">Height</p>
-                <p className="font-medium">{product.measurements.height} cm</p>
+              <div className="bg-[var(--color-secondary)] p-3 rounded-lg border border-[var(--color-border-custom)]">
+                <p className="text-[var(--text-accent)] text-xs">Height</p>
+                <p className="font-semibold text-[var(--color-foreground)]">
+                  {product.measurements.height} cm
+                </p>
               </div>
             )}
             {product.measurements.depth && (
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="text-gray-600 text-sm">Depth</p>
-                <p className="font-medium">{product.measurements.depth} cm</p>
+              <div className="bg-[var(--color-secondary)] p-3 rounded-lg border border-[var(--color-border-custom)]">
+                <p className="text-[var(--text-accent)] text-xs">Depth</p>
+                <p className="font-semibold text-[var(--color-foreground)]">
+                  {product.measurements.depth} cm
+                </p>
               </div>
             )}
             {product.measurements.weight && (
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="text-gray-600 text-sm">Weight</p>
-                <p className="font-medium">{product.measurements.weight} kg</p>
+              <div className="bg-[var(--color-secondary)] p-3 rounded-lg border border-[var(--color-border-custom)]">
+                <p className="text-[var(--text-accent)] text-xs">Weight</p>
+                <p className="font-semibold text-[var(--color-foreground)]">
+                  {product.measurements.weight} kg
+                </p>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Warranty & Disclaimer */}
-      <div className="space-y-4 mb-6">
-        {product.warranty && (
-          <div>
-            <h4 className="font-medium text-gray-900">Warranty</h4>
-            <p className="text-gray-600">{product.warranty}</p>
-          </div>
-        )}
-        {product.disclaimer && (
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-gray-500 text-sm italic">{product.disclaimer}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Merged Additional Information (as sub-section) */}
-      <div className="pt-6 border-t border-gray-100">
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">Shipping & Policies</h3> {/* Optional: More specific sub-heading */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex items-center gap-3">
-            <FaShippingFast className="text-xl text-[--color-accent]" />
+      {/* Warranty & Policies - Inline */}
+      <div className="pt-4 border-t border-[var(--color-border-custom)]">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🚚</span>
             <div>
-              <h4 className="font-medium">Free Shipping</h4>
-              <p className="text-sm text-gray-500">All over India</p>
+              <p className="font-medium text-[var(--color-foreground)]">
+                Free Shipping
+              </p>
+              <p className="text-[var(--text-accent)] text-xs">
+                All over India
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <FaShieldAlt className="text-xl text-[--color-accent]" />
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🔒</span>
             <div>
-              <h4 className="font-medium">Secure Payment</h4>
-              <p className="text-sm text-gray-500">100% Protected</p>
+              <p className="font-medium text-[var(--color-foreground)]">
+                Secure Payment
+              </p>
+              <p className="text-[var(--text-accent)] text-xs">
+                100% Protected
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="bg-[--color-accent] w-6 h-6 rounded-full flex items-center justify-center">
-              <span className="text-white text-sm font-bold">7</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">↩️</span>
             <div>
-              <h4 className="font-medium">Easy Returns</h4>
-              <p className="text-sm text-gray-500">7 Days Policy</p>
+              <p className="font-medium text-[var(--color-foreground)]">
+                Easy Returns
+              </p>
+              <p className="text-[var(--text-accent)] text-xs">7 Days Policy</p>
             </div>
           </div>
         </div>
+
+        {product.warranty && (
+          <div className="mt-3 pt-3 border-t border-[var(--color-border-custom)]">
+            <p className="text-[var(--text-accent)] text-sm">
+              <strong>Warranty:</strong> {product.warranty}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

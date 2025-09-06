@@ -12,7 +12,7 @@
   --color-secondary: #d8bfa6;
   --color-accent: #6b3c1a;
   --color-foreground: var(--text-dark);
-  --color-card: #d8bfa6;
+  /* --color-card: #d8bfa6; */
   /* --color-card: #f5f0ea; */
   --text-dark: #1a1a1a;
   --text-light: #ffffff;
@@ -25,6 +25,19 @@
   --color-hover-card: #c7b294;
 
   --secondary-light: #eddcca;
+
+  
+  --color-card: #f5f0ea; /* Softer cream-white, better contrast */
+
+  /* Light theme additions */
+  --color-card-secondary: #e8ddd0;
+  --color-surface: #ffffff;
+  --color-surface-secondary: #f8f5f1;
+
+  /* Status colors */
+  --color-success: #4caf50;
+  --color-warning: #ff9800;
+  --color-info: #2196f3;
 }
 
 /* Dark Theme Overrides */
@@ -93,5 +106,30 @@
   .scrollbar-custom::-webkit-scrollbar-thumb {
     background: var(--color-scroll-thumb);
     border-radius: 10px;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .scrollbar-visible {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-accent) transparent;
+  }
+  
+  .scrollbar-visible::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .scrollbar-visible::-webkit-scrollbar-thumb {
+    background-color: var(--color-accent);
+    border-radius: 6px;
   }
 }

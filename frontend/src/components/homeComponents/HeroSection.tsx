@@ -13,7 +13,7 @@ const HeroSection = () => {
   // ✅ Use image directly from product (not from variants)
   const products = data || [];
 
-  const images = products.map((product) => product.image).filter(Boolean);
+  const images = products.map((product) => product?.image).filter(Boolean);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -107,7 +107,7 @@ const HeroSection = () => {
         {/* Right - Image Slider */}
         <div className="col-span-1 md:col-span-7 relative flex justify-center md:justify-end my-8">
           <div
-            className="relative w-full max-w-2xl aspect-[3/2] rounded-3xl overflow-hidden bg-[var(--color-card)] shadow-2xl border border-[var(--color-border)]"
+            className="relative w-full max-w-2xl aspect-[3/2] rounded-3xl overflow-hidden bg-[var(--color-secondary)] shadow-2xl border border-[var(--color-border)]"
             onMouseEnter={handlePause}
             onMouseLeave={handleResume}
             onTouchStart={handlePause}

@@ -17,10 +17,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clearActiveUser } from "@/redux/slices/userSlice";
 import { useGetCartCountQuery } from "@/redux/services/user/cartApi";
+import { useWishlistidsQuery } from "@/redux/services/user/wishlistApi"; // ✅ Import wishlist API
 
 const Navbar = () => {
   const activeUser = useSelector((state: RootState) => state.user.activeUser);
-  const wishlistCount = useSelector((state: RootState) => state.wishlist.count || 0);
+  
+  // ✅ TEMPORARY FIX: Get wishlist count from API
+  const { data: wishlistIds = [], isLoading: wishlistLoading } = useWishlistidsQuery();
+  const wishlistCount = wishlistIds.length; // ✅ Real-time count
   
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
@@ -49,6 +53,11 @@ const Navbar = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // ✅ Debug log for wishlist count
+  useEffect(() => {
+    console.log("🔄 Navbar wishlist count updated:", wishlistCount);
+  }, [wishlistCount]);
+
   return (
     <nav className="fixed top-0 left-0 w-full z-[1000] bg-[var(--color-secondary)] backdrop-blur border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
       <div className="px-4 sm:px-6 lg:px-8">
@@ -75,7 +84,7 @@ const Navbar = () => {
             </button>
           </div>
 
-          {/* Center - Search (Desktop) */}
+          {/* Center - Search */}
           <div className="hidden sm:flex flex-1 max-w-xl mx-4">
             <div className="relative group w-full">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -94,36 +103,23 @@ const Navbar = () => {
             </div>
           </div>
 
-          {/* Right - Icons & User */}
+          {/* Right - Icons */}
           <div className="flex items-center gap-3">
             
-            {/* ✅ FIXED: Wishlist Icon with Non-clickable Badge */}
-            <Link href="/wishlist">
-              <button className="relative p-2 group hover:bg-[var(--color-primary)] rounded-lg transition-colors">
-                <FiHeart className="h-6 w-6 text-[var(--foreground)] group-hover:text-red-500 transition-colors" />
-                
-                {/* ✅ Badge with pointer-events-none and cursor-default */}
-                {wishlistCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center pointer-events-none cursor-default">
-                    {wishlistCount > 99 ? '99+' : wishlistCount}
-                  </span>
-                )}
-              </button>
-            </Link>
+            {/* ✅ WISHLIST ICON - Temporary Fix with API Count */}
+            
 
-            {/* ✅ FIXED: Cart Icon with Non-clickable Badge */}
+            {/* Cart Icon */}
             <Link href="/cart">
               <button className="relative p-2 group hover:bg-[var(--color-primary)] rounded-lg transition-colors">
                 <FiShoppingCart className="h-6 w-6 text-[var(--foreground)] group-hover:text-[var(--color-accent)] transition-colors" />
 
-                {/* ✅ Fixed cart badge - no click cursor */}
                 {!cartCountLoading && cartCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-[var(--color-accent)] text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center pointer-events-none cursor-default">
                     {cartCount > 99 ? '99+' : cartCount}
                   </span>
                 )}
 
-                {/* ✅ Fixed loading indicator */}
                 {cartCountLoading && (
                   <span className="absolute -top-1 -right-1 bg-gray-400 text-white text-xs rounded-full h-3 w-3 animate-pulse pointer-events-none"></span>
                 )}
@@ -198,12 +194,13 @@ const Navbar = () => {
                         </Link>
                         <Link
                           href="/wishlist"
-                          className="flex items-center px-4 py-3 text-sm text-[var(--foreground)] hover:bg-[var(--color-accent)]/20 transition-colors duration-200"
+                          className="flex items-center justify-between px-4 py-3 text-sm text-[var(--foreground)] hover:bg-[var(--color-accent)]/20 transition-colors duration-200"
                           onClick={() => setIsDropdownOpen(false)}
                         >
-                          ❤️ My Wishlist
+                          <span>❤️ My Wishlist</span>
+                          {/* ✅ Show count in dropdown too */}
                           {wishlistCount > 0 && (
-                            <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full pointer-events-none">
+                            <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full pointer-events-none">
                               {wishlistCount}
                             </span>
                           )}
@@ -274,7 +271,7 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* Mobile Search Input */}
+        {/* Mobile Search */}
         {isMobileSearchOpen && (
           <div className="sm:hidden pb-3">
             <div className="relative">

@@ -2,6 +2,9 @@
 
 import { DisplayProduct } from "@/types/Product";
 import Image from "next/image";
+import ActionButton from "@/components/ui/ActionButton";
+import { Minus, Plus, Trash2 } from "lucide-react";
+import Button from "../ui/Button";
 
 type Props = {
   product: DisplayProduct;
@@ -18,7 +21,6 @@ const ProductCartItem = ({
   onRemove,
   onQuantityChange,
 }: Props) => {
-  // ✅ Find the selected variant
   const selectedVariant = product.variants?.find((v) => v._id === variantId);
 
   if (!selectedVariant) {
@@ -26,88 +28,111 @@ const ProductCartItem = ({
     return null;
   }
 
-  // ✅ Use correct property names matching your schema
-  const displayPrice = selectedVariant.hasDiscount
-    ? selectedVariant.discountedPrice || 0
-    : selectedVariant.price || 0;
+  const finalPrice = selectedVariant.hasDiscount
+    ? selectedVariant.discountedPrice
+    : selectedVariant.price;
 
   return (
-    <div className="flex flex-col sm:flex-row gap-6 bg-[--color-card] p-6 rounded-xl shadow-md border border-[--color-border] transition-shadow hover:shadow-lg">
-      {/* Product Image */}
-      <div className="w-28 h-28 rounded-lg overflow-hidden bg-white flex items-center justify-center border">
-        <Image
-          src={selectedVariant.images?.[0]?.url || "/placeholder.jpg"}
-          alt={product.name}
-          width={112}
-          height={112}
-          className="w-full h-full object-contain"
-        />
-      </div>
-
-      {/* Product Info and Actions */}
-      <div className="flex-1 flex flex-col justify-between">
-        <div className="flex justify-between items-start gap-4">
-          <div>
-            <h3 className="text-lg font-semibold mb-1">{product.name}</h3>
-            <p className="text-sm text-[--color-muted] mb-1">{product.title}</p>
-
-            {/* ✅ Show variant details */}
-            <div className="flex gap-2 text-xs text-gray-600">
-              <span className="bg-gray-100 px-2 py-1 rounded">
-                {selectedVariant.color}
-              </span>
-              <span className="bg-gray-100 px-2 py-1 rounded">
-                {selectedVariant.size}
-              </span>
-            </div>
+    <div className="bg-[var(--color-card)] rounded shadow-sm border border-[var(--color-border-custom)] hover:shadow-lg transition-shadow">
+      <div className="flex gap-3 p-2">
+        {/* Left Column - Image and Quantity */}
+        <div className="flex flex-col items-center gap-2">
+          {/* Product Image */}
+          <div className="w-30 h-30 rounded overflow-hidden bg-[var(--color-secondary)] flex items-center justify-center border border-[var(--color-border-custom)] p-2">
+            <Image
+              src={selectedVariant.images?.[0]?.url || "/placeholder.jpg"}
+              alt={product.name}
+              width={100}
+              height={100}
+              className="w-full h-full object-contain"
+            />
           </div>
 
-          <button
-            onClick={onRemove}
-            className="text-xs sm:text-sm text-red-600 hover:bg-red-50 px-3 py-1 rounded-md font-medium transition-colors"
-          >
-            Remove
-          </button>
+          {/* Quantity Controls - Under Image */}
+          <div className="flex items-center bg-[var(--color-secondary)] rounded border border-[var(--color-border-custom)]">
+            <ActionButton
+              icon={Minus}
+              variant="secondary"
+              size="sm"
+              onClick={() => quantity > 1 && onQuantityChange(quantity - 1)}
+              disabled={quantity <= 1}
+              className="rounded-r-none border-none px-1.5"
+            />
+            <span className="px-2 py-1 text-sm font-medium text-[var(--color-foreground)] min-w-[24px] text-center">
+              {quantity}
+            </span>
+            <ActionButton
+              icon={Plus}
+              variant="secondary"
+              size="sm"
+              onClick={() => onQuantityChange(quantity + 1)}
+              disabled={quantity >= (selectedVariant.stock || 999)}
+              className="rounded-l-none border-none px-1.5"
+            />
+          </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-4">
-          {/* ✅ Price with discount display */}
-          <div className="flex items-center gap-2">
-            <span className="text-[--color-accent] font-bold text-base">
-              ₹{displayPrice.toFixed(2)}
+        {/* Right Column - Product Info */}
+        <div className="flex-1 min-w-0">
+          {/* Product Title */}
+          <h3 className="text-base font-semibold text-[var(--color-foreground)] truncate">
+            {product.name}
+          </h3>
+          <p className="text-[var(--text-accent)] text-sm truncate">
+            {product.title}
+          </p>
+
+          {/* Variant Details */}
+          <div className="text-sm text-[var(--text-accent)] mt-1">
+            <span>Color: {selectedVariant.color}</span> •{" "}
+            <span>Size: {selectedVariant.size}</span>
+            <br />
+            <span
+              className={
+                selectedVariant.stock && selectedVariant.stock > 0
+                  ? "text-green-600"
+                  : "text-red-500"
+              }
+            >
+              Stock: {selectedVariant.stock || 0}
             </span>
-            {selectedVariant.hasDiscount && selectedVariant.price && (
-              <>
+          </div>
+
+          {/* Price Section */}
+          <div className="mt-2">
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-medium text-[var(--color-foreground)]">
+                ₹{finalPrice?.toLocaleString()}
+              </span>
+
+              {selectedVariant.hasDiscount && selectedVariant.price && (
                 <span className="text-sm line-through text-gray-500">
-                  ₹{selectedVariant.price.toFixed(2)}
+                  ₹{selectedVariant.price.toLocaleString()}
                 </span>
-                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                  {selectedVariant.discountPercent || 0}% OFF
+              )}
+
+              {selectedVariant.hasDiscount && (
+                <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-xs">
+                  {selectedVariant.discountPercent}% off
                 </span>
-              </>
+              )}
+            </div>
+
+            {selectedVariant.hasDiscount && selectedVariant.savings && (
+              <p className="text-sm text-green-600 mt-0.5">
+                You save ₹{selectedVariant.savings.toLocaleString()}
+              </p>
             )}
           </div>
 
-          {/* Quantity Control */}
-          <div className="flex items-center gap-2">
-            <label
-              htmlFor={`qty-${product._id}-${variantId}`}
-              className="text-sm"
+          {/* Remove Button - Bottom Left */}
+          <div className="flex justify-start mt-2">
+            <button 
+              className="font-semibold text-red-600 hover:text-red-800 cursor-pointer text-sm transition-colors" 
+              onClick={onRemove}
             >
-              Qty:
-            </label>
-            <input
-              id={`qty-${product._id}-${variantId}`}
-              type="number"
-              min={1}
-              max={selectedVariant.stock || 999}
-              value={quantity}
-              onChange={(e) => onQuantityChange(Number(e.target.value))}
-              className="w-16 px-2 py-1 border border-[--color-border] rounded text-center bg-white focus:ring-2 focus:ring-[--color-accent] focus:outline-none transition"
-            />
-            <span className="text-xs text-gray-500">
-              (Stock: {selectedVariant.stock || 0})
-            </span>
+              Remove
+            </button>
           </div>
         </div>
       </div>

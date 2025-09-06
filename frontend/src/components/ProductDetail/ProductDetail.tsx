@@ -2,8 +2,8 @@
 
 import React, { useEffect } from "react";
 import { useGetProductBySlugQuery } from "@/redux/services/user/publicProductApi";
-import { useDispatch, useSelector } from "react-redux"; // ✅ Add useSelector
-import { AppDispatch, RootState } from "@/redux/store"; // ✅ Add RootState
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "@/redux/store";
 import {
   setQuantity,
   resetProductState,
@@ -27,14 +27,11 @@ interface Props {
 const ProductDetail = ({ slug }: Props) => {
   const dispatch = useDispatch<AppDispatch>();
   const { data: product, isLoading, error } = useGetProductBySlugQuery(slug);
-
-  // ✅ Direct Redux selector for user
   const user = useSelector((state: RootState) => state.user.activeUser);
 
   useEffect(() => {
     if (product) {
       dispatch(setQuantity(1));
-      console.log("Transformed Product Data:", product);
     }
   }, [product, dispatch]);
 
@@ -46,18 +43,12 @@ const ProductDetail = ({ slug }: Props) => {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-pulse flex flex-col space-y-4 w-full max-w-6xl">
-          <div className="flex flex-col md:flex-row gap-8">
-            <div className="bg-gray-200 rounded-lg w-full md:w-1/2 h-[400px]"></div>
-            <div className="w-full md:w-1/2 space-y-6">
-              <div className="h-8 bg-gray-200 rounded w-3/4"></div>
-              <div className="h-6 bg-gray-200 rounded w-1/4"></div>
-              <div className="h-4 bg-gray-200 rounded w-full"></div>
-              <div className="h-4 bg-gray-200 rounded w-4/5"></div>
-              <div className="h-12 bg-gray-200 rounded w-1/2"></div>
-            </div>
-          </div>
+      <div className="w-screen min-h-screen bg-[var(--color-primary)] flex items-center justify-center">
+        <div className="text-center bg-[var(--color-card)] p-6 rounded-xl shadow-lg">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-4 border-[var(--color-accent)] mx-auto"></div>
+          <p className="mt-3 text-[var(--color-foreground)] font-medium text-sm">
+            Loading product...
+          </p>
         </div>
       </div>
     );
@@ -65,51 +56,74 @@ const ProductDetail = ({ slug }: Props) => {
 
   if (error || !product) {
     return (
-      <div className="flex justify-center items-center min-h-[300px]">
-        <p className="text-destructive text-lg">Failed to load product.</p>
+      <div className="w-screen min-h-screen bg-[var(--color-primary)] flex items-center justify-center">
+        <div className="text-center bg-[var(--color-card)] p-6 rounded-xl shadow-lg">
+          <div className="text-3xl mb-3">⚠️</div>
+          <p className="text-[var(--text-error)] font-semibold text-sm">
+            Failed to load product
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-[1440px] mx-auto px-2 md:px-4 py-6">
-      {/* Product Details Section */}
-      <div className="flex flex-col lg:flex-row gap-3 lg:gap-4">
-        {/* Left Column - Image + Buttons */}
-        <div className="w-full lg:w-1/2 flex flex-col gap-2 lg:gap-3">
-          <ImageGallery />
-          <div className="ml-0 lg:ml-[72px] max-w-full lg:max-w-[480px] w-full">
-            <ActionButtons productId={product._id} />
+    <>
+      {/* Main Container - Navbar से 8px gap, sides में कोई gap नहीं */}
+      <div className="w-full min-h-screen bg-[var(--color-primary)] pt-8 px-0">
+        {/* Main Product Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2">
+          {/* Left Column - Images & Buttons */}
+          <div className="pl-0 pr-4  lg:pl-0 lg:pr-6 ">
+            {/* Image Gallery with Frame */}
+            <div className="w-full mb-1">
+              <ImageGallery />
+            </div>
+
+            {/* Action Buttons in Frame */}
+            <div className="w-full">
+              <div className="relative p-2 lg:p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border-2 border-gray-200 shadow-xl">
+                <div className="absolute inset-3 border-2 border-gray-300 rounded-xl opacity-20 pointer-events-none"></div>
+                <div className="relative z-10">
+                  <ActionButtons productId={product._id} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Product Info */}
+          <div className="pl-0 pr-4 lg:pl-0 lg:pr-6  bg-[var(--color-card)] ">
+            <div className="space-y-2">
+              <ProductHeader product={product} />
+              <ProductPrice variants={product.variants} />
+
+              <div className="space-y-4">
+                <VariantSelector variants={product.variants} />
+                <QuantitySelector />
+              </div>
+
+              <StockStatus />
+
+              <div className="pt-6 border-t border-[var(--color-border-custom)]">
+                <h3 className="text-base font-semibold text-[var(--color-foreground)] mb-3">
+                  📍 Check Delivery
+                </h3>
+                <PincodeChecker />
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Right Column - Product Info */}
-        <div className="w-full lg:w-1/2 mt-4 lg:mt-0">
-          <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-100">
-            <ProductHeader product={product} />
-            <ProductPrice variants={product.variants} />
-            <div className="py-4 space-y-4">
-              <VariantSelector variants={product.variants} />
-              <QuantitySelector />
-            </div>
-            <StockStatus />
-            <div className="mt-6 pt-4 border-t border-gray-200">
-              <h3 className="text-sm font-medium text-gray-900 mb-3">
-                📍 Check Delivery Availability
-              </h3>
-              <PincodeChecker />
-            </div>
-          </div>
+        {/* Product Information & Reviews */}
+        <div className="p-4 lg:p-6 space-y-6">
           <ProductInfo product={product} />
+          <ReviewsSection
+            productId={product._id}
+            currentUserId={user?._id || "guest"}
+          />
         </div>
       </div>
-
-      {/* ✅ Reviews Section with Direct Redux User */}
-      <ReviewsSection
-        productId={product._id}
-        currentUserId={user?._id || "guest"} // ✅ Direct selector usage
-      />
-    </div>
+    </>
   );
 };
 
