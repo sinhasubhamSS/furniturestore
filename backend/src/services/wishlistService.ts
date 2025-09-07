@@ -62,7 +62,7 @@ class WishlistService {
   // wishlistService.ts में enhanced getWishlistWithProducts method:
   // wishlistService.ts में getWishlistWithProducts को update करें:
   async getWishlistWithProducts(userId: string) {
-    console.log("🔍 Fetching wishlist for user:", userId);
+    
 
     const wishlist = await Wishlist.findOne({ user: userId }).populate({
       path: "products",
@@ -74,23 +74,18 @@ class WishlistService {
       },
     });
 
-    console.log("📦 Raw wishlist data:", wishlist);
+  
 
     // ✅ Return empty array instead of throwing error
     if (!wishlist) {
-      console.log("📋 No wishlist found, returning empty array");
+     
       return [];
     }
 
-    console.log("🔍 Wishlist products array length:", wishlist.products.length);
 
     // ✅ Log variant information for debugging
     wishlist.products.forEach((product: any, index: number) => {
-      console.log(
-        `📦 Product ${index}: ${product.name} - Variants: ${
-          product.variants?.length || 0
-        }`
-      );
+      
     });
 
     // ✅ Filter out any null/undefined products (safety check)
@@ -98,7 +93,7 @@ class WishlistService {
       (product) => product != null
     );
 
-    console.log("✅ Returning products:", validProducts.length);
+    
     return validProducts;
   }
 }

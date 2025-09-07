@@ -27,7 +27,6 @@ const ProductsPage = () => {
     return filters;
   }, [categoryFromUrl]);
 
-  // ✅ Updated API call with sortBy
   const { data, isLoading, isError } = useGetPublishedProductsQuery({
     page,
     limit: 12,
@@ -71,10 +70,9 @@ const ProductsPage = () => {
     router.replace(`${pathname}${query}`, { scroll: false });
   };
 
-  // ✅ Sort change handler
   const handleSortChange = (sortValue: string) => {
     updateURL({ sortBy: sortValue });
-    setPage(1); // Reset to first page when sorting changes
+    setPage(1);
   };
 
   const clearCategoryFilter = () => {
@@ -86,8 +84,8 @@ const ProductsPage = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-500 mx-auto"></div>
-          <p className="mt-6 text-gray-600 text-lg">Loading products...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600 text-base">Loading products...</p>
         </div>
       </div>
     );
@@ -97,13 +95,13 @@ const ProductsPage = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <p className="text-red-600 text-xl font-semibold">
+          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <p className="text-red-600 text-lg font-semibold">
             Failed to load products
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
           >
             Try Again
           </button>
@@ -114,19 +112,18 @@ const ProductsPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-full mx-auto px-4 py-8">
-        {/* ✅ Header with Title and Sort */}
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="max-w-full mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-xl text-gray-800 font-medium">
+            <h1 className="text-lg text-gray-800 font-semibold">
               Showing results for {selectedCategoryName || "All Products"}
             </h1>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-xs text-gray-600 mt-0.5">
               {data?.totalItems || 0} products found
             </p>
           </div>
 
-          {/* ✅ Sort Dropdown */}
           <SortDropdown
             currentSort={sortFromUrl}
             onSortChange={handleSortChange}
@@ -134,8 +131,8 @@ const ProductsPage = () => {
           />
         </div>
 
-        {/* ✅ Product List */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        {/* Product List */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           {filteredProducts.length > 0 ? (
             <div className="divide-y divide-gray-100">
               {filteredProducts.map((product) => (
@@ -149,12 +146,12 @@ const ProductsPage = () => {
               ))}
             </div>
           ) : (
-            <div className="text-center py-20 px-4">
-              <div className="text-6xl mb-6">🔍</div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            <div className="text-center py-16 px-4">
+              <div className="text-5xl mb-5">🔍</div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">
                 No products found
               </h3>
-              <p className="text-gray-600 mb-6">
+              <p className="text-gray-600 mb-5 text-sm">
                 {searchText
                   ? `No products match "${searchText}"`
                   : selectedCategoryName
@@ -162,14 +159,22 @@ const ProductsPage = () => {
                   : "No products available"}
               </p>
 
-              <div className="flex gap-3 justify-center">
+              <div className="flex gap-3 justify-center flex-wrap">
                 {searchText && (
-                  <Button onClick={() => setSearchText("")} variant="outline">
+                  <Button
+                    onClick={() => setSearchText("")}
+                    variant="outline"
+            
+                  >
                     Clear Search
                   </Button>
                 )}
                 {selectedCategoryName && (
-                  <Button onClick={clearCategoryFilter} variant="outline">
+                  <Button
+                    onClick={clearCategoryFilter}
+                    variant="outline"
+            
+                  >
                     View All Products
                   </Button>
                 )}
@@ -178,19 +183,20 @@ const ProductsPage = () => {
           )}
         </div>
 
-        {/* ✅ Pagination */}
+        {/* Pagination */}
         {(data?.totalPages || 1) > 1 && filteredProducts.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-6 mt-6">
-            <div className="flex justify-center items-center gap-6">
+          <div className="bg-white rounded-lg shadow-sm p-4 mt-4">
+            <div className="flex justify-center items-center gap-4 flex-wrap">
               <Button
                 onClick={() => setPage((p) => Math.max(p - 1, 1))}
                 disabled={page === 1}
                 variant="outline"
+        
               >
                 ← Previous
               </Button>
 
-              <span className="text-gray-700 font-medium">
+              <span className="text-gray-700 font-medium text-sm">
                 Page {page} of {data?.totalPages || 1}
               </span>
 
@@ -200,6 +206,7 @@ const ProductsPage = () => {
                 }
                 disabled={page === (data?.totalPages || 1)}
                 variant="outline"
+        
               >
                 Next →
               </Button>

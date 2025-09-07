@@ -118,7 +118,7 @@ export class EmailService {
         throw new Error(`Email failed: ${error.message}`);
       }
 
-      console.log("✅ Email sent successfully:", data?.id);
+  
       return { success: true, id: data?.id };
     } catch (error: any) {
       console.error("❌ Email service error:", error);

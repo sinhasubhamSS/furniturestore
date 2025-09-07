@@ -9,7 +9,7 @@ import { AppError } from "../utils/AppError";
 export const createPaymentOrder = catchAsync(
   async (req: Request, res: Response) => {
     const { amount } = req.body;
-    console.log("📥 Received amount from frontend:", amount);
+   
     if (!amount || typeof amount !== "number") {
       throw new AppError("Amount must be provided as number", 400);
     }

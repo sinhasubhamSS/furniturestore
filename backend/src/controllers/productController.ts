@@ -59,7 +59,7 @@ export const getAllProductsAdmin = catchAsync(
 
 export const getAllProducts = catchAsync(
   async (req: AuthRequest, res: Response) => {
-    console.log("📥 Request query:", req.query);
+
 
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
@@ -68,7 +68,7 @@ export const getAllProducts = catchAsync(
     // ✅ Extract sort parameters from frontend
     const sortBy = req.query.sortBy?.toString() || "latest";
 
-    console.log("🔄 Controller received sortBy:", sortBy);
+    
 
     // Build filter object from query parameters
     const filter: any = {};
@@ -77,7 +77,7 @@ export const getAllProducts = catchAsync(
       filter.category = req.query.category;
     }
 
-    console.log("🔍 Processed filter:", filter);
+
 
     const products = await productService.getAllProducts(
       filter,
@@ -88,12 +88,7 @@ export const getAllProducts = catchAsync(
       sortBy // ✅ Pass sort parameter to service
     );
 
-    console.log(
-      "✅ Products fetched with sort:",
-      sortBy,
-      "Count:",
-      products.products.length
-    );
+    
 
     res
       .status(200)

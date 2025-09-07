@@ -295,7 +295,6 @@ export class NewsletterService {
   // Private methods for email notifications
   // In newsletter service - sendVerificationEmail method
   private async sendVerificationEmail(subscriber: any) {
-    console.log(`📧 Sending verification email to: ${subscriber.email}`);
 
     const verificationUrl = `${process.env.FRONTEND_URL}/newsletter/verify/${subscriber.verificationToken}`;
 
@@ -337,15 +336,13 @@ export class NewsletterService {
         text: `Please verify your newsletter subscription by visiting: ${verificationUrl}`,
       });
 
-      console.log(`✅ Verification email sent to: ${subscriber.email}`);
     } catch (error) {
       console.error("❌ Failed to send verification email:", error);
     }
   }
 
   private async sendWelcomeEmail(subscriber: any) {
-    console.log(`🎉 Sending welcome email to: ${subscriber.email}`);
-
+  
     const html = `
       <!DOCTYPE html>
       <html>
@@ -399,14 +396,14 @@ export class NewsletterService {
         )}`,
       });
 
-      console.log(`✅ Welcome email sent to: ${subscriber.email}`);
+
     } catch (error) {
       console.error("❌ Failed to send welcome email:", error);
     }
   }
 
   private async sendUnsubscribeConfirmation(subscriber: any) {
-    console.log(`📧 Sending unsubscribe confirmation to: ${subscriber.email}`);
+ 
 
     const html = `
       <!DOCTYPE html>
@@ -441,14 +438,12 @@ export class NewsletterService {
         text: "You have been successfully unsubscribed from our newsletter.",
       });
 
-      console.log(`✅ Unsubscribe confirmation sent to: ${subscriber.email}`);
     } catch (error) {
       console.error("❌ Failed to send unsubscribe confirmation:", error);
     }
   }
 
   private async sendPreferencesUpdateEmail(subscriber: any) {
-    console.log(`📧 Sending preferences update email to: ${subscriber.email}`);
 
     const html = `
       <!DOCTYPE html>
@@ -495,7 +490,6 @@ export class NewsletterService {
         )}`,
       });
 
-      console.log(`✅ Preferences update email sent to: ${subscriber.email}`);
     } catch (error) {
       console.error("❌ Failed to send preferences update email:", error);
     }

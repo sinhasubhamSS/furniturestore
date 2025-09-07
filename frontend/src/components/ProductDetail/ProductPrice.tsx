@@ -61,11 +61,7 @@ const ProductPrice: React.FC<Props> = ({ variants }) => {
         </p>
       </div>
 
-      <div className="flex items-center space-x-2">
-        <button className="p-2 rounded-full hover:bg-gray-100">
-          <FaHeart className="text-gray-500 hover:text-red-500" />
-        </button>
-      </div>
+      
     </div>
   );
 };

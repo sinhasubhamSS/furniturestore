@@ -30,12 +30,12 @@ export class DataLoader {
         }));
 
         allPincodes.push(...processedData);
-        console.log(`✅ Loaded ${fileData.length} pincodes from ${file}`);
+      
       });
 
       return allPincodes;
     } catch (error) {
-      console.error("❌ Error loading pincode data:", error);
+      
       return [];
     }
   }

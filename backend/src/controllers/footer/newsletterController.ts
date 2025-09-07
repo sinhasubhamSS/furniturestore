@@ -18,7 +18,7 @@ export class NewsletterController {
     try {
       const validatedData = newsletterSubscribeSchema.parse(req.body);
       const result = await newsletterService.subscribe(validatedData);
-      console.log("hi",result);
+     
 
       const message = result.isReactivated
         ? "Welcome back! Your subscription has been reactivated"

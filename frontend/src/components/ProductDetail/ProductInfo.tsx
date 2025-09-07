@@ -9,7 +9,7 @@ type Props = {
 
 const ProductInfo: React.FC<Props> = ({ product }) => {
   return (
-    <div className="bg-[var(--color-card)] rounded-xl shadow-lg border border-[var(--color-border-custom)] p-4">
+    <div className="bg-[var(--color-card)]  shadow-lg border border-[var(--color-border-custom)] p-4">
       <h2 className="text-xl font-bold text-[var(--color-foreground)] mb-3">
         Product Details
       </h2>

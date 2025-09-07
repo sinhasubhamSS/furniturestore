@@ -17,7 +17,7 @@ class ReviewController {
     const { body: validatedData } = createReviewSchema.parse({
       body: req.body,
     });
-    console.log(req.body);
+  
 
     // Ensure userId exists
     if (!req.userId) {

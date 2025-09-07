@@ -44,7 +44,7 @@ const ReviewsSection = ({ productId, currentUserId }: ReviewsSectionProps) => {
 
   return (
     <section className="mt-8">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white  shadow-sm border border-gray-100 overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
           <div className="flex items-center justify-between">

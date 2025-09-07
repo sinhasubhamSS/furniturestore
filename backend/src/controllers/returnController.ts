@@ -232,11 +232,7 @@ export class ReturnController {
         throw new AppError("Admin notes must be a string", 400);
       }
 
-      // ✅ Add audit logging
-      console.log(
-        `Admin ${req.user.email} updating return ${returnId} status to ${status}`
-      );
-
+   
       const updatedReturn = await returnService.updateReturnStatus(
         returnId,
         status as ReturnStatus, // ✅ Type assertion

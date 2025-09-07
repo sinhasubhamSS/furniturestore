@@ -242,7 +242,6 @@ class OrderService {
           );
 
           await product.save({ session: session || undefined });
-          console.log(`✅ Confirmed: ${item.quantity} units of ${variant.sku}`);
         }
       }
     }
@@ -271,7 +270,6 @@ class OrderService {
           );
 
           await product.save({ session: session || undefined });
-          console.log(`✅ Released: ${item.quantity} units of ${variant.sku}`);
         }
       }
     }
@@ -518,9 +516,7 @@ class OrderService {
           newOrder.status = OrderStatus.Confirmed;
           await newOrder.save({ session });
 
-          console.log(
-            `✅ Order ${newOrder.orderId} confirmed and stock decremented`
-          );
+         
         } else {
           console.log(
             `✅ Order ${newOrder.orderId} created with reserved stock`
@@ -543,9 +539,7 @@ class OrderService {
       if (createdOrder && createdOrder._id) {
         try {
           await this.releaseReservation(createdOrder._id.toString());
-          console.log(
-            `⚠️ Released reserved stock for failed order ${createdOrder.orderId}`
-          );
+         
         } catch (releaseError) {
           console.error("Error releasing reservation:", releaseError);
         }

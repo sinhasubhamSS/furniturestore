@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useEffect } from "react";
 import { useGetProductBySlugQuery } from "@/redux/services/user/publicProductApi";
 import { useDispatch, useSelector } from "react-redux";
@@ -43,7 +42,7 @@ const ProductDetail = ({ slug }: Props) => {
 
   if (isLoading) {
     return (
-      <div className="w-screen min-h-screen bg-[var(--color-primary)] flex items-center justify-center">
+      <div className="w-full min-h-screen bg-[var(--color-primary)] flex items-center justify-center p-4">
         <div className="text-center bg-[var(--color-card)] p-6 rounded-xl shadow-lg">
           <div className="animate-spin rounded-full h-8 w-8 border-b-4 border-[var(--color-accent)] mx-auto"></div>
           <p className="mt-3 text-[var(--color-foreground)] font-medium text-sm">
@@ -56,7 +55,7 @@ const ProductDetail = ({ slug }: Props) => {
 
   if (error || !product) {
     return (
-      <div className="w-screen min-h-screen bg-[var(--color-primary)] flex items-center justify-center">
+      <div className="w-full min-h-screen bg-[var(--color-primary)] flex items-center justify-center p-4">
         <div className="text-center bg-[var(--color-card)] p-6 rounded-xl shadow-lg">
           <div className="text-3xl mb-3">⚠️</div>
           <p className="text-[var(--text-error)] font-semibold text-sm">
@@ -68,44 +67,40 @@ const ProductDetail = ({ slug }: Props) => {
   }
 
   return (
-    <>
-      {/* Main Container - Navbar से 8px gap, sides में कोई gap नहीं */}
-      <div className="w-full min-h-screen bg-[var(--color-primary)] pt-8 px-0">
-        {/* Main Product Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2">
-          {/* Left Column - Images & Buttons */}
-          <div className="pl-0 pr-4  lg:pl-0 lg:pr-6 ">
-            {/* Image Gallery with Frame */}
-            <div className="w-full mb-1">
+    <div className="w-full min-h-screen bg-[var(--color-primary)] pt-8">
+      {/* Main Product Section - 40/60 split on large screens */}
+      <div className="container mx-auto px-4 lg:px-6">
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+          {/* Left Column - 40% width on desktop */}
+          <div className="w-full lg:w-[40%]">
+            <div className="mb-4">
               <ImageGallery />
             </div>
-
-            {/* Action Buttons in Frame */}
-            <div className="w-full">
-              <div className="relative p-2 lg:p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border-2 border-gray-200 shadow-xl">
-                <div className="absolute inset-3 border-2 border-gray-300 rounded-xl opacity-20 pointer-events-none"></div>
-                <div className="relative z-10">
-                  <ActionButtons productId={product._id} />
-                </div>
+            <div className="relative p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border-2 border-gray-200 shadow-xl">
+              <div className="absolute inset-3 border-2 border-gray-300 rounded-xl opacity-20 pointer-events-none"></div>
+              <div className="relative z-10">
+                <ActionButtons productId={product._id} />
               </div>
             </div>
           </div>
 
-          {/* Right Column - Product Info */}
-          <div className="pl-0 pr-4 lg:pl-0 lg:pr-6  bg-[var(--color-card)] ">
+          {/* Right Column - 60% width on desktop */}
+          <div className="w-full lg:w-[60%] bg-[var(--color-card)] rounded-xl p-2 lg:p- shadow-sm">
             <div className="space-y-2">
               <ProductHeader product={product} />
               <ProductPrice variants={product.variants} />
 
-              <div className="space-y-4">
+              <div className="space-y-2">
                 <VariantSelector variants={product.variants} />
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                 <QuantitySelector />
+                <StockStatus />
               </div>
 
-              <StockStatus />
-
-              <div className="pt-6 border-t border-[var(--color-border-custom)]">
-                <h3 className="text-base font-semibold text-[var(--color-foreground)] mb-3">
+              <div className="pt-2 border-t border-[var(--color-border-custom)]">
+                <h3 className="text-base font-semibold text-[var(--color-foreground)] mb-1">
                   📍 Check Delivery
                 </h3>
                 <PincodeChecker />
@@ -114,8 +109,8 @@ const ProductDetail = ({ slug }: Props) => {
           </div>
         </div>
 
-        {/* Product Information & Reviews */}
-        <div className="p-4 lg:p-6 space-y-6">
+        {/* Product Information & Reviews - Full width below */}
+        <div className="mt-8 space-y-6">
           <ProductInfo product={product} />
           <ReviewsSection
             productId={product._id}
@@ -123,7 +118,7 @@ const ProductDetail = ({ slug }: Props) => {
           />
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

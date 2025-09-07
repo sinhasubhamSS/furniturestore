@@ -255,7 +255,7 @@ private async updateOrderStatusOnReturn(orderId: string): Promise<void> {
       order.status = OrderStatus.Refunded;
       await order.save();
       
-      console.log(`✅ Order ${orderId} marked as refunded after return processing`);
+     
     } else {
       console.log(`⚠️ Order ${orderId} status is ${order.status}, not updating to refunded`);
     }

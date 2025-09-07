@@ -57,7 +57,7 @@ export const getMyOrders = catchAsync(
 
     // ✅ UPDATED: Service now returns pagination data
     const result = await orderService.getMyOrders(userId, page, limit);
-    console.log(result);
+
 
     return res
       .status(200)
@@ -174,8 +174,7 @@ export const getCheckoutPricing = catchAsync(
 );
 export const getAllOrdersAdmin = catchAsync(
   async (req: AuthRequest, res: Response) => {
-    console.log("=== DEBUG: getAllOrdersAdmin called ===");
-    console.log("Query params:", req.query);
+    
 
     const {
       page = 1,
@@ -197,7 +196,7 @@ export const getAllOrdersAdmin = catchAsync(
         search as string
       );
 
-      console.log("Service returned:", result);
+     
 
       return res.status(200).json(
         new ApiResponse(
@@ -207,7 +206,7 @@ export const getAllOrdersAdmin = catchAsync(
         )
       );
     } catch (error: any) {
-      console.error("=== ERROR in getAllOrdersAdmin Controller ===");
+     
       console.error("Error:", error.message);
       console.error("Stack:", error.stack);
 
