@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "seed:interactive-faq": "ts-node scripts/seedInteractiveFAQ.ts",
-   "seed": "ts-node scripts/seed-delivery-zones.ts"
+    "seed": "ts-node scripts/seed-delivery-zones.ts"
   },
   "keywords": [],
   "author": "",
@@ -37,7 +37,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/mongoose": "^5.11.97",
     "@types/multer": "^1.4.13",
-    "@types/node": "^24.0.3",
+    "@types/node": "^24.3.1",
     "@types/streamifier": "^0.1.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.8.3"
