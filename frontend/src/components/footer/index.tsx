@@ -52,19 +52,19 @@ const Footer: React.FC<FooterProps> = ({ className = "" }) => {
             </p>
             <div className="flex space-x-6 text-sm">
               <a
-                href="/privacy"
+                href="/policies/privacy"
                 className="hover:text-[--color-primary] transition-colors"
               >
                 Privacy Policy
               </a>
               <a
-                href="/terms"
+                href="/policies/terms"
                 className="hover:text-[--color-primary] transition-colors"
               >
-                Terms of Service
+                Terms of Use
               </a>
               <a
-                href="/returns"
+                href="/policies/returns&refunds"
                 className="hover:text-[--color-primary] transition-colors"
               >
                 Returns & Refunds
