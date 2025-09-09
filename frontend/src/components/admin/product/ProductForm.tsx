@@ -1,25 +1,23 @@
 "use client";
 
 import { useForm, useFieldArray } from "react-hook-form";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import VisibilityToggle from "./VisibilityToggle";
-import VariantForm from "./VariantsField"; // Handles only color, size, images
-import SpecificationForm from "./SpecificationsField"; // Full specs
-import CategoryDropdown from "./CategoryDropdown"; // Custom select
-import { Product } from "@/types/Product";
-import { CreateProductInput } from "@/lib/validations/product.schema";
-// ----- Types -----
+import VariantForm from "./VariantsField";
+import SpecificationForm from "./SpecificationsField";
+import CategoryDropdown from "./CategoryDropdown";
+import type { CreateProductInput } from "@/lib/validations/product.schema";
 
 type ProductFormProps = {
   onSubmit: (data: CreateProductInput) => void;
   isEdit?: boolean;
+  defaultValues?: Partial<CreateProductInput>;
+  loading?: boolean;
 };
 
-// ----- Component -----
-
-const defaultVariant = {
+const defaultVariant: CreateProductInput["variants"][number] = {
   color: "",
   size: "",
   images: [],
@@ -29,14 +27,18 @@ const defaultVariant = {
   hasDiscount: false,
   discountPercent: 0,
   discountValidUntil: "",
-  discountedPrice: 0, // Added to satisfy Variant type
+  discountedPrice: 0,
 };
 
 const ProductForm: React.FC<ProductFormProps> = ({
   onSubmit,
   isEdit = false,
+  defaultValues,
+  loading = false,
 }) => {
-  const [visibility, setVisibility] = useState(true);
+  const [visibility, setVisibility] = useState(
+    defaultValues?.isPublished ?? true
+  );
 
   const {
     register,
@@ -45,15 +47,24 @@ const ProductForm: React.FC<ProductFormProps> = ({
     handleSubmit,
     setValue,
     getValues,
+    reset,
     formState: { errors },
-  } = useForm<Product>({
+  } = useForm<CreateProductInput>({
     defaultValues: {
       variants: [defaultVariant],
       specifications: [],
       measurements: {},
       isPublished: true,
+      ...defaultValues,
     },
   });
+
+  useEffect(() => {
+    if (defaultValues) {
+      reset({ ...defaultValues });
+      setVisibility(defaultValues.isPublished ?? true);
+    }
+  }, [defaultValues, reset]);
 
   const {
     fields: variantFields,
@@ -64,12 +75,14 @@ const ProductForm: React.FC<ProductFormProps> = ({
     name: "variants",
   });
 
-  const handleFormSubmit = (data: Product) => {
+  const handleFormSubmit = (data: CreateProductInput) => {
     data.isPublished = visibility;
     onSubmit(data);
   };
 
-  const handleSpecificationChange = (specs: Product["specifications"]) => {
+  const handleSpecificationChange = (
+    specs: CreateProductInput["specifications"]
+  ) => {
     setValue("specifications", specs);
   };
 
@@ -110,16 +123,13 @@ const ProductForm: React.FC<ProductFormProps> = ({
         )}
       </div>
 
-      {/* Category Dropdown */}
       <CategoryDropdown
         value={getValues("category") ?? ""}
         onChange={(value: string) => setValue("category", value)}
       />
 
-      {/* Visibility Toggle */}
       <VisibilityToggle value={visibility} onChange={setVisibility} />
 
-      {/* Variants Section */}
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-semibold">Variants</h3>
@@ -137,14 +147,13 @@ const ProductForm: React.FC<ProductFormProps> = ({
             getValues={getValues}
             watch={watch}
             remove={() => removeVariant(index)}
+         
           />
         ))}
       </div>
 
-      {/* Specification Section */}
       <SpecificationForm onChange={handleSpecificationChange} />
 
-      {/* Measurements Section */}
       <div>
         <h3 className="text-lg font-semibold mb-2">Measurements</h3>
         <div className="grid grid-cols-2 gap-4">
@@ -193,7 +202,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
         register={register("disclaimer")}
       />
 
-      <Button type="submit" className="w-full mt-6">
+      <Button type="submit" className="w-full mt-6" disabled={loading}>
         {isEdit ? "Update Product" : "Create Product"}
       </Button>
     </form>

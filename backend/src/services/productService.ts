@@ -7,6 +7,8 @@ import { AppError } from "../utils/AppError";
 import slugify from "slugify";
 import { generateSKU } from "../utils/genetateSku";
 import { SortByOptions } from "../types/productservicetype";
+import { IVariant } from "../types/productservicetype"; // Adjust the path as necessary
+
 class ProductService {
   // ==================== PRIVATE/UTILITY METHODS ====================
 
@@ -54,24 +56,18 @@ class ProductService {
   // ==================== PRIVATE/UTILITY METHODS ==================== में add करें
 
   private buildSortOptions(sortBy: string): { [key: string]: 1 | -1 } {
-    
-
     switch (sortBy) {
       case "price_low":
-        
         return { price: 1 }; // Lowest price first
 
       case "price_high":
-      
         return { price: -1 }; // Highest price first
 
       case "discount":
-        
         return { maxSavings: -1 }; // Highest savings first
 
       case "latest":
       default:
-       
         return { createdAt: -1 }; // Newest first
     }
   }
@@ -144,6 +140,126 @@ class ProductService {
     return product;
   }
 
+  async editProduct(
+    productId: string,
+    userId: string,
+    updateData: Partial<IProductInput>
+  ) {
+    const product = await Product.findOne({
+      _id: productId,
+      createdBy: userId,
+    });
+    if (!product) throw new AppError("Product not found or unauthorized", 404);
+
+    // Update slug on name change
+    if (updateData.name && updateData.name !== product.name) {
+      product.slug = this.buildSlug(updateData.name);
+    }
+
+    // Variants update handling
+    if (updateData.variants) {
+      if (updateData.variants.length === 0) {
+        throw new AppError("At least one variant is required", 400);
+      }
+
+      // Delete images removed in update for each old variant compared to new
+      for (let i = 0; i < product.variants.length; i++) {
+        const oldVariant = product.variants[i];
+        const newVariant = updateData.variants[i];
+        if (newVariant) {
+          await this.deleteRemovedImages(oldVariant.images, newVariant.images);
+        } else {
+          await this.deleteRemovedImages(oldVariant.images, []);
+        }
+      }
+
+      // Recalculate pricing and fields for each new variant
+      const processedVariants: IVariant[] = updateData.variants.map(
+        (variant) => {
+          if (!variant.images || variant.images.length === 0) {
+            throw new AppError(
+              "Each variant must have at least one image",
+              400
+            );
+          }
+
+          const sku = generateSKU(
+            updateData.name || product.name,
+            variant.color,
+            variant.size
+          );
+          const gstDecimal = variant.gstRate / 100;
+          const price = variant.basePrice + variant.basePrice * gstDecimal;
+
+          let discountedPrice = price;
+          let savings = 0;
+          const isDiscountValid =
+            variant.hasDiscount &&
+            variant.discountPercent > 0 &&
+            (!variant.discountValidUntil ||
+              new Date(variant.discountValidUntil) > new Date());
+
+          if (isDiscountValid) {
+            const discountAmount =
+              (variant.basePrice * variant.discountPercent) / 100;
+            const discountedBasePrice = variant.basePrice - discountAmount;
+            discountedPrice =
+              discountedBasePrice + discountedBasePrice * gstDecimal;
+            savings = price - discountedPrice;
+          }
+
+          return {
+            ...variant,
+            sku,
+            price: Math.round(price * 100) / 100,
+            discountedPrice: Math.round(discountedPrice * 100) / 100,
+            savings: Math.round(savings * 100) / 100,
+            stock: variant.stock || 0,
+          };
+        }
+      );
+
+      // Assign variants with Mongoose DocumentArray .set()
+     product.variants.splice(0, product.variants.length, ...processedVariants);
+
+
+      // Update aggregate fields
+      product.price = Math.min(...processedVariants.map((v) => v.price ?? 0));
+      product.lowestDiscountedPrice = Math.min(
+        ...processedVariants.map((v) => v.discountedPrice ?? 0)
+      );
+      product.maxSavings = Math.max(
+        ...processedVariants.map((v) => v.savings ?? 0)
+      );
+      product.colors = [...new Set(processedVariants.map((v) => v.color))];
+      product.sizes = [...new Set(processedVariants.map((v) => v.size))];
+    }
+
+    // Fields allowed to be updated
+    const updatableFields: (keyof IProductInput)[] = [
+      "name",
+      "title",
+      "description",
+      "specifications",
+      "measurements",
+      "warranty",
+      "disclaimer",
+      "category",
+      "isPublished",
+    ];
+
+    // Apply updates
+    updatableFields.forEach((field) => {
+      if (updateData[field] !== undefined) {
+        (product as any)[field] = updateData[field];
+      }
+    });
+
+    await product.save();
+
+    return product.toObject();
+  }
+
   async deleteProduct(productId: string, userId: string) {
     const product = await Product.findOneAndDelete({
       _id: productId,
@@ -164,71 +280,60 @@ class ProductService {
    * @param populateCreatedBy - Whether to populate creator info
    */
   // ProductService.js - Debug getAllProducts method
- async getAllProducts(
-  filter: any = {},
-  page: number = 1,
-  limit: number = 10,
-  isAdmin: boolean = false,
-  populateCreatedBy: boolean = false,
-  sortBy: string = 'latest'  // ✅ NEW PARAMETER
-) {
-  const mongoFilter: any = {};
+  async getAllProducts(
+    filter: any = {},
+    page: number = 1,
+    limit: number = 10,
+    isAdmin: boolean = false,
+    populateCreatedBy: boolean = false,
+    sortBy: string = "latest" // ✅ NEW PARAMETER
+  ) {
+    const mongoFilter: any = {};
 
-  // Handle category filter - convert slug to ObjectId
-  if (filter.category) {
-   
+    // Handle category filter - convert slug to ObjectId
+    if (filter.category) {
+      const category = await Category.findOne({ slug: filter.category });
 
-    const category = await Category.findOne({ slug: filter.category });
-
-
-    if (category) {
-      mongoFilter.category = category._id;
-     
-    } else {
-     
-      return {
-        products: [],
-        page,
-        limit,
-        totalPages: 0,
-        totalItems: 0,
-      };
+      if (category) {
+        mongoFilter.category = category._id;
+      } else {
+        return {
+          products: [],
+          page,
+          limit,
+          totalPages: 0,
+          totalItems: 0,
+        };
+      }
     }
+
+    // ✅ NEW: Build dynamic sort options
+    const sortOptions = this.buildSortOptions(sortBy);
+
+    // ✅ CRITICAL: Build the query with dynamic sort
+    const query = this.buildProductQuery(
+      mongoFilter,
+      isAdmin,
+      populateCreatedBy
+    ).sort(sortOptions); // ✅ CHANGED: Dynamic sort instead of hardcoded
+
+    // ✅ CRITICAL: Apply pagination to the query
+    const paginated = this.applyPagination(query, page, limit);
+
+    // ✅ Now execute the queries
+    const [products, total] = await Promise.all([
+      paginated.lean(),
+      Product.countDocuments(mongoFilter),
+    ]);
+
+    return {
+      products,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      totalItems: total,
+    };
   }
-
-
-
-  // ✅ NEW: Build dynamic sort options
-  const sortOptions = this.buildSortOptions(sortBy);
-  
-
-  // ✅ CRITICAL: Build the query with dynamic sort
-  const query = this.buildProductQuery(
-    mongoFilter,
-    isAdmin,
-    populateCreatedBy
-  ).sort(sortOptions); // ✅ CHANGED: Dynamic sort instead of hardcoded
-
-  // ✅ CRITICAL: Apply pagination to the query
-  const paginated = this.applyPagination(query, page, limit);
-
-  // ✅ Now execute the queries
-  const [products, total] = await Promise.all([
-    paginated.lean(),
-    Product.countDocuments(mongoFilter),
-  ]);
-
-  
-
-  return {
-    products,
-    page,
-    limit,
-    totalPages: Math.ceil(total / limit),
-    totalItems: total,
-  };
-}
-
 
   /**
    * ✅ UNIFIED - Get single product by query

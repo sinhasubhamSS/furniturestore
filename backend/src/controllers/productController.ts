@@ -6,7 +6,7 @@ import { AppError } from "../utils/AppError";
 import { ApiResponse } from "../utils/ApiResponse";
 import { createProductSchema } from "../validations/product.validation";
 import { Types } from "mongoose";
-
+import { updateProductSchema } from "../validations/product.validation";
 
 // ==================== ADMIN CONTROLLERS ====================
 
@@ -25,7 +25,27 @@ export const createProduct = catchAsync(
       .json(new ApiResponse(201, product, "Product created successfully"));
   }
 );
+export const editProduct = catchAsync(
+  async (req: AuthRequest, res: Response) => {
+    if (!req.userId) throw new AppError("Unauthorized", 401);
 
+    // Parse and validate input - assuming update schema allows partial fields
+    const updateData = updateProductSchema.parse(req.body);
+
+    // Call service method with productId from URL and logged-in user ID
+    const updatedProduct = await productService.editProduct(
+      req.params.productId,
+      req.userId,
+      updateData
+    );
+
+    res
+      .status(200)
+      .json(
+        new ApiResponse(200, updatedProduct, "Product updated successfully")
+      );
+  }
+);
 export const deleteProduct = catchAsync(
   async (req: AuthRequest, res: Response) => {
     if (!req.userId) throw new AppError("Unauthorized", 401);
@@ -59,8 +79,6 @@ export const getAllProductsAdmin = catchAsync(
 
 export const getAllProducts = catchAsync(
   async (req: AuthRequest, res: Response) => {
-
-
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
     const isAdmin = req.user?.role === "admin";
@@ -68,16 +86,12 @@ export const getAllProducts = catchAsync(
     // ✅ Extract sort parameters from frontend
     const sortBy = req.query.sortBy?.toString() || "latest";
 
-    
-
     // Build filter object from query parameters
     const filter: any = {};
 
     if (req.query.category) {
       filter.category = req.query.category;
     }
-
-
 
     const products = await productService.getAllProducts(
       filter,
@@ -87,8 +101,6 @@ export const getAllProducts = catchAsync(
       false,
       sortBy // ✅ Pass sort parameter to service
     );
-
-    
 
     res
       .status(200)

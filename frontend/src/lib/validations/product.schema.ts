@@ -25,6 +25,7 @@ export const createProductSchema = z.object({
           .max(70, "Discount must be 0-70%")
           .default(0), // ✅ Remove .optional()
         discountValidUntil: z.string().optional(), // Date string from date input
+        discountedPrice: z.number().default(0), // ✅ Remove .optional()
 
         images: z
           .array(

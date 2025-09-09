@@ -21,7 +21,6 @@ export const adminProductApi = createApi({
         params: { page, limit },
       }),
       transformResponse: (response: { data: AdminProductResponse }) => {
-        console.log("📦 Admin Products Response:", response.data);
         return response.data;
       },
       providesTags: ["AdminProducts"],
