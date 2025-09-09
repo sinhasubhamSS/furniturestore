@@ -1,14 +1,16 @@
+const BACKEND_API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000/api";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ["res.cloudinary.com"], // 👈 Required for Cloudinary images
+    domains: ["res.cloudinary.com"],
   },
-
   async rewrites() {
     return [
       {
-        source: "/api/:path*", // frontend call
-        destination: "http://localhost:5000/api/:path*", // actual backend
+        source: "/api/:path*",
+        destination: `${BACKEND_API_BASE_URL}/:path*`, // Removes duplicated /api
       },
     ];
   },
