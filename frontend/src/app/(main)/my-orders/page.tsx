@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   useGetMyOrdersQuery,
@@ -27,8 +28,12 @@ const MyOrders = () => {
         await cancelOrder({ orderId }).unwrap();
         alert("Order cancelled successfully.");
         refetch();
-      } catch (err: any) {
-        alert(err?.data?.message || "Failed to cancel order");
+      } catch (err: unknown) {
+        // Use unknown and narrow type safely
+        alert(
+          (err as { data?: { message?: string } })?.data?.message ||
+            "Failed to cancel order"
+        );
       }
     }
   };
@@ -185,10 +190,12 @@ const MyOrders = () => {
                   {/* Product Info */}
                   <div className="flex items-center gap-3">
                     <div className="w-16 h-16 rounded-lg overflow-hidden bg-[var(--color-secondary)] flex items-center justify-center border border-[var(--color-border-custom)] p-2">
-                      <img
+                      <Image
                         src={order.productPreview?.images || "/placeholder.png"}
                         alt={order.productPreview?.name || "Product"}
-                        className="w-full h-full object-contain"
+                        width={64}
+                        height={64}
+                        className="object-contain"
                       />
                     </div>
                     <div className="flex-1 min-w-0">

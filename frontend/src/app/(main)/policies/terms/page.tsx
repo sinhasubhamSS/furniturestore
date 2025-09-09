@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 
 const TermsOfUse: React.FC = () => {
@@ -13,7 +15,7 @@ const TermsOfUse: React.FC = () => {
       <section className="mb-8">
         <h2 className="text-2xl font-semibold mb-4">Acceptance of Terms</h2>
         <p>
-          By accessing and using Suvidha Furniture's services, you agree to
+          By accessing and using Suvidha Furniture&apos;s services, you agree to
           these Terms of Use.
         </p>
         <p>
@@ -112,9 +114,9 @@ const TermsOfUse: React.FC = () => {
       <section className="mb-8">
         <h2 className="text-2xl font-semibold mb-4">Limitation of Liability</h2>
         <p>
-          We provide the platform "as is" without warranties. Suvidha Furniture
-          is not liable for indirect, incidental, or consequential damages
-          arising from use.
+          We provide the platform &quot;as is&quot; without warranties. Suvidha
+          Furniture is not liable for indirect, incidental, or consequential
+          damages arising from use.
         </p>
       </section>
 
@@ -129,8 +131,14 @@ const TermsOfUse: React.FC = () => {
       <section>
         <h2 className="text-2xl font-semibold mb-4">Contact</h2>
         <p>
-          Questions about these terms can be directed to
-          support@suvidhafurniture.in.
+          Questions about these terms can be directed to{" "}
+          <a
+            href="mailto:support@suvidhafurniture.in"
+            className="text-[var(--color-accent)]"
+          >
+            support@suvidhafurniture.in
+          </a>
+          .
         </p>
       </section>
     </main>

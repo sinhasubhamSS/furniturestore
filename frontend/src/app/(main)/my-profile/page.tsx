@@ -3,6 +3,7 @@
 import React from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/redux/store";
+import Image from "next/image";
 
 const MyProfile = () => {
   const user = useSelector((state: RootState) => state.user.activeUser);
@@ -22,10 +23,12 @@ const MyProfile = () => {
 
       <div className="flex flex-col md:flex-row md:items-center gap-6">
         {user.avatar ? (
-          <img
+          <Image
             src={user.avatar}
             alt={`${user.name} avatar`}
-            className="w-28 h-28 rounded-full object-cover border-4 border-[var(--color-primary)] shadow-md"
+            width={112}
+            height={112}
+            className="rounded-full object-cover border-4 border-[var(--color-primary)] shadow-md"
           />
         ) : (
           <div className="w-28 h-28 rounded-full bg-[var(--color-secondary)] flex items-center justify-center border-4 border-[var(--color-primary)] shadow-md text-4xl font-extrabold text-[var(--color-accent)]">
