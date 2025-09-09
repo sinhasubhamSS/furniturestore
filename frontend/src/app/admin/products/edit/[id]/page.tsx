@@ -14,9 +14,7 @@ const EditProductPage = () => {
 
   if (!id) return <p className="p-4 text-red-500">Invalid product ID</p>;
   if (Array.isArray(id))
-    return (
-      <p className="p-4 text-red-500">Invalid product ID (multiple values)</p>
-    );
+    return <p className="p-4 text-red-500">Invalid product ID (multiple values)</p>;
 
   const { data: productList, isLoading } = useGetAdminProductsQuery({
     page: 1,
@@ -30,8 +28,15 @@ const EditProductPage = () => {
   if (isLoading) return <p className="p-4">Loading...</p>;
   if (!product) return <p className="p-4 text-red-500">Product not found</p>;
 
-  const { category, ...restProduct } = product;
+  // Explicitly exclude slug when destructuring
+  // Use type assertion since slug exists in product but not in CreateProductInput
+  const { category, slug, ...restProduct } = product as {
+    slug: string;
+    category: { _id: string };
+    [key: string]: any;
+  };
 
+  // Build default values without slug for the form
   const transformedProduct: Partial<CreateProductInput> = {
     ...restProduct,
     category: category._id,
@@ -53,6 +58,8 @@ const EditProductPage = () => {
   const handleUpdate = async (data: CreateProductInput) => {
     try {
       console.log("Submitting product update:", data);
+
+      // No slug removal needed here because form data never has slug
       await editProduct({ id, data }).unwrap();
 
       toast.success("Product updated successfully");
