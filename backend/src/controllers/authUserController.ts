@@ -8,7 +8,7 @@ import { AppError } from "../utils/AppError";
 import { ApiResponse } from "../utils/ApiResponse";
 import { catchAsync } from "../utils/catchAsync";
 import jwt from "jsonwebtoken";
-
+import { AuthRequest } from "../types/app-request";
 export const registerUser = catchAsync(async (req: Request, res: Response) => {
   const { name, email, password } = req.body;
   const file = req.file;
@@ -98,3 +98,20 @@ export const refreshAccessToken = catchAsync(
     return sendTokenResponse(res, decoded.userId, "Access token refreshed");
   }
 );
+export const getMyProfile = catchAsync(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId; // Make sure auth middleware sets this
+
+  if (!userId) {
+    throw new AppError("Unauthorized: User not authenticated", 401);
+  }
+
+  const user = await User.findById(userId).select("-password -refreshToken");
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  res.status(200).json(
+    new ApiResponse(200, user, "User profile fetched successfully")
+  );
+});

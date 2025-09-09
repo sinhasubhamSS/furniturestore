@@ -33,8 +33,6 @@ export const userProductApi = createApi({
         },
       }),
       transformResponse: (res: { data: UserProductResponse }) => {
-        console.log("📦 Published Products Response:", res.data);
-        console.log("🔄 Sort applied:", res.data); // Debug sort results
         return res.data;
       },
       providesTags: ["UserProducts"],
@@ -56,7 +54,7 @@ export const userProductApi = createApi({
         params: { q: searchQuery, page, limit, sortBy },
       }),
       transformResponse: (res: { data: UserProductResponse }) => {
-        console.log("📦 Search Results:", res.data);
+
         return res.data;
       },
     }),

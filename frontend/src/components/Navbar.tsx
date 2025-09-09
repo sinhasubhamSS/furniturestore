@@ -179,7 +179,7 @@ const Navbar = () => {
                       {/* Navigation Links */}
                       <div className="py-1">
                         <Link
-                          href="/profile"
+                          href="/my-profile"
                           className="flex items-center px-4 py-3 text-sm text-[var(--foreground)] hover:bg-[var(--color-accent)]/20 transition-colors duration-200"
                           onClick={() => setIsDropdownOpen(false)}
                         >

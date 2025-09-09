@@ -1,4 +1,5 @@
 import {
+  getMyProfile,
   loginUser,
   logoutUser,
   refreshAccessToken,
@@ -14,5 +15,6 @@ router.post("/register", upload.single("avatar"), registerUser);
 router.post("/login", loginUser); // Assuming you have a loginUser function in your controller
 router.post("/logout",authVerify, logoutUser); // Assuming you have a loginUser function in your controller
 router.post("/refresh-token", refreshAccessToken); // Assuming you have a loginUser function in your controller
+router.get("/my-profile", getMyProfile); // Assuming you have a loginUser function in your controller
 
 export default router;

@@ -12,6 +12,7 @@ export interface SocialLink {
   name: string;
   url: string;
   icon: string;
+    isUpcoming?: boolean;
 }
 
 export interface StoreLocation {

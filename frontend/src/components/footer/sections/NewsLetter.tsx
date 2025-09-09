@@ -4,8 +4,9 @@ import React, { useState, FormEvent, ChangeEvent } from "react";
 
 import type { NewsletterFormData } from "@/types/footer/footer";
 import axiosClient from "../../../../utils/axios";
+
 type NewsletterProps = {
-  source: string; // ✅ Added prop type
+  source: string;
 };
 
 const Newsletter: React.FC<NewsletterProps> = ({ source }) => {
@@ -24,12 +25,10 @@ const Newsletter: React.FC<NewsletterProps> = ({ source }) => {
       ...prev,
       [name]: value,
     }));
-    setError(""); // Clear error on input change
+    setError("");
   };
 
-  const handleSubscribe = async (
-    e: FormEvent<HTMLFormElement>
-  ): Promise<void> => {
+  const handleSubscribe = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (!formData.email) {
       setError("Email is required");
@@ -38,7 +37,6 @@ const Newsletter: React.FC<NewsletterProps> = ({ source }) => {
 
     setLoading(true);
     try {
-      // ✅ API call using AxiosClient
       const response = await axiosClient.post("/newsletter/subscribe", {
         email: formData.email,
         preferences: formData.preferences,
@@ -55,7 +53,6 @@ const Newsletter: React.FC<NewsletterProps> = ({ source }) => {
         setError("");
       }
     } catch (err: any) {
-      // Handle different error types
       if (err.response?.data?.message) {
         setError(err.response.data.message);
       } else if (err.response?.status === 400) {
@@ -72,14 +69,16 @@ const Newsletter: React.FC<NewsletterProps> = ({ source }) => {
   };
 
   return (
-    <div className="bg-[--color-accent] text-[--text-light] py-8">
+    <div
+      className="py-8 mt-2"
+      style={{ backgroundColor: "var(--color-secondary)", color: "var(--text-dark)" }}
+    >
       <div className="container mx-auto px-4">
         <div className="flex flex-col lg:flex-row items-center justify-between space-y-4 lg:space-y-0">
           <div>
             <h3 className="text-2xl font-bold mb-2">Get Exclusive Offers!</h3>
-            <p className="text-[--color-primary] text-sm">
-              Subscribe to get special offers, free giveaways, and deals
-              delivered to your inbox.
+            <p className="text-sm">
+              Subscribe to get special offers, free giveaways, and deals delivered to your inbox.
             </p>
           </div>
 
@@ -93,30 +92,35 @@ const Newsletter: React.FC<NewsletterProps> = ({ source }) => {
                     placeholder="Enter your email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="flex-1 px-4 py-3 rounded-lg border-none outline-none text-[--text-dark] bg-[--color-primary]"
+                    className="flex-1 px-4 py-3 rounded-lg border-none outline-none text-[--text-dark]"
                     required
                     disabled={loading}
+                    style={{ backgroundColor: "var(--color-card)" }} // Cream-white background for input
                   />
                   <button
                     type="submit"
                     disabled={loading}
-                    className="bg-[--color-secondary] text-[--text-dark] px-6 py-3 rounded-lg font-medium hover:bg-[--color-hover-card] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-6 py-3 rounded-lg font-medium text-[--text-dark] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      backgroundColor: "var(--color-primary)", // Highlight button background
+                    }}
+                    onMouseOver={e => (e.currentTarget.style.backgroundColor = "var(--color-hover-card)")}
+                    onMouseOut={e => (e.currentTarget.style.backgroundColor = "var(--color-primary)")}
                   >
                     {loading ? "Subscribing..." : "Subscribe"}
                   </button>
                 </div>
                 {error && <p className="text-red-300 text-sm">{error}</p>}
-                <p className="text-xs text-[--color-primary] opacity-75">
-                  By subscribing, you agree to receive marketing emails. Check
-                  your email to verify your subscription.
+                <p className="text-xs text-[--text-dark] opacity-75">
+                  By subscribing, you agree to receive marketing emails. Check your email to verify your subscription.
                 </p>
               </form>
             ) : (
               <div className="text-center py-3">
-                <span className="text-[--color-primary] text-lg">
+                <span className="text-[--text-dark] text-lg">
                   ✅ Successfully subscribed! Check your email to verify.
                 </span>
-                <p className="text-xs text-[--color-primary] opacity-75 mt-2">
+                <p className="text-xs text-[--text-dark] opacity-75 mt-2">
                   You'll start receiving newsletters after verification.
                 </p>
               </div>

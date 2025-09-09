@@ -11,13 +11,17 @@ import type { FooterProps } from "../../types/footer/footer";
 const Footer: React.FC<FooterProps> = ({ className = "" }) => {
   return (
     <footer
-      className={`bg-[--color-secondary] text-[--text-dark] mt-auto ${className}`}
+      style={{ backgroundColor: "var(--color-primary)" }}
+      className={`text-[--text-dark] mt-auto ${className}`}
     >
       {/* Newsletter Section - Full width background */}
       <Newsletter source="website_footer" />
 
       {/* Main Footer Content - Full width background */}
-      <div className="w-full bg-[--color-card] py-12">
+      <div
+        className="w-full py-12"
+        style={{ backgroundColor: "var(--color-secondary)" }}
+      >
         {/* Content constrained to max-width */}
         <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
@@ -44,7 +48,10 @@ const Footer: React.FC<FooterProps> = ({ className = "" }) => {
       <ContactInfo />
 
       {/* Footer Bottom - Full width background */}
-      <div className="w-full bg-[--color-accent] text-[--text-light] py-4">
+      <div
+        className="w-full text-[--text-light] py-4"
+        style={{ backgroundColor: "var(--color-accent)" }}
+      >
         <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <p className="text-sm">
