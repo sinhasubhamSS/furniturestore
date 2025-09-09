@@ -38,6 +38,7 @@ const SignupPage = () => {
           name: res.user.name,
           avatar: res.user.avatar,
           role: res.user.role ?? "buyer",
+           email: res.user.email,
         })
       );
     }
