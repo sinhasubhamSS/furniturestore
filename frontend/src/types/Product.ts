@@ -1,4 +1,13 @@
 // Base shared structure
+export type homeProduct = {
+  _id: string;
+  name: string;
+  slug: string;
+  image: string;
+  price: number;
+  discountedPrice: number;}
+
+
 export type Variant = {
   _id?: string;
   color: string;

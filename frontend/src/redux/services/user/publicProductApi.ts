@@ -6,6 +6,7 @@ import {
   DisplayProduct,
   UserProductResponse,
   ProductQueryParams,
+  homeProduct,
 } from "@/types/Product";
 export const userProductApi = createApi({
   reducerPath: "userProductApi",
@@ -54,7 +55,6 @@ export const userProductApi = createApi({
         params: { q: searchQuery, page, limit, sortBy },
       }),
       transformResponse: (res: { data: UserProductResponse }) => {
-
         return res.data;
       },
     }),
@@ -105,13 +105,13 @@ export const userProductApi = createApi({
       providesTags: (_result, _error, id) => [{ type: "UserProducts", id }],
     }),
 
-    getLatestProducts: builder.query<DisplayProduct[], number | void>({
+    getLatestProducts: builder.query<homeProduct[], number | void>({
       query: (limit = 8) => ({
         url: "/products/latest",
         method: "GET",
         params: { limit },
       }),
-      transformResponse: (response: { data: DisplayProduct[] }) => {
+      transformResponse: (response: { data: homeProduct[] }) => {
         console.log("📦 Latest Products Response:", response.data);
         return response.data;
       },

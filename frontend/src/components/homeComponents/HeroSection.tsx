@@ -1,6 +1,7 @@
 "use client";
 
 import { useGetLatestProductsQuery } from "@/redux/services/user/publicProductApi";
+import { homeProduct } from "@/types/Product";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
 
@@ -11,7 +12,7 @@ const HeroSection = () => {
   const { data, isLoading } = useGetLatestProductsQuery();
 
   // ✅ Use image directly from product (not from variants)
-  const products = data || [];
+  const products:homeProduct[] = data || [];
 
   const images = products.map((product) => product?.image).filter(Boolean);
 
