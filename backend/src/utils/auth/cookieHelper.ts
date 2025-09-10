@@ -1,10 +1,13 @@
-
 import { Response } from "express";
+type SameSiteType = "none" | "lax" | "strict";
 
 const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "strict" as const,
+  sameSite:
+    process.env.NODE_ENV === "production"
+      ? ("none" as SameSiteType)
+      : ("lax" as SameSiteType),
 };
 
 export const setAuthCookies = (
