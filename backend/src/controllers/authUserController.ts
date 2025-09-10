@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import User from "../models/user.models";
-import { uploadToCloudinary } from "../utils/cloudinaryUpload";
+
 import { sendTokenResponse } from "../utils/auth/sendToken";
 import { clearAuthCookies } from "../utils/auth/cookieHelper";
 import { AppError } from "../utils/AppError";
@@ -10,8 +10,7 @@ import { catchAsync } from "../utils/catchAsync";
 import jwt from "jsonwebtoken";
 import { AuthRequest } from "../types/app-request";
 export const registerUser = catchAsync(async (req: Request, res: Response) => {
-  const { name, email, password } = req.body;
-  const file = req.file;
+  const { name, email, password, avatar } = req.body; // avatar URL expect kar rahe hain ab
 
   if (!name || !email || !password) {
     throw new AppError("All fields are required", 400);
@@ -24,17 +23,12 @@ export const registerUser = catchAsync(async (req: Request, res: Response) => {
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  let avatarUrl = "";
-  if (file) {
-    const result = await uploadToCloudinary(file.buffer, "avatars");
-    avatarUrl = result.secure_url;
-  }
-
+  // ab avatar url directly request body se le rahe hain, file upload nahi
   const newUser = await User.create({
     name,
     email,
     password: hashedPassword,
-    avatar: avatarUrl,
+    avatar: avatar || "", // agar avatar URL nahi aya to empty string
     role: "buyer",
   });
 
@@ -79,7 +73,6 @@ export const logoutUser = catchAsync(async (req: Request, res: Response) => {
 
 export const refreshAccessToken = catchAsync(
   async (req: Request, res: Response) => {
-  
     const refreshToken = req.cookies?.refreshToken;
 
     if (!refreshToken) {
@@ -98,20 +91,22 @@ export const refreshAccessToken = catchAsync(
     return sendTokenResponse(res, decoded.userId, "Access token refreshed");
   }
 );
-export const getMyProfile = catchAsync(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId; // Make sure auth middleware sets this
+export const getMyProfile = catchAsync(
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.userId; // Make sure auth middleware sets this
 
-  if (!userId) {
-    throw new AppError("Unauthorized: User not authenticated", 401);
+    if (!userId) {
+      throw new AppError("Unauthorized: User not authenticated", 401);
+    }
+
+    const user = await User.findById(userId).select("-password -refreshToken");
+
+    if (!user) {
+      throw new AppError("User not found", 404);
+    }
+
+    res
+      .status(200)
+      .json(new ApiResponse(200, user, "User profile fetched successfully"));
   }
-
-  const user = await User.findById(userId).select("-password -refreshToken");
-
-  if (!user) {
-    throw new AppError("User not found", 404);
-  }
-
-  res.status(200).json(
-    new ApiResponse(200, user, "User profile fetched successfully")
-  );
-});
+);

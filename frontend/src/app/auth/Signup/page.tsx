@@ -9,38 +9,62 @@ import Link from "next/link";
 import { useDispatch } from "react-redux";
 import { setActiveUser } from "@/redux/slices/userSlice";
 import type { AppDispatch } from "@/redux/store";
+import { uploadImageToCloudinary } from "../../../../utils/uploadToCloudinary";
+import { useState } from "react";
+
 type SignupFormValues = {
   name: string;
+  avatar?: string;
   email: string;
   password: string;
   confirmPassword: string;
 };
 
 const SignupPage = () => {
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<SignupFormValues>({ mode: "onChange" });
+
   const dispatch = useDispatch<AppDispatch>();
   const { signup, loading, error } = useSignup();
   const router = useRouter();
 
   const onSubmit = async (data: SignupFormValues) => {
-    const res = await signup(data);
+    try {
+      let avatarUrl = "";
+      if (avatarFile) {
+        const uploadResult = await uploadImageToCloudinary(avatarFile, "avatars");
+        avatarUrl = uploadResult.url;
+      }
 
-    if (res?.user?._id) {
-      toast.success("Signup successful! 🎉");
-      router.push("/");
-      dispatch(
-        setActiveUser({
-          _id: res.user._id,
-          name: res.user.name,
-          avatar: res.user.avatar,
-          role: res.user.role ?? "buyer",
-           email: res.user.email,
-        })
-      );
+      const signupData = {
+        ...data,
+        avatar: avatarUrl,
+      };
+
+      const { confirmPassword, ...payload } = signupData;
+
+      const res = await signup(payload);
+
+      if (res?.user?._id) {
+        toast.success("Signup successful! 🎉");
+        router.push("/");
+        dispatch(
+          setActiveUser({
+            _id: res.user._id,
+            name: res.user.name,
+            avatar: res.user.avatar,
+            role: res.user.role ?? "buyer",
+            email: res.user.email,
+          })
+        );
+      }
+    } catch {
+      toast.error("Image upload failed, please try again.");
     }
   };
 
@@ -97,6 +121,21 @@ const SignupPage = () => {
           error={errors.confirmPassword?.message}
         />
 
+        <div className="mt-4 mb-4">
+          <label className="block mb-1 text-sm font-medium text-[var(--text-accent)]">
+            Avatar (optional)
+          </label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) setAvatarFile(file);
+            }}
+            className="w-full text-sm text-[var(--foreground)]"
+          />
+        </div>
+
         <button
           type="submit"
           disabled={loading}
@@ -106,15 +145,11 @@ const SignupPage = () => {
         </button>
 
         {error && (
-          <p className="text-[var(--text-error)] mt-3 text-sm text-center">
-            {error}
-          </p>
+          <p className="text-[var(--text-error)] mt-3 text-sm text-center">{error}</p>
         )}
 
         <div className="mt-4 text-sm text-center">
-          <span className="text-[var(--foreground)]">
-            Already have an account?{" "}
-          </span>
+          <span className="text-[var(--foreground)]">Already have an account? </span>
           <Link
             href="/auth/login"
             className="text-[var(--text-accent)] font-medium hover:underline"

@@ -6,7 +6,7 @@ interface SignupData {
   name: string;
   email: string;
   password: string;
-  confirmPassword: string;
+  confirmPassword?: string;
 }
 export const useSignup = () => {
   const [loading, setLoading] = useState(false);
