@@ -10,6 +10,7 @@ import { catchAsync } from "../utils/catchAsync";
 import jwt from "jsonwebtoken";
 import { AuthRequest } from "../types/app-request";
 export const registerUser = catchAsync(async (req: Request, res: Response) => {
+  console.log("reached registerUser controller");
   const { name, email, password, avatar } = req.body; // avatar URL expect kar rahe hain ab
 
   if (!name || !email || !password) {

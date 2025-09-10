@@ -4,7 +4,7 @@ import cors from "cors";
 const app = express();
 app.use(
   cors({
-  origin: "https://suvidhafurniture-maxivr90l-sinhasubhamss-projects.vercel.app", 
+    origin: "https://furniturestore-lilac.vercel.app",
     credentials: true, // 👈 important if using cookies
   })
 );
