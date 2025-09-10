@@ -20,6 +20,7 @@ export const useLogin = () => {
     setError(null);
 
     try {
+      console.log("Attempting login with data:", data);
       const res = await axiosClient.post("/user/login", data);
       console.log("Login success:", res.data);
       dispatch(setActiveUser(res.data.user));

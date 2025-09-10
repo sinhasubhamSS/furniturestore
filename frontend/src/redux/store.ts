@@ -1,7 +1,6 @@
 import { configureStore, combineReducers } from "@reduxjs/toolkit";
 import userReducer from "./slices/userSlice";
-// import cartReducer from "./slices/cartSlice";
-import checkoutReducer from "./slices/checkoutSlice"; // ✅ Import checkout reducer
+import checkoutReducer from "./slices/checkoutSlice";
 import wishlistReducer from "./slices/wishlistSlice";
 import {
   persistStore,
@@ -30,11 +29,18 @@ import { deliveryApi } from "./services/user/deliveryApi";
 import { orderadminApi } from "./services/admin/adminOrderapi";
 import { adminReturnApi } from "./services/admin/adminReturnapi";
 
+// Manually define PersistPartial to fix missing import error
+type PersistPartial = {
+  _persist?: {
+    version: number;
+    rehydrated: boolean;
+  };
+};
+
 const rootReducer = combineReducers({
   user: userReducer,
   checkout: checkoutReducer,
   productDetail: productDetailReducer,
-  // cart: cartReducer,
   wishlist: wishlistReducer,
   [adminProductApi.reducerPath]: adminProductApi.reducer,
   [adminCategoryApi.reducerPath]: adminCategoryApi.reducer,
@@ -51,11 +57,12 @@ const rootReducer = combineReducers({
   [adminReturnApi.reducerPath]: adminReturnApi.reducer,
 });
 
-// ✅ Updated persist config to include checkout
+export type RootState = ReturnType<typeof rootReducer> & PersistPartial;
+
 const persistConfig = {
   key: "root",
   storage,
-  whitelist: ["user", "checkout"], // ✅ Add checkout to whitelist
+  whitelist: ["user", "checkout"],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
@@ -86,5 +93,4 @@ export const store = configureStore({
 
 export const persistor = persistStore(store);
 
-export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
