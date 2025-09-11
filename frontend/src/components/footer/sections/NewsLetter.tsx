@@ -28,7 +28,9 @@ const Newsletter: React.FC<NewsletterProps> = ({ source }) => {
     setError("");
   };
 
-  const handleSubscribe = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+  const handleSubscribe = async (
+    e: FormEvent<HTMLFormElement>
+  ): Promise<void> => {
     e.preventDefault();
     if (!formData.email) {
       setError("Email is required");
@@ -71,48 +73,57 @@ const Newsletter: React.FC<NewsletterProps> = ({ source }) => {
   return (
     <div
       className="py-8 mt-2"
-      style={{ backgroundColor: "var(--color-secondary)", color: "var(--text-dark)" }}
+      style={{
+        backgroundColor: "var(--color-secondary)",
+        color: "var(--text-dark)",
+      }}
     >
       <div className="container mx-auto px-4">
         <div className="flex flex-col lg:flex-row items-center justify-between space-y-4 lg:space-y-0">
           <div>
             <h3 className="text-2xl font-bold mb-2">Get Exclusive Offers!</h3>
             <p className="text-sm">
-              Subscribe to get special offers, free giveaways, and deals delivered to your inbox.
+              Subscribe to get special offers, free giveaways, and deals
+              delivered to your inbox.
             </p>
           </div>
 
           <div className="w-full lg:w-auto lg:min-w-[400px]">
             {!isSubscribed ? (
               <form onSubmit={handleSubscribe} className="space-y-2">
-                <div className="flex space-x-2">
+                <div className="flex flex-wrap -mx-1">
                   <input
                     type="email"
                     name="email"
                     placeholder="Enter your email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="flex-1 px-4 py-3 rounded-lg border-none outline-none text-[--text-dark]"
+                    className="flex-grow min-w-0 px-4 py-3 rounded-lg border-none outline-none text-[--text-dark] mx-1 my-1"
                     required
                     disabled={loading}
-                    style={{ backgroundColor: "var(--color-card)" }} // Cream-white background for input
+                    style={{ backgroundColor: "var(--color-card)" }}
                   />
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-6 py-3 rounded-lg font-medium text-[--text-dark] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{
-                      backgroundColor: "var(--color-primary)", // Highlight button background
-                    }}
-                    onMouseOver={e => (e.currentTarget.style.backgroundColor = "var(--color-hover-card)")}
-                    onMouseOut={e => (e.currentTarget.style.backgroundColor = "var(--color-primary)")}
+                    className="w-full sm:w-auto px-6 py-3 rounded-lg font-medium text-[--text-dark] transition-colors disabled:opacity-50 disabled:cursor-not-allowed mx-1 my-1"
+                    style={{ backgroundColor: "var(--color-primary)" }}
+                    onMouseOver={(e) =>
+                      (e.currentTarget.style.backgroundColor =
+                        "var(--color-hover-card)")
+                    }
+                    onMouseOut={(e) =>
+                      (e.currentTarget.style.backgroundColor =
+                        "var(--color-primary)")
+                    }
                   >
                     {loading ? "Subscribing..." : "Subscribe"}
                   </button>
                 </div>
-                {error && <p className="text-red-300 text-sm">{error}</p>}
-                <p className="text-xs text-[--text-dark] opacity-75">
-                  By subscribing, you agree to receive marketing emails. Check your email to verify your subscription.
+                {error && <p className="text-red-300 text-sm mx-1">{error}</p>}
+                <p className="text-xs text-[--text-dark] opacity-75 mx-1">
+                  By subscribing, you agree to receive marketing emails. Check
+                  your email to verify your subscription.
                 </p>
               </form>
             ) : (
