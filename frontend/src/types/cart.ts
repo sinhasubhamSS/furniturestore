@@ -1,24 +1,24 @@
-// types/cart.ts - ✅ Updated to match new backend structure
 import { DeliveryInfo } from "./delivery";
 import { DisplayProduct } from "./Product";
 
 export type CartItem = {
-  productId: string;
-  product: DisplayProduct;
-  variantId: string;
+  productId: string;           // Backend ObjectId as string
+  variantId: string;           // Variant Id as string
   quantity: number;
-  addedAt?: Date;
-  // ✅ For local cart state management
-  name: string;
-  image: string;
-  price: number;
-  hasDiscount: boolean;
+  addedAt?: Date | string;
+
+  // Ye fields optional rakhni chahiye kyunki ye populated data se aate hain
+  product?: DisplayProduct;
+  name?: string;
+  image?: string;
+  price?: number;
+  hasDiscount?: boolean;
   discountPercent?: number;
-  color: string;
-  size: string;
-  stock: number;
-  weight: number;
-  title: string;
+  color?: string;
+  size?: string;
+  stock?: number;
+  weight?: number;
+  title?: string;
 };
 
 export type CartResponse = {
@@ -32,6 +32,7 @@ export type CartResponse = {
   createdAt?: Date;
   updatedAt?: Date;
 };
+
 export interface CartState {
   items: CartItem[];
   totalItems: number;

@@ -2,13 +2,7 @@
 
 import React, { useState } from "react";
 import { useCheckDeliveryMutation } from "@/redux/services/user/deliveryApi";
-import {
-  Truck,
-  Clock,
-  CreditCard,
-  CheckCircle,
-  XCircle,
-} from "lucide-react";
+import { Truck, Clock, CreditCard, CheckCircle, XCircle } from "lucide-react";
 
 interface PincodeCheckerProps {
   className?: string;
@@ -16,7 +10,8 @@ interface PincodeCheckerProps {
 
 const PincodeChecker: React.FC<PincodeCheckerProps> = ({ className = "" }) => {
   const [pincode, setPincode] = useState("");
-  const [checkDelivery, { data, isLoading, error }] = useCheckDeliveryMutation();
+  const [checkDelivery, { data, isLoading, error }] =
+    useCheckDeliveryMutation();
   const [showResult, setShowResult] = useState(false);
 
   const handleCheck = async () => {
@@ -46,8 +41,8 @@ const PincodeChecker: React.FC<PincodeCheckerProps> = ({ className = "" }) => {
 
   return (
     <div className={`delivery-checker space-y-1 ${className}`}>
-      {/* Input and Custom Button */}
-      <div className="flex gap-2">
+      {/* Input and Button container with flex and responsive */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
         <input
           type="text"
           name="pincode"
@@ -56,13 +51,13 @@ const PincodeChecker: React.FC<PincodeCheckerProps> = ({ className = "" }) => {
           onKeyPress={handleKeyPress}
           placeholder="Enter 6-digit pincode"
           maxLength={6}
-          className="flex-grow pl-10 py-2 border border-[var(--color-border-custom)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] text-[var(--text-accent)]"
-          style={{ backgroundColor: "var(--color-surface)" }}
+          className="flex-grow sm:flex-grow-0 sm:basis-[150px] pl-10 py-2 border border-[var(--color-border-custom)] rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] text-[var(--text-accent)]"
+          style={{ backgroundColor: "var(--color-surface)", minWidth: "0" }}
         />
         <button
           onClick={handleCheck}
           disabled={isLoading || pincode.length !== 6}
-          className={`min-w-[100px] px-4 text-sm font-medium rounded-md text-white flex items-center justify-center gap-2 transition-colors duration-200 ${
+          className={`w-full sm:w-auto min-w-[100px] px-4 text-sm font-medium rounded-md text-white flex items-center justify-center gap-2 transition-colors duration-200 ${
             isLoading || pincode.length !== 6
               ? "bg-[var(--color-accent)]/60 cursor-not-allowed"
               : "bg-[var(--color-accent)] hover:bg-[var(--color-accent)]/90"
@@ -72,7 +67,10 @@ const PincodeChecker: React.FC<PincodeCheckerProps> = ({ className = "" }) => {
           {isLoading && (
             <div
               className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
-              style={{ borderColor: "var(--color-accent) transparent transparent transparent" }}
+              style={{
+                borderColor:
+                  "var(--color-accent) transparent transparent transparent",
+              }}
             ></div>
           )}
           {isLoading ? "Checking..." : "Check"}
@@ -115,27 +113,35 @@ const PincodeChecker: React.FC<PincodeCheckerProps> = ({ className = "" }) => {
                 <div className="flex items-center gap-2">
                   <Truck className="h-4 w-4 text-gray-500" />
                   <span>Delivery:</span>
-                  <span className="font-medium">₹{data.data.deliveryCharge}</span>
+                  <span className="font-medium">
+                    ₹{data.data.deliveryCharge}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-gray-500" />
                   <span>Time:</span>
-                  <span className="font-medium">{data.data.deliveryDays} days</span>
+                  <span className="font-medium">
+                    {data.data.deliveryDays} days
+                  </span>
                 </div>
 
                 {data.data.codAvailable && (
                   <div className="flex items-center gap-2">
                     <CreditCard className="h-4 w-4 text-gray-500" />
                     <span>COD:</span>
-                    <span className="font-medium text-green-600">Available</span>
+                    <span className="font-medium text-green-600">
+                      Available
+                    </span>
                   </div>
                 )}
 
                 {data.data.courierPartner && (
                   <div className="flex items-center gap-2">
                     <span>Partner:</span>
-                    <span className="font-medium">{data.data.courierPartner}</span>
+                    <span className="font-medium">
+                      {data.data.courierPartner}
+                    </span>
                   </div>
                 )}
               </div>
