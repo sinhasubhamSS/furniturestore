@@ -4,7 +4,7 @@ import cors from "cors";
 const app = express();
 app.use(
   cors({
-    origin: "http://localhost:3000", // frontend URL
+    origin: "http://furniturestore-lilac.vercel.app", // frontend URL
     credentials: true, // 👈 important if using cookies
   })
 );
