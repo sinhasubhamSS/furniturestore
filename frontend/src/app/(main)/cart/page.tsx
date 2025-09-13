@@ -27,11 +27,13 @@ const CartPage = () => {
       return;
     }
 
-    const checkoutItems = data.items.map((item) => ({
-      productId: item.product._id,
-      variantId: item.variantId,
-      quantity: item.quantity,
-    }));
+    const checkoutItems = data.items
+      .filter((item) => item.product !== undefined) // ✅ ensure defined
+      .map((item) => ({
+        productId: item.product!._id,
+        variantId: item.variantId,
+        quantity: item.quantity,
+      }));
 
     dispatch(setCartPurchase(checkoutItems));
     router.push("/checkout");
@@ -94,7 +96,7 @@ const CartPage = () => {
   return (
     <div className="min-h-screen bg-[var(--color-primary)] pb-32 md:pb-8">
       <div className="w-full max-w-6xl mx-auto px-4">
-        {/* Mobile-optimized Header */}
+        {/* Header */}
         <div className="py-4 md:py-8">
           <div className="flex items-center justify-between mb-4 md:mb-0">
             <div>
@@ -102,11 +104,10 @@ const CartPage = () => {
                 My Cart
               </h1>
               <p className="text-[var(--text-accent)] text-sm md:text-base">
-                {data.totalItems} {data.totalItems === 1 ? 'item' : 'items'}
+                {data.totalItems} {data.totalItems === 1 ? "item" : "items"}
               </p>
             </div>
 
-            {/* Desktop Continue Shopping */}
             <Button
               variant="ghost"
               onClick={() => router.push("/products")}
@@ -117,7 +118,6 @@ const CartPage = () => {
             </Button>
           </div>
 
-          {/* Mobile Continue Shopping */}
           <Button
             variant="outline"
             onClick={() => router.push("/products")}
@@ -130,36 +130,38 @@ const CartPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-3 md:space-y-4">
-            {data.items.map((item) => (
-              <ProductCartItem
-                key={`${item.product._id}-${item.variantId}`}
-                product={item.product}
-                variantId={item.variantId}
-                quantity={item.quantity}
-                onRemove={() =>
-                  removeItem({
-                    productId: item.product._id,
-                    variantId: item.variantId,
-                  })
-                }
-                onQuantityChange={(qty) =>
-                  updateQty({
-                    productId: item.product._id,
-                    variantId: item.variantId,
-                    quantity: qty,
-                  })
-                }
-              />
-            ))}
+            {data.items.map((item, idx) =>
+              item.product ? (
+                <ProductCartItem
+                  key={`${item.product._id}-${item.variantId}`}
+                  product={item.product} // guaranteed defined
+                  variantId={item.variantId}
+                  quantity={item.quantity}
+                  onRemove={() =>
+                    removeItem({
+                      productId: item.product?._id ?? "",
+                      variantId: item.variantId,
+                    })
+                  }
+                  onQuantityChange={(qty) =>
+                    updateQty({
+                      productId: item.product?._id ?? "",
+                      variantId: item.variantId,
+                      quantity: qty,
+                    })
+                  }
+                />
+              ) : null
+            )}
           </div>
 
-          {/* Desktop Summary Sidebar */}
+          {/* Desktop Summary */}
           <div className="lg:col-span-1 hidden lg:block">
             <div className="bg-[var(--color-card)] p-6 rounded-2xl shadow-lg border border-[var(--color-border-custom)] sticky top-8">
               <h3 className="text-2xl font-bold mb-6 text-[var(--color-foreground)] border-b-2 border-[var(--color-accent)] pb-2 w-max">
                 Order Summary
               </h3>
-              
+
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between items-center py-2">
                   <span className="text-[var(--color-foreground)] font-medium">
@@ -171,7 +173,9 @@ const CartPage = () => {
                 </div>
 
                 <div className="flex justify-between items-center py-2">
-                  <span className="text-[var(--color-foreground)] font-medium">GST</span>
+                  <span className="text-[var(--color-foreground)] font-medium">
+                    GST
+                  </span>
                   <span className="text-[var(--color-foreground)] font-semibold">
                     ₹{data.cartGST.toFixed(2)}
                   </span>
@@ -179,7 +183,9 @@ const CartPage = () => {
 
                 <div className="border-t-2 border-[var(--color-border-custom)] pt-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-xl font-bold text-[var(--color-foreground)]">Total</span>
+                    <span className="text-xl font-bold text-[var(--color-foreground)]">
+                      Total
+                    </span>
                     <span className="text-2xl font-bold text-[var(--color-accent)]">
                       ₹{data.cartTotal.toFixed(2)}
                     </span>
@@ -199,10 +205,13 @@ const CartPage = () => {
         </div>
       </div>
 
-      {/* Mobile Fixed Bottom Checkout - Enhanced Version */}
+      {/* Mobile Bottom Checkout */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-[var(--color-card)] border-t border-[var(--color-border-custom)] shadow-2xl z-50">
-        {/* Expandable Summary Details */}
-        <div className={`transition-all duration-300 overflow-hidden ${showDetails ? 'max-h-48' : 'max-h-0'}`}>
+        <div
+          className={`transition-all duration-300 overflow-hidden ${
+            showDetails ? "max-h-48" : "max-h-0"
+          }`}
+        >
           <div className="p-4 border-b border-[var(--color-border-custom)] bg-[var(--color-secondary)]">
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
@@ -213,16 +222,18 @@ const CartPage = () => {
                   ₹{data.cartSubtotal.toFixed(2)}
                 </span>
               </div>
-              
+
               <div className="flex justify-between">
                 <span className="text-[var(--color-foreground)]">GST</span>
                 <span className="font-semibold text-[var(--color-foreground)]">
                   ₹{data.cartGST.toFixed(2)}
                 </span>
               </div>
-              
+
               <div className="border-t border-[var(--color-border-custom)] pt-2 flex justify-between">
-                <span className="font-bold text-[var(--color-foreground)]">Total</span>
+                <span className="font-bold text-[var(--color-foreground)]">
+                  Total
+                </span>
                 <span className="font-bold text-[var(--color-accent)] text-lg">
                   ₹{data.cartTotal.toFixed(2)}
                 </span>
@@ -231,27 +242,29 @@ const CartPage = () => {
           </div>
         </div>
 
-        {/* Main Bottom Bar */}
         <div className="p-4">
-          {/* Toggle Summary Button */}
           <button
             onClick={() => setShowDetails(!showDetails)}
             className="w-full flex items-center justify-between mb-3 py-2 px-2 hover:bg-[var(--color-secondary)] rounded transition-colors"
           >
             <div className="flex items-center gap-3">
               <span className="text-sm text-[var(--text-accent)]">
-                {data.totalItems} {data.totalItems === 1 ? 'item' : 'items'}
+                {data.totalItems} {data.totalItems === 1 ? "item" : "items"}
               </span>
               <span className="text-lg font-bold text-[var(--color-accent)]">
                 ₹{data.cartTotal.toFixed(0)}
               </span>
             </div>
             <div className="flex items-center gap-1 text-xs text-[var(--text-accent)] font-medium">
-              <span>{showDetails ? 'Hide' : 'View'} details</span>
-              {showDetails ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+              <span>{showDetails ? "Hide" : "View"} details</span>
+              {showDetails ? (
+                <ChevronDown size={16} />
+              ) : (
+                <ChevronUp size={16} />
+              )}
             </div>
           </button>
-          
+
           <Button
             onClick={handleProceedToCheckout}
             disabled={!data.items || data.items.length === 0}

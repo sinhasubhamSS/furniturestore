@@ -39,5 +39,6 @@ export const config = {
     '/my-orders',
     '/checkout/payment',
     '/return'
+    
   ],
 };
