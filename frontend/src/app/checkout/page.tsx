@@ -65,7 +65,7 @@ export default function CheckoutPage() {
 
     if (type === "cart_purchase" && cartData?.items?.length) {
       return cartData.items.reduce((sum, item) => {
-        const variant = item.product.variants.find((v) => v._id === item.variantId);
+        const variant = item.product?.variants.find((v) => v._id === item.variantId);
         if (!variant) return sum;
         const price = variant.hasDiscount ? variant.discountedPrice ?? 0 : variant.price ?? 0;
         return sum + price * item.quantity;
@@ -76,26 +76,29 @@ export default function CheckoutPage() {
   }, [type, items, product, cartData]);
 
   const checkoutItems: CheckoutItem[] = useMemo(() => {
-    if (type === "direct_purchase" && items.length > 0 && product) {
-      const item = items[0];
-      const selectedVariant = product.variants?.find((v) => v._id === item.variantId);
+  if (type === "direct_purchase" && items.length > 0 && product) {
+    const item = items[0];
+    const selectedVariant = product.variants?.find((v) => v._id === item.variantId);
 
-      if (selectedVariant) {
-        return [{
-          product,
-          variantId: selectedVariant._id!,
-          quantity: item.quantity,
-        }];
-      }
-    } else if (type === "cart_purchase" && cartData?.items?.length) {
-      return cartData.items.map(({ product, variantId, quantity }) => ({
+    if (selectedVariant) {
+      return [{
         product,
-        variantId,
-        quantity,
-      }));
+        variantId: selectedVariant._id!,
+        quantity: item.quantity,
+      }];
     }
-    return [];
-  }, [type, items, product, cartData]);
+  } else if (type === "cart_purchase" && cartData?.items?.length) {
+    return cartData.items
+      .filter(item => item.product !== undefined)  // filter out undefined products
+      .map(item => ({
+        product: item.product!,           // assert non-null here
+        variantId: item.variantId,
+        quantity: item.quantity,
+      }));
+  }
+  return [];
+}, [type, items, product, cartData]);
+
 
   // ✅ Pricing fetch
   useEffect(() => {

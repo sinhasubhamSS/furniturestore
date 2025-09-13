@@ -8,7 +8,6 @@ import {
   FiChevronDown,
   FiX,
   FiHelpCircle,
-  FiHeart,
 } from "react-icons/fi";
 import { RiLoginCircleLine } from "react-icons/ri";
 import type { RootState } from "@/redux/store";
@@ -17,23 +16,30 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clearActiveUser } from "@/redux/slices/userSlice";
 import { useGetCartCountQuery } from "@/redux/services/user/cartApi";
-import { useWishlistidsQuery } from "@/redux/services/user/wishlistApi"; // ✅ Import wishlist API
+import { useWishlistidsQuery } from "@/redux/services/user/wishlistApi";
 
 const Navbar = () => {
   const activeUser = useSelector((state: RootState) => state.user.activeUser);
-  
-  // ✅ TEMPORARY FIX: Get wishlist count from API
-  const { data: wishlistIds = [], isLoading: wishlistLoading } = useWishlistidsQuery();
-  const wishlistCount = wishlistIds.length; // ✅ Real-time count
-  
+
+  // ✅ Wishlist API - sirf jab user login hoga
+  const { data: wishlistIds = [], isLoading: wishlistLoading } =
+    useWishlistidsQuery(undefined, {
+      skip: !activeUser,
+    });
+  const wishlistCount = wishlistIds.length;
+
+  // ✅ Cart API - sirf jab user login hoga
+  const { data: cartCountData, isLoading: cartCountLoading } =
+    useGetCartCountQuery(undefined, {
+      skip: !activeUser,
+    });
+  const cartCount = cartCountData?.count || 0;
+
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch();
   const router = useRouter();
-  
-  const { data: cartCountData, isLoading: cartCountLoading } = useGetCartCountQuery();
-  const cartCount = cartCountData?.count || 0;
 
   const handleSignOut = () => {
     dispatch(clearActiveUser());
@@ -53,16 +59,16 @@ const Navbar = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ✅ Debug log for wishlist count
+  // ✅ Debugging logs
   useEffect(() => {
-    console.log("🔄 Navbar wishlist count updated:", wishlistCount);
-  }, [wishlistCount]);
+    console.log("🔄 Navbar wishlistCount:", wishlistCount);
+    console.log("🔄 Navbar cartCount:", cartCount);
+  }, [wishlistCount, cartCount]);
 
   return (
     <nav className="fixed top-0 left-0 w-full z-[1000] bg-[var(--color-secondary)] backdrop-blur border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between py-3 gap-4">
-          
           {/* Left - Brand */}
           <div className="flex items-center gap-4">
             <Link
@@ -105,22 +111,18 @@ const Navbar = () => {
 
           {/* Right - Icons */}
           <div className="flex items-center gap-3">
-            
-            {/* ✅ WISHLIST ICON - Temporary Fix with API Count */}
-            
-
             {/* Cart Icon */}
             <Link href="/cart">
               <button className="relative p-2 group hover:bg-[var(--color-primary)] rounded-lg transition-colors">
                 <FiShoppingCart className="h-6 w-6 text-[var(--foreground)] group-hover:text-[var(--color-accent)] transition-colors" />
 
-                {!cartCountLoading && cartCount > 0 && (
+                {activeUser && !cartCountLoading && cartCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-[var(--color-accent)] text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center pointer-events-none cursor-default">
-                    {cartCount > 99 ? '99+' : cartCount}
+                    {cartCount > 99 ? "99+" : cartCount}
                   </span>
                 )}
 
-                {cartCountLoading && (
+                {activeUser && cartCountLoading && (
                   <span className="absolute -top-1 -right-1 bg-gray-400 text-white text-xs rounded-full h-3 w-3 animate-pulse pointer-events-none"></span>
                 )}
               </button>
@@ -154,10 +156,11 @@ const Navbar = () => {
 
                   {isDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-64 rounded-lg bg-[var(--color-secondary)] backdrop-blur-lg shadow-xl ring-1 ring-black ring-opacity-10 border border-white/20 overflow-hidden">
-                      
                       {/* User Info */}
                       <div className="px-4 py-3 border-b border-white/10">
-                        <p className="text-sm text-[var(--foreground)] opacity-75">Signed in as</p>
+                        <p className="text-sm text-[var(--foreground)] opacity-75">
+                          Signed in as
+                        </p>
                         <p className="text-sm font-semibold text-[var(--text-accent)] truncate">
                           {activeUser.name}
                         </p>
@@ -198,7 +201,6 @@ const Navbar = () => {
                           onClick={() => setIsDropdownOpen(false)}
                         >
                           <span>❤️ My Wishlist</span>
-                          {/* ✅ Show count in dropdown too */}
                           {wishlistCount > 0 && (
                             <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full pointer-events-none">
                               {wishlistCount}
@@ -210,7 +212,9 @@ const Navbar = () => {
                       {/* Theme Toggle */}
                       <div className="py-1 border-t border-white/10">
                         <div className="flex items-center justify-between px-4 py-3">
-                          <span className="text-sm text-[var(--foreground)]">🎨 Theme</span>
+                          <span className="text-sm text-[var(--foreground)]">
+                            🎨 Theme
+                          </span>
                           <Toggle />
                         </div>
                       </div>
@@ -244,8 +248,12 @@ const Navbar = () => {
                   {isDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-56 rounded-lg bg-[var(--card-bg)] shadow-lg ring-1 ring-black ring-opacity-5 border border-white/10">
                       <div className="px-4 py-3">
-                        <p className="text-sm text-[var(--foreground)]">Guest User</p>
-                        <p className="text-sm text-[var(--text-accent)]">Please login for full access</p>
+                        <p className="text-sm text-[var(--foreground)]">
+                          Guest User
+                        </p>
+                        <p className="text-sm text-[var(--text-accent)]">
+                          Please login for full access
+                        </p>
                       </div>
                       <div className="py-1">
                         <Link
@@ -259,7 +267,9 @@ const Navbar = () => {
                       </div>
                       <div className="py-1 border-t border-white/10">
                         <div className="flex items-center justify-between px-4 py-2">
-                          <span className="text-sm text-[var(--foreground)]">Theme</span>
+                          <span className="text-sm text-[var(--foreground)]">
+                            Theme
+                          </span>
                           <Toggle />
                         </div>
                       </div>

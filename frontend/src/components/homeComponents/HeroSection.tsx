@@ -2,6 +2,7 @@
 
 import { useGetLatestProductsQuery } from "@/redux/services/user/publicProductApi";
 import { homeProduct } from "@/types/Product";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
 
@@ -12,7 +13,7 @@ const HeroSection = () => {
   const { data, isLoading } = useGetLatestProductsQuery();
 
   // ✅ Use image directly from product (not from variants)
-  const products:homeProduct[] = data || [];
+  const products: homeProduct[] = data || [];
 
   const images = products.map((product) => product?.image).filter(Boolean);
 
@@ -128,11 +129,14 @@ const HeroSection = () => {
               </div>
             ) : (
               images.map((src, index) => (
-                <img
+                <Image
                   key={index}
                   src={src}
                   alt={`Slide ${index + 1}`}
-                  className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-700 ease-in-out ${
+                  fill
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  priority={index === 0} // ✅ first image fast load
+                  className={`absolute inset-0 object-contain transition-opacity duration-700 ease-in-out ${
                     index === currentIndex ? "opacity-100" : "opacity-0"
                   }`}
                 />
