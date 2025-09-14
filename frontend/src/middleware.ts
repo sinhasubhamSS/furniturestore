@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const protectedRoutes = [
-  '/admin/dashboard',
+  
   '/my-profile',
   '/my-orders',
   '/checkout/payment',
@@ -34,7 +34,7 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    '/admin/dashboard',
+  
     '/my-profile',
     '/my-orders',
     '/checkout/payment',
