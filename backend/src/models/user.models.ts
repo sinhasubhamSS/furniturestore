@@ -8,7 +8,7 @@ export interface IUser extends Document {
   password: string;
   avatar?: string;
   role: string;
-  refreshToken?: string;
+
   createdAt: Date;
 }
 
@@ -42,10 +42,7 @@ const userSchema = new Schema<IUser>(
       default: "buyer",
     },
 
-    refreshToken: {
-      type: String,
-      select: false, // optional: hide refresh token from queries by default
-    },
+  
     createdAt: {
       type: Date,
       default: Date.now,

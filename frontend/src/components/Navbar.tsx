@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { clearActiveUser } from "@/redux/slices/userSlice";
 import { useGetCartCountQuery } from "@/redux/services/user/cartApi";
 import { useWishlistidsQuery } from "@/redux/services/user/wishlistApi";
+import axiosClient from "../../utils/axios";
 
 const Navbar = () => {
   const activeUser = useSelector((state: RootState) => state.user.activeUser);
@@ -41,10 +42,17 @@ const Navbar = () => {
   const dispatch = useDispatch();
   const router = useRouter();
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+  try {
+    await axiosClient.post("/user/logout"); // cookie clear
+  } catch (err) {
+    console.error("Logout failed:", err);
+  } finally {
     dispatch(clearActiveUser());
     router.push("/auth/login");
-  };
+  }
+};
+
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

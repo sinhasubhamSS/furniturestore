@@ -1,7 +1,8 @@
 import { Response } from "express";
 import { generateAccessToken, generateRefreshToken } from "./generateTokens";
 import { setAuthCookies } from "./cookieHelper";
-import User from "../../models/user.models";
+import crypto from "crypto";
+import { Session } from "../../models/session.model";
 
 interface UserData {
   _id: string;
@@ -16,35 +17,34 @@ export const sendTokenResponse = async (
   userId: string,
   message: string,
   options?: {
-    userData?: UserData; // Make this optional
-    includeTokensInBody?: boolean; // For non-cookie clients
+    userData?: UserData;
+    includeTokensInBody?: boolean;
   }
 ) => {
   const accessToken = generateAccessToken(userId);
   const refreshToken = generateRefreshToken(userId);
-  await User.findByIdAndUpdate(userId, { refreshToken });
 
-  // Always set HTTP-only cookies
+  const refreshTokenHash = crypto
+    .createHash("sha256")
+    .update(refreshToken)
+    .digest("hex");
+
+  await Session.create({
+    user: userId,
+    refreshTokenHash,
+    userAgent: res.req.headers["user-agent"],
+    ip: res.req.ip,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  });
+
   setAuthCookies(res, accessToken, refreshToken);
 
-  // Prepare base response
   const response: any = {
     success: true,
     message,
   };
 
-  // Conditionally add user data
-  if (options?.userData) {
-    response.user = {
-      _id: options.userData._id,
-      name: options.userData.name,
-      email: options.userData.email,
-      avatar: options.userData.avatar || "",
-      role: options.userData.role,
-    };
-  }
-
-  // Conditionally add tokens in body (for mobile/non-cookie clients)
+  if (options?.userData) response.user = options.userData;
   if (options?.includeTokensInBody) {
     response.accessToken = accessToken;
     response.refreshToken = refreshToken;

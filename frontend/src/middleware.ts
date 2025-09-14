@@ -1,8 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
 const protectedRoutes = [
-  
-  '/my-profile',
+  "/admin/dashboard",
+  "/my-profile",
+  "/my-orders",
+  "/checkout/payment",
+  "/return",
 ];
 
 export function middleware(req: NextRequest) {
@@ -13,13 +16,13 @@ export function middleware(req: NextRequest) {
   console.log("👉 PATHNAME:", pathname);
 
   if (protectedRoutes.includes(pathname)) {
-   const token = req.cookies.get('accessToken');
+    const token = req.cookies.get("accessToken");
 
     console.log("🔑 Token:", token?.value || "Not Found");
 
     if (!token) {
       console.log("❌ No token, redirecting to login");
-      return NextResponse.redirect(new URL('/auth/login', req.url));
+      return NextResponse.redirect(new URL("/auth/login", req.url));
     }
 
     console.log("✅ Token found, access allowed");
@@ -32,7 +35,10 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-  
-    '/my-profile',
+    "/admin/dashboard",
+    "/my-profile",
+    "/my-orders",
+    "/checkout/payment",
+    "/return",
   ],
 };
