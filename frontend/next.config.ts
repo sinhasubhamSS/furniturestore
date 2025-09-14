@@ -3,9 +3,11 @@ const BACKEND_API_BASE_URL =
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  images: {
-    domains: ["res.cloudinary.com"],
-  },
+ images: {
+  remotePatterns: [
+    { protocol: 'https', hostname: 'res.cloudinary.com' }
+  ]
+},
   async rewrites() {
     return [
       {

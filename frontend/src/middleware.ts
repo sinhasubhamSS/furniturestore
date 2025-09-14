@@ -16,7 +16,8 @@ export function middleware(req: NextRequest) {
   console.log("👉 PATHNAME:", pathname);
 
   if (protectedRoutes.includes(pathname)) {
-    const token = req.cookies.get('token');
+   const token = req.cookies.get('accessToken');
+
     console.log("🔑 Token:", token?.value || "Not Found");
 
     if (!token) {
