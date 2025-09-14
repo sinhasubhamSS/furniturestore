@@ -3,9 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 const protectedRoutes = [
   
   '/my-profile',
-  '/my-orders',
-  '/checkout/payment',
-  '/return'
 ];
 
 export function middleware(req: NextRequest) {
@@ -36,9 +33,5 @@ export const config = {
   matcher: [
   
     '/my-profile',
-    '/my-orders',
-    '/checkout/payment',
-    '/return'
-    
   ],
 };
