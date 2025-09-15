@@ -2,11 +2,18 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 const app = express();
+const ORIGIN = process.env.ALLOWED_ORIGINS || ""; // single origin string
+const whitelist = (process.env.ALLOWED_ORIGINS || "")
+  .split(/\s*,\s*/)
+  .filter(Boolean); // split + trim
+
 app.use(
   cors({
-    // origin: "http://localhost:3000", // frontend URL
-    origin: "https://furniturestore-lilac.vercel.app",
-    credentials: true, // 👈 important if using cookies
+    origin(origin, cb) {
+      if (!origin) return cb(null, true); // allow Postman/cURL
+      return cb(null, whitelist.includes(origin)); // exact match required
+    },
+    credentials: true,
   })
 );
 app.use(cookieParser());
