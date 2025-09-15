@@ -41,19 +41,39 @@ axiosClient.interceptors.response.use(
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
-        }).then(() => axiosClient(originalRequest));
+        }).then((token) => {
+          if (token) {
+            originalRequest.headers = {
+              ...originalRequest.headers,
+              Authorization: `Bearer ${token}`,
+            };
+          }
+          return axiosClient(originalRequest);
+        });
       }
 
       isRefreshing = true;
 
       try {
-        await axios.post(
+        const res = await axios.post(
           `${process.env.NEXT_PUBLIC_API_BASE_URL}/user/refresh-token`,
           {},
           { withCredentials: true }
         );
 
-        processQueue(null);
+        const newAccessToken = res.data?.accessToken;
+
+        if (newAccessToken) {
+          axiosClient.defaults.headers.common["Authorization"] = `Bearer ${newAccessToken}`;
+        }
+
+        processQueue(null, newAccessToken);
+        if (newAccessToken) {
+          originalRequest.headers = {
+            ...originalRequest.headers,
+            Authorization: `Bearer ${newAccessToken}`,
+          };
+        }
         return axiosClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
