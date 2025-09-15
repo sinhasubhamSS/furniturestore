@@ -28,58 +28,99 @@ const TrendingSection = () => {
     }
 
     return (
-      <div
-        className="flex gap-2 overflow-x-auto scrollbar-custom pb-2"
-        role="list"
-        aria-label="Trending products"
-      >
-        {data.map((product) => (
-          <article
-            key={product._id}
-            onClick={() =>
-              window.open(`/products/${product.slug}`, "_blank", "noopener,noreferrer")
-            }
-            className="flex-none w-[140px] md:w-[160px] bg-[var(--color-card)] border border-[var(--color-border-custom)] rounded-xl shadow-sm hover:shadow-lg hover:bg-[var(--color-hover-card)] transition-all duration-300 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] group"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                window.open(`/products/${product.slug}`, "_blank", "noopener,noreferrer");
-              }
-            }}
-          >
-            <div className="w-full h-[110px] flex items-center justify-center bg-[var(--color-secondary)] rounded-t-xl overflow-hidden p-2 border-b border-[var(--color-border-custom)]">
-              <img
-                src={product.image || "/images/placeholder.jpg"}
-                alt={product.slug}
-                className="max-h-full max-w-full object-contain transition-transform duration-300 ease-in-out group-hover:scale-110"
-                loading="lazy"
-                onError={(e) => {
-                  e.currentTarget.src = "/images/placeholder.jpg";
+      <>
+        {/* Mobile: horizontal scroll slider with smaller cards */}
+        <div className="sm:hidden overflow-x-auto scrollbar-custom py-4 px-1">
+          <div className="flex gap-3 min-w-max">
+            {data.map((product) => (
+              <article
+                key={product._id}
+                onClick={() =>
+                  window.open(`/products/${product.slug}`, "_blank", "noopener,noreferrer")
+                }
+                className="flex-none w-36 bg-[var(--color-card)] border border-[var(--color-border-custom)] rounded-xl shadow-sm hover:shadow-lg cursor-pointer p-2"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    window.open(`/products/${product.slug}`, "_blank", "noopener,noreferrer");
+                  }
                 }}
-              />
-            </div>
+              >
+                <div className="h-40 w-full p-2 border border-[var(--color-border-custom)] rounded-md flex items-center justify-center bg-[var(--color-secondary)] overflow-hidden">
+                  <img
+                    src={product.image || "/images/placeholder.jpg"}
+                    alt={product.slug}
+                    className="max-h-full max-w-full object-contain transition-transform duration-300 ease-in-out group-hover:scale-110"
+                    loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.src = "/images/placeholder.jpg";
+                    }}
+                  />
+                </div>
 
-            <div className="p-2">
+                <h3
+                  className="mt-2 text-base font-semibold text-[var(--color-foreground)] truncate"
+                  title={product.slug}
+                >
+                  {product.slug}
+                </h3>
+                <p className="mt-1 text-[var(--color-accent)] font-bold text-base">
+                  ₹{product.price?.toLocaleString() || "N/A"}
+                </p>
+              </article>
+            ))}
+          </div>
+        </div>
+
+        {/* Medium and larger screens: grid layout maximized */}
+        <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1 max-w-[1440px] px-1">
+          {data.map((product) => (
+            <article
+              key={product._id}
+              onClick={() =>
+                window.open(`/products/${product.slug}`, "_blank", "noopener,noreferrer")
+              }
+              className="bg-[var(--color-card)] border border-[var(--color-border-custom)] rounded-xl shadow-sm hover:shadow-lg cursor-pointer p-4"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  window.open(`/products/${product.slug}`, "_blank", "noopener,noreferrer");
+                }
+              }}
+            >
+              <div className="h-44 w-full rounded-md border border-[var(--color-border-custom)] overflow-hidden bg-[var(--color-secondary)] flex items-center justify-center p-2">
+                <img
+                  src={product.image || "/images/placeholder.jpg"}
+                  alt={product.slug}
+                  className="object-contain max-h-full max-w-full transition-transform duration-300 ease-in-out group-hover:scale-110"
+                  loading="lazy"
+                  onError={(e) => {
+                    e.currentTarget.src = "/images/placeholder.jpg";
+                  }}
+                />
+              </div>
+
               <h3
-                className="text-sm font-semibold text-[var(--color-foreground)] truncate"
+                className="mt-4 text-lg font-semibold text-[var(--color-foreground)] truncate"
                 title={product.slug}
               >
                 {product.slug}
               </h3>
-              <p className="text-[var(--color-accent)] text-base font-bold mt-1">
+              <p className="mt-2 text-[var(--color-accent)] font-bold text-xl">
                 ₹{product.price?.toLocaleString() || "N/A"}
               </p>
-            </div>
-          </article>
-        ))}
-      </div>
+            </article>
+          ))}
+        </div>
+      </>
     );
   };
 
   return (
-    <section className="w-full py-2 border border-[var(--color-border-custom)] rounded-xl mt-8 bg-[var(--color-primary)] shadow-lg">
-      <div className="max-w-[1440px] mx-auto px-4 md:px-8">
-        <div className="flex items-center justify-between mb-6">
+    <section className="w-full py-4 border border-[var(--color-border-custom)] rounded-xl mt-8 bg-[var(--color-primary)] shadow-lg">
+      {/* Responsive container with max width for big screens */}
+      <div className="max-w-[1440px] mx-auto px-2 sm:px-4 md:px-8">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl md:text-3xl font-extrabold text-[var(--color-foreground)] select-none border-b-4 border-[var(--color-accent)] w-max pb-1">
             Latest Products
           </h2>
