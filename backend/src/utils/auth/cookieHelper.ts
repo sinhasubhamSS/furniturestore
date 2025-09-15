@@ -1,14 +1,12 @@
 import { Response } from "express";
 type SameSiteType = "none" | "lax" | "strict";
 
+// Always cross-site friendly: None + Secure
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite:
-    process.env.NODE_ENV === "production"
-      ? ("none" as SameSiteType)
-      : ("lax" as SameSiteType),
-};
+  secure: true, // must be HTTPS
+  sameSite: "none" as SameSiteType,
+} as const;
 
 export const setAuthCookies = (
   res: Response,
@@ -17,20 +15,19 @@ export const setAuthCookies = (
 ): void => {
   res.cookie("accessToken", accessToken, {
     ...cookieOptions,
-  maxAge: 15 * 60 * 1000 // 15 minutes
- // 15 minutes
+    path: "/", // visible to all routes
+    maxAge: 15 * 60 * 1000, // 15 minutes
   });
 
   res.cookie("refreshToken", refreshToken, {
     ...cookieOptions,
-    path: "/api/user/refresh-token",
-
+    path: "/api/user/refresh-token", // only for refresh endpoint
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 };
 
 export const clearAuthCookies = (res: Response): void => {
-  res.clearCookie("accessToken", cookieOptions);
+  res.clearCookie("accessToken", { ...cookieOptions, path: "/" });
   res.clearCookie("refreshToken", {
     ...cookieOptions,
     path: "/api/user/refresh-token",
