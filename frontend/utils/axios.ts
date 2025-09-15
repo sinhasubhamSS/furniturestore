@@ -3,6 +3,7 @@ import axios, { AxiosRequestConfig } from "axios";
 const axiosClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,
   withCredentials: true,
+
 });
 
 interface RetryableRequestConfig extends AxiosRequestConfig {
@@ -17,12 +18,17 @@ let failedQueue: Array<{
 
 const processQueue = (error: any, token: string | null = null) => {
   failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
+    try {
+      if (error) {
+        prom.reject(error);
+      } else {
+        prom.resolve(token);
+      }
+    } catch {
+      // optionally handle or ignore
     }
   });
+
   failedQueue = [];
 };
 
@@ -41,45 +47,26 @@ axiosClient.interceptors.response.use(
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
-        }).then((token) => {
-          if (token) {
-            originalRequest.headers = {
-              ...originalRequest.headers,
-              Authorization: `Bearer ${token}`,
-            };
-          }
-          return axiosClient(originalRequest);
-        });
+        })
+          .then(() => axiosClient(originalRequest))
+          .catch((err) => Promise.reject(err));
       }
 
       isRefreshing = true;
 
       try {
-        const res = await axios.post(
+        // Use raw axios call to refresh token with credentials
+        await axios.post(
           `${process.env.NEXT_PUBLIC_API_BASE_URL}/user/refresh-token`,
           {},
           { withCredentials: true }
         );
 
-        const newAccessToken = res.data?.accessToken;
-
-        if (newAccessToken) {
-          axiosClient.defaults.headers.common["Authorization"] = `Bearer ${newAccessToken}`;
-        }
-
-        processQueue(null, newAccessToken);
-        if (newAccessToken) {
-          originalRequest.headers = {
-            ...originalRequest.headers,
-            Authorization: `Bearer ${newAccessToken}`,
-          };
-        }
+        processQueue(null);
         return axiosClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        if (typeof window !== "undefined") {
-          window.location.replace("/auth/login");
-        }
+        window.location.href = "/auth/login";
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

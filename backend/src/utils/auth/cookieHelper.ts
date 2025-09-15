@@ -7,9 +7,8 @@ const cookieOptions = {
   httpOnly: true,
   secure: isProd, // ✅ prod = true
   sameSite: isProd ? ("none" as SameSiteType) : ("lax" as SameSiteType),
-  domain: isProd ? ".onrender.com" : undefined,
-  // ^ optional: agar same root domain hota to best hota,
-  // abhi tum Vercel+Render alag-alag use kar rahe ho so isko skip bhi kar sakte ho
+  // ❌ yaha domain mat do kyunki frontend+backend alag domains pe hain
+  // domain: ".onrender.com",  <-- isko hata do
 };
 
 export const setAuthCookies = (
