@@ -3,17 +3,11 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 const app = express();
 const ORIGIN = process.env.ALLOWED_ORIGINS || ""; // single origin string
-const whitelist = (process.env.ALLOWED_ORIGINS || "")
-  .split(/\s*,\s*/)
-  .filter(Boolean); // split + trim
-
 app.use(
   cors({
-    origin(origin, cb) {
-      if (!origin) return cb(null, true); // allow Postman/cURL
-      return cb(null, whitelist.includes(origin)); // exact match required
-    },
-    credentials: true,
+    // origin: "http://localhost:3000", // frontend URL
+    origin: ORIGIN,
+    credentials: true, // 👈 important if using cookies
   })
 );
 app.use(cookieParser());

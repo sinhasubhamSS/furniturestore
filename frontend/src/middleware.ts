@@ -9,6 +9,7 @@ const protectedRoutes = [
 ];
 
 export function middleware(req: NextRequest) {
+  console.log("Cookie header:", req.headers.get("cookie") || "none");
   const { pathname } = req.nextUrl;
 
   // Debugging
