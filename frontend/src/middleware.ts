@@ -2,7 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const protectedRoutes = [ 
-  /return
+  matcher: [
+    "/return",
 ];
 
 export function middleware(req: NextRequest) {
@@ -33,6 +34,6 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    /return 
+    "/return",
   ],
 };
