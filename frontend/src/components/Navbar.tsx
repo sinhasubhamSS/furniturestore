@@ -1,40 +1,42 @@
+// src/components/layout/Navbar.tsx
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import {
-  FiShoppingCart,
-  FiSearch,
-  FiUser,
-  FiChevronDown,
-  FiX,
-  FiHelpCircle,
-} from "react-icons/fi";
-import { RiLoginCircleLine } from "react-icons/ri";
+import { useSelector, useDispatch } from "react-redux";
 import type { RootState } from "@/redux/store";
-import Toggle from "@/components/helperComponents/Toogle";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clearActiveUser } from "@/redux/slices/userSlice";
 import { useGetCartCountQuery } from "@/redux/services/user/cartApi";
 import { useWishlistidsQuery } from "@/redux/services/user/wishlistApi";
+import Toggle from "@/components/helperComponents/Toogle";
+import { FiShoppingCart, FiSearch, FiUser, FiChevronDown, FiX, FiHelpCircle } from "react-icons/fi";
+import { RiLoginCircleLine } from "react-icons/ri";
 import axiosClient from "../../utils/axios";
 
-const Navbar = () => {
-  const activeUser = useSelector((state: RootState) => state.user.activeUser);
 
-  // ✅ Wishlist API - sirf jab user login hoga
-  const { data: wishlistIds = [], isLoading: wishlistLoading } =
-    useWishlistidsQuery(undefined, {
-      skip: !activeUser,
-    });
+const Navbar = () => {
+  const activeUser = useSelector((s: RootState) => s.user.activeUser);
+
+  // Wishlist
+  const { data: wishlistIds = [] } = useWishlistidsQuery(undefined, { skip: !activeUser });
   const wishlistCount = wishlistIds.length;
 
-  // ✅ Cart API - sirf jab user login hoga
-  const { data: cartCountData, isLoading: cartCountLoading } =
-    useGetCartCountQuery(undefined, {
+  // Lightweight count only (homepage-safe)
+  const { data: cartCountData, isLoading: cartCountLoading, refetch } = useGetCartCountQuery(
+    undefined,
+    {
       skip: !activeUser,
-    });
-  const cartCount = cartCountData?.count || 0;
+      refetchOnMountOrArgChange: true,
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
+    }
+  );
+  const cartCount = activeUser ? Number(cartCountData?.count ?? 0) : 0;
+
+  // Optional: when user toggles from logged-out -> logged-in, force refetch
+  useEffect(() => {
+    if (activeUser) refetch();
+  }, [activeUser, refetch]);
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
@@ -43,23 +45,19 @@ const Navbar = () => {
   const router = useRouter();
 
   const handleSignOut = async () => {
-  try {
-    await axiosClient.post("/user/logout"); // cookie clear
-  } catch (err) {
-    console.error("Logout failed:", err);
-  } finally {
-    dispatch(clearActiveUser());
-    router.push("/auth/login");
-  }
-};
-
+    try {
+      await axiosClient.post("/user/logout");
+    } catch (err) {
+      console.error("Logout failed:", err);
+    } finally {
+      dispatch(clearActiveUser());
+      router.push("/auth/login");
+    }
+  };
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsDropdownOpen(false);
       }
     };
@@ -67,38 +65,21 @@ const Navbar = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ✅ Debugging logs
-  useEffect(() => {
-    console.log("🔄 Navbar wishlistCount:", wishlistCount);
-    console.log("🔄 Navbar cartCount:", cartCount);
-  }, [wishlistCount, cartCount]);
-
   return (
-    <nav className="fixed top-0 left-0 w-full z-[1000] bg-[var(--color-secondary)] backdrop-blur border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
+    <nav className="fixed top-0 left-0 w-full z- bg-[var(--color-secondary)] backdrop-blur border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between py-3 gap-4">
-          {/* Left - Brand */}
+          {/* Left */}
           <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="font-bold text-xl tracking-tight text-[var(--text-accent)] hover:scale-105 transition-transform duration-300"
-            >
+            <Link href="/" className="font-bold text-xl tracking-tight text-[var(--text-accent)] hover:scale-105 transition-transform duration-300">
               SUVIDHA
             </Link>
-
-            <button
-              className="sm:hidden p-2"
-              onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
-            >
-              {isMobileSearchOpen ? (
-                <FiX className="h-5 w-5 text-[var(--foreground)]" />
-              ) : (
-                <FiSearch className="h-5 w-5 text-[var(--foreground)]" />
-              )}
+            <button className="sm:hidden p-2" onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}>
+              {isMobileSearchOpen ? <FiX className="h-5 w-5 text-[var(--foreground)]" /> : <FiSearch className="h-5 w-5 text-[var(--foreground)]" />}
             </button>
           </div>
 
-          {/* Center - Search */}
+          {/* Center */}
           <div className="hidden sm:flex flex-1 max-w-xl mx-4">
             <div className="relative group w-full">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -110,33 +91,29 @@ const Navbar = () => {
                 className="block w-full pl-10 pr-3 py-2.5 rounded-full bg-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-accent)] text-sm text-[var(--foreground)] placeholder-gray-500 transition-all"
               />
               <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                <kbd className="px-2 py-1 text-xs rounded bg-[var(--card-bg)] text-[var(--foreground)] opacity-70">
-                  ⌘K
-                </kbd>
+                <kbd className="px-2 py-1 text-xs rounded bg-[var(--card-bg)] text-[var(--foreground)] opacity-70">⌘K</kbd>
               </div>
             </div>
           </div>
 
-          {/* Right - Icons */}
+          {/* Right */}
           <div className="flex items-center gap-3">
-            {/* Cart Icon */}
+            {/* Cart */}
             <Link href="/cart">
               <button className="relative p-2 group hover:bg-[var(--color-primary)] rounded-lg transition-colors">
                 <FiShoppingCart className="h-6 w-6 text-[var(--foreground)] group-hover:text-[var(--color-accent)] transition-colors" />
-
                 {activeUser && !cartCountLoading && cartCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-[var(--color-accent)] text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center pointer-events-none cursor-default">
                     {cartCount > 99 ? "99+" : cartCount}
                   </span>
                 )}
-
-                {activeUser && cartCountLoading && (
+                {activeUser && cartCountLoading && cartCount === 0 && (
                   <span className="absolute -top-1 -right-1 bg-gray-400 text-white text-xs rounded-full h-3 w-3 animate-pulse pointer-events-none"></span>
                 )}
               </button>
             </Link>
 
-            {/* User Dropdown */}
+            {/* User */}
             <div ref={dropdownRef} className="relative">
               {activeUser ? (
                 <>
@@ -151,43 +128,22 @@ const Navbar = () => {
                         className="h-8 w-8 rounded-full object-cover border-2 border-transparent group-hover:border-[var(--color-accent)] transition-colors"
                       />
                     ) : (
-                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[var(--color-accent)] to-purple-500 flex items-center justify-center text-white font-semibold">
-                        <FiUser className="h-4 w-4" />
+                      <div className="h-8 w-8 rounded-full bg-[var(--color-secondary)] flex items-center justify-center">
+                        <FiUser className="h-4 w-4 text-[var(--foreground)]" />
                       </div>
                     )}
                     <FiChevronDown
-                      className={`h-4 w-4 text-[var(--foreground)] transition-transform duration-200 ${
-                        isDropdownOpen ? "rotate-180" : ""
-                      }`}
+                      className={`h-4 w-4 text-[var(--foreground)] transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`}
                     />
                   </button>
 
                   {isDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-64 rounded-lg bg-[var(--color-secondary)] backdrop-blur-lg shadow-xl ring-1 ring-black ring-opacity-10 border border-white/20 overflow-hidden">
-                      {/* User Info */}
                       <div className="px-4 py-3 border-b border-white/10">
-                        <p className="text-sm text-[var(--foreground)] opacity-75">
-                          Signed in as
-                        </p>
-                        <p className="text-sm font-semibold text-[var(--text-accent)] truncate">
-                          {activeUser.name}
-                        </p>
+                        <p className="text-sm text-[var(--foreground)] opacity-75">Signed in as</p>
+                        <p className="text-sm font-semibold text-[var(--text-accent)] truncate">{activeUser.name}</p>
                       </div>
 
-                      {/* Admin Link */}
-                      {activeUser.role === "admin" && (
-                        <div className="py-1">
-                          <Link
-                            href="/admin/dashboard"
-                            className="block px-4 py-3 text-sm text-[var(--foreground)] hover:bg-[var(--color-accent)]/20 transition-colors duration-200"
-                            onClick={() => setIsDropdownOpen(false)}
-                          >
-                            🔧 Admin Dashboard
-                          </Link>
-                        </div>
-                      )}
-
-                      {/* Navigation Links */}
                       <div className="py-1">
                         <Link
                           href="/my-profile"
@@ -210,24 +166,18 @@ const Navbar = () => {
                         >
                           <span>❤️ My Wishlist</span>
                           {wishlistCount > 0 && (
-                            <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full pointer-events-none">
-                              {wishlistCount}
-                            </span>
+                            <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full pointer-events-none">{wishlistCount}</span>
                           )}
                         </Link>
                       </div>
 
-                      {/* Theme Toggle */}
                       <div className="py-1 border-t border-white/10">
                         <div className="flex items-center justify-between px-4 py-3">
-                          <span className="text-sm text-[var(--foreground)]">
-                            🎨 Theme
-                          </span>
+                          <span className="text-sm text-[var(--foreground)]">🎨 Theme</span>
                           <Toggle />
                         </div>
                       </div>
 
-                      {/* Sign Out */}
                       <div className="py-1 border-t border-white/10">
                         <button
                           onClick={() => {
@@ -256,12 +206,8 @@ const Navbar = () => {
                   {isDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-56 rounded-lg bg-[var(--card-bg)] shadow-lg ring-1 ring-black ring-opacity-5 border border-white/10">
                       <div className="px-4 py-3">
-                        <p className="text-sm text-[var(--foreground)]">
-                          Guest User
-                        </p>
-                        <p className="text-sm text-[var(--text-accent)]">
-                          Please login for full access
-                        </p>
+                        <p className="text-sm text-[var(--foreground)]">Guest User</p>
+                        <p className="text-sm text-[var(--text-accent)]">Please login for full access</p>
                       </div>
                       <div className="py-1">
                         <Link
@@ -275,9 +221,7 @@ const Navbar = () => {
                       </div>
                       <div className="py-1 border-t border-white/10">
                         <div className="flex items-center justify-between px-4 py-2">
-                          <span className="text-sm text-[var(--foreground)]">
-                            Theme
-                          </span>
+                          <span className="text-sm text-[var(--foreground)]">Theme</span>
                           <Toggle />
                         </div>
                       </div>
@@ -302,10 +246,7 @@ const Navbar = () => {
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <FiSearch className="h-5 w-5 text-[var(--foreground)]" />
               </div>
-              <button
-                onClick={() => setIsMobileSearchOpen(false)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-              >
+              <button onClick={() => setIsMobileSearchOpen(false)} className="absolute inset-y-0 right-0 pr-3 flex items-center">
                 <FiX className="h-5 w-5 text-[var(--foreground)]" />
               </button>
             </div>

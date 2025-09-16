@@ -26,8 +26,7 @@ export const cartApi = createApi({
         const patch = dispatch(
           cartApi.util.updateQueryData("getCart", undefined, (draft) => {
             const existing = draft.items.find(
-              (i) =>
-                i.productId === arg.productId && i.variantId === arg.variantId
+              (i) => i.productId === arg.productId && i.variantId === arg.variantId
             );
             if (existing) {
               existing.quantity =
@@ -58,7 +57,7 @@ export const cartApi = createApi({
           patch.undo();
         }
       },
-      invalidatesTags: ["Cart"], // ensures getCartCount refetches
+      invalidatesTags: ["Cart"],
     }),
 
     updateQuantity: builder.mutation<
@@ -70,8 +69,7 @@ export const cartApi = createApi({
         const patch = dispatch(
           cartApi.util.updateQueryData("getCart", undefined, (draft) => {
             const existing = draft.items.find(
-              (i) =>
-                i.productId === arg.productId && i.variantId === arg.variantId
+              (i) => i.productId === arg.productId && i.variantId === arg.variantId
             );
             if (existing) existing.quantity = Number(arg.quantity || 0);
             draft.totalItems = recomputeTotalItems(draft.items);
@@ -104,10 +102,7 @@ export const cartApi = createApi({
         const patch = dispatch(
           cartApi.util.updateQueryData("getCart", undefined, (draft) => {
             draft.items = draft.items.filter(
-              (i) =>
-                !(
-                  i.productId === arg.productId && i.variantId === arg.variantId
-                )
+              (i) => !(i.productId === arg.productId && i.variantId === arg.variantId)
             );
             draft.totalItems = recomputeTotalItems(draft.items);
           })
@@ -162,10 +157,7 @@ export const cartApi = createApi({
 
     getCartCount: builder.query<{ count: number }, void>({
       query: () => ({ url: "/cart/count", method: "GET" }),
-       transformResponse: (response: any) => {
-        console.log("🔍 RTK Query - get cartresponecount.data:", response.data);
-        return response.data;
-      },
+      transformResponse: (response: any) => response.data,
       providesTags: ["Cart"],
     }),
   }),

@@ -1,3 +1,4 @@
+// src/app/cart/page.tsx (or wherever your route is)
 "use client";
 
 import { useState } from "react";
@@ -15,7 +16,16 @@ import { ChevronUp, ChevronDown } from "lucide-react";
 
 const CartPage = () => {
   const [showDetails, setShowDetails] = useState(false);
-  const { data, isLoading, error } = useGetCartQuery();
+
+  // Observe getCart cache so optimistic patches render instantly
+  const { data, isLoading, error } = useGetCartQuery(undefined, {
+    selectFromResult: ({ data, isLoading, error }) => ({
+      data,
+      isLoading,
+      error,
+    }),
+  });
+
   const [updateQty] = useUpdateQuantityMutation();
   const [removeItem] = useRemoveItemMutation();
   const router = useRouter();
@@ -26,15 +36,13 @@ const CartPage = () => {
       alert("Your cart is empty!");
       return;
     }
-
     const checkoutItems = data.items
-      .filter((item) => item.product !== undefined) // ✅ ensure defined
+      .filter((item) => item.product !== undefined)
       .map((item) => ({
         productId: item.product!._id,
         variantId: item.variantId,
         quantity: item.quantity,
       }));
-
     dispatch(setCartPurchase(checkoutItems));
     router.push("/checkout");
   };
@@ -96,7 +104,6 @@ const CartPage = () => {
   return (
     <div className="min-h-screen bg-[var(--color-primary)] pb-32 md:pb-8">
       <div className="w-full max-w-6xl mx-auto px-4">
-        {/* Header */}
         <div className="py-4 md:py-8">
           <div className="flex items-center justify-between mb-4 md:mb-0">
             <div>
@@ -107,7 +114,6 @@ const CartPage = () => {
                 {data.totalItems} {data.totalItems === 1 ? "item" : "items"}
               </p>
             </div>
-
             <Button
               variant="ghost"
               onClick={() => router.push("/products")}
@@ -128,24 +134,24 @@ const CartPage = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
-          {/* Cart Items */}
           <div className="lg:col-span-2 space-y-3 md:space-y-4">
-            {data.items.map((item, idx) =>
+            {data.items.map((item) =>
               item.product ? (
                 <ProductCartItem
                   key={`${item.product._id}-${item.variantId}`}
-                  product={item.product} // guaranteed defined
+                  product={item.product}
+                  productId={item.product._id} // pass explicit id
                   variantId={item.variantId}
                   quantity={item.quantity}
                   onRemove={() =>
                     removeItem({
-                      productId: item.product?._id ?? "",
+                      productId: item.product!._id,
                       variantId: item.variantId,
                     })
                   }
                   onQuantityChange={(qty) =>
                     updateQty({
-                      productId: item.product?._id ?? "",
+                      productId: item.product!._id,
                       variantId: item.variantId,
                       quantity: qty,
                     })
@@ -155,7 +161,6 @@ const CartPage = () => {
             )}
           </div>
 
-          {/* Desktop Summary */}
           <div className="lg:col-span-1 hidden lg:block">
             <div className="bg-[var(--color-card)] p-6 rounded-2xl shadow-lg border border-[var(--color-border-custom)] sticky top-8">
               <h3 className="text-2xl font-bold mb-6 text-[var(--color-foreground)] border-b-2 border-[var(--color-accent)] pb-2 w-max">
@@ -257,11 +262,7 @@ const CartPage = () => {
             </div>
             <div className="flex items-center gap-1 text-xs text-[var(--text-accent)] font-medium">
               <span>{showDetails ? "Hide" : "View"} details</span>
-              {showDetails ? (
-                <ChevronDown size={16} />
-              ) : (
-                <ChevronUp size={16} />
-              )}
+              {showDetails ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
             </div>
           </button>
 
