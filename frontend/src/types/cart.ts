@@ -8,7 +8,7 @@ export type CartItem = {
   addedAt?: Date | string;
 
   // Ye fields optional rakhni chahiye kyunki ye populated data se aate hain
-  product: DisplayProduct;
+  product?: DisplayProduct;
   name?: string;
   image?: string;
   price?: number;

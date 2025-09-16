@@ -515,8 +515,6 @@ class OrderService {
           );
           newOrder.status = OrderStatus.Confirmed;
           await newOrder.save({ session });
-
-         
         } else {
           console.log(
             `✅ Order ${newOrder.orderId} created with reserved stock`
@@ -527,7 +525,15 @@ class OrderService {
         if (fromCart) {
           await Cart.findOneAndUpdate(
             { user: userId },
-            { items: [] },
+            {
+              $set: {
+                items: [],
+                totalItems: 0,
+                cartSubtotal: 0,
+                cartGST: 0,
+                cartTotal: 0,
+              },
+            },
             { session }
           );
         }
@@ -539,7 +545,6 @@ class OrderService {
       if (createdOrder && createdOrder._id) {
         try {
           await this.releaseReservation(createdOrder._id.toString());
-         
         } catch (releaseError) {
           console.error("Error releasing reservation:", releaseError);
         }

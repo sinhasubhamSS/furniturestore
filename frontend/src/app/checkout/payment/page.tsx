@@ -95,7 +95,7 @@ const PaymentPage = () => {
     }
     if (type === "cart_purchase" && cartData?.items?.length) {
       return cartData.items.reduce((sum, item) => {
-        const variant = item.product.variants.find(
+        const variant = item.product?.variants.find(
           (v) => v._id === item.variantId
         );
         if (!variant) return sum;
@@ -125,8 +125,8 @@ const PaymentPage = () => {
     }
     if (type === "cart_purchase" && cartData?.items?.length) {
       return cartData.items.map((item) => ({
-        productId: item.product._id,
-        variantId: item.variantId,
+        productId: item.product?._id || "",
+        variantId: item.variantId || "",
         quantity: item.quantity,
       }));
     }

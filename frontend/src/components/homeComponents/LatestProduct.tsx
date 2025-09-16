@@ -129,7 +129,7 @@ const TrendingSection = () => {
             onClick={() => window.open("/products", "_blank")}
             className="text-[var(--color-accent)] hover:text-[var(--text-accent)] font-semibold text-sm md:text-base transition-colors duration-200 hover:underline"
           >
-            View All →
+            View All 
           </button>
         </div>
         {renderContent()}

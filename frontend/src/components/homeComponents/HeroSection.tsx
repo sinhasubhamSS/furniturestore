@@ -136,7 +136,7 @@ const HeroSection = () => {
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"
                   priority={index === 0} // ✅ first image fast load
-                  className={`absolute inset-0 object-contain transition-opacity duration-700 ease-in-out ${
+                  className={`absolute inset-0 object-contain transition-opacity duration-700 ease-in-out p-2  ${
                     index === currentIndex ? "opacity-100" : "opacity-0"
                   }`}
                 />
