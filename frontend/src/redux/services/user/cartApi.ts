@@ -35,44 +35,52 @@ export const cartApi = createApi({
       query: ({ productId, variantId, quantity }) => ({
         url: `/cart/update`,
         method: "PUT",
-        body: { productId, variantId, quantity }, // 👈 axios jaisa "data" nahi, RTK Query me "body"
+        data: { productId, variantId, quantity },
       }),
-      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+      async onQueryStarted(arg, { dispatch, queryFulfilled, getState }) {
         console.log("🟡 Optimistic update started with:", arg);
 
+        // Get current cart state for reference
+        const currentState = cartApi.endpoints.getCart.select(undefined)(getState());
+        const currentCart = currentState.data;
+
+        // Optimistic update
         const patchResult = dispatch(
           cartApi.util.updateQueryData("getCart", undefined, (draft) => {
-            const existing = draft.items.find(
-              (i) =>
-                i.productId === arg.productId && i.variantId === arg.variantId
+            if (!draft?.items?.length) return;
+
+            const existingItem = draft.items.find(
+              (i) => i.productId === arg.productId && i.variantId === arg.variantId
             );
 
-            if (existing && existing.price !== undefined) {
-              const oldQty = existing.quantity;
-              const newQty = arg.quantity;
-              const diff = newQty - oldQty;
+            if (!existingItem) return;
 
-              existing.quantity = newQty;
+            // Update the quantity optimistically
+            const oldQty = existingItem.quantity;
+            const newQty = arg.quantity;
+            const diff = newQty - oldQty;
 
-              draft.totalItems += diff;
-              draft.cartSubtotal += diff * existing.price;
+            existingItem.quantity = newQty;
+
+            // Recalculate totals (only if price is available)
+            if (existingItem.price !== undefined) {
+              draft.totalItems = Math.max(0, draft.totalItems + diff);
+              draft.cartSubtotal = Math.max(
+                0,
+                draft.cartSubtotal + diff * existingItem.price
+              );
               draft.cartGST = draft.cartSubtotal * 0.18;
               draft.cartTotal = draft.cartSubtotal + draft.cartGST;
-
-              console.log("🟢 Optimistic draft update:", {
-                oldQty,
-                newQty,
-                subtotal: draft.cartSubtotal,
-                gst: draft.cartGST,
-                total: draft.cartTotal,
-              });
             }
           })
         );
 
         try {
-          await queryFulfilled;
-          console.log("✅ API confirmed, keeping optimistic changes");
+          const { data: serverData } = await queryFulfilled;
+          console.log("✅ API confirmed, updating with server data");
+          
+          // Invalidate the cart to trigger a refetch
+          dispatch(cartApi.util.invalidateTags(["Cart"]));
         } catch (error) {
           console.error("❌ Update failed, rolling back...", error);
           patchResult.undo();
