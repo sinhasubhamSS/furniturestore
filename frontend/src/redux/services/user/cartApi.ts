@@ -37,32 +37,23 @@ export const cartApi = createApi({
         method: "PUT",
         data: { productId, variantId, quantity },
       }),
+      // Optimistic Update - UI will instantly update on click
       async onQueryStarted(arg, { dispatch, queryFulfilled, getState }) {
         console.log("🟡 Optimistic update started with:", arg);
-
-        // Get current cart state for reference
-        const currentState = cartApi.endpoints.getCart.select(undefined)(getState());
-        const currentCart = currentState.data;
-
-        // Optimistic update
+        // Apply patch instantly
         const patchResult = dispatch(
           cartApi.util.updateQueryData("getCart", undefined, (draft) => {
             if (!draft?.items?.length) return;
-
             const existingItem = draft.items.find(
-              (i) => i.productId === arg.productId && i.variantId === arg.variantId
+              (i) =>
+                i.productId === arg.productId && i.variantId === arg.variantId
             );
-
             if (!existingItem) return;
-
-            // Update the quantity optimistically
             const oldQty = existingItem.quantity;
             const newQty = arg.quantity;
             const diff = newQty - oldQty;
-
             existingItem.quantity = newQty;
-
-            // Recalculate totals (only if price is available)
+            // recalc totals
             if (existingItem.price !== undefined) {
               draft.totalItems = Math.max(0, draft.totalItems + diff);
               draft.cartSubtotal = Math.max(
@@ -74,12 +65,11 @@ export const cartApi = createApi({
             }
           })
         );
-
+        // Wait for API confirmation
         try {
           const { data: serverData } = await queryFulfilled;
           console.log("✅ API confirmed, updating with server data");
-          
-          // Invalidate the cart to trigger a refetch
+          // (Optional) Invalidate/refetch if server data differs or for extra freshness
           dispatch(cartApi.util.invalidateTags(["Cart"]));
         } catch (error) {
           console.error("❌ Update failed, rolling back...", error);
