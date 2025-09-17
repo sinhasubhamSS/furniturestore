@@ -16,7 +16,6 @@ export const cartApi = createApi({
         method: "POST",
         data: { productId, variantId, quantity },
       }),
-
       invalidatesTags: ["Cart"],
     }),
 
@@ -39,7 +38,8 @@ export const cartApi = createApi({
         data: { productId, variantId, quantity },
       }),
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
-        // Optimistically update cart cache
+        console.log("🟡 Optimistic update started with:", arg);
+
         const patchResult = dispatch(
           cartApi.util.updateQueryData("getCart", undefined, (draft) => {
             const existing = draft.items.find(
@@ -47,15 +47,33 @@ export const cartApi = createApi({
                 i.productId === arg.productId && i.variantId === arg.variantId
             );
 
-            if (existing) {
-              existing.quantity = arg.quantity;
+            if (existing && existing.price !== undefined) {
+              const oldQty = existing.quantity;
+              const newQty = arg.quantity;
+              const diff = newQty - oldQty;
+
+              existing.quantity = newQty;
+
+              draft.totalItems += diff;
+              draft.cartSubtotal += diff * existing.price;
+              draft.cartGST = draft.cartSubtotal * 0.18;
+              draft.cartTotal = draft.cartSubtotal + draft.cartGST;
+
+              console.log("🟢 Optimistic draft update:", {
+                oldQty,
+                newQty,
+                subtotal: draft.cartSubtotal,
+                gst: draft.cartGST,
+                total: draft.cartTotal,
+              });
             }
           })
         );
 
         try {
           const { data } = await queryFulfilled;
-          // Sync backend response with local cache
+          console.log("✅ API response received:", data);
+
           dispatch(
             cartApi.util.updateQueryData("getCart", undefined, (draft) => {
               draft.items = data.items;
@@ -65,8 +83,9 @@ export const cartApi = createApi({
               draft.cartTotal = data.cartTotal;
             })
           );
-        } catch {
-          // Rollback in case of error
+          console.log("🟢 Cache synced with backend");
+        } catch (error) {
+          console.error("❌ Update failed, rolling back...", error);
           patchResult.undo();
         }
       },

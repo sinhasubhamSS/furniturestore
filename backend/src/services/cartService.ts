@@ -97,8 +97,7 @@ class CartService {
         item.product.toString() === productId &&
         item.variantId.toString() === variantId
     );
-    console.log("Cart Items:", cart.items);
-    console.log("Searching for ProductId:", productId, "VariantId:", variantId);
+
 
     if (itemIndex === -1) {
       throw new AppError("Item not found in cart", 404);
