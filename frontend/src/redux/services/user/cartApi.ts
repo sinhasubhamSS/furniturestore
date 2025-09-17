@@ -35,7 +35,7 @@ export const cartApi = createApi({
       query: ({ productId, variantId, quantity }) => ({
         url: `/cart/update`,
         method: "PUT",
-        data: { productId, variantId, quantity },
+        body: { productId, variantId, quantity }, // 👈 axios jaisa "data" nahi, RTK Query me "body"
       }),
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         console.log("🟡 Optimistic update started with:", arg);
@@ -71,25 +71,13 @@ export const cartApi = createApi({
         );
 
         try {
-          const { data } = await queryFulfilled;
-          console.log("✅ API response received:", data);
-
-          dispatch(
-            cartApi.util.updateQueryData("getCart", undefined, (draft) => {
-              draft.items = data.items;
-              draft.totalItems = data.totalItems;
-              draft.cartSubtotal = data.cartSubtotal;
-              draft.cartGST = data.cartGST;
-              draft.cartTotal = data.cartTotal;
-            })
-          );
-          console.log("🟢 Cache synced with backend");
+          await queryFulfilled;
+          console.log("✅ API confirmed, keeping optimistic changes");
         } catch (error) {
           console.error("❌ Update failed, rolling back...", error);
           patchResult.undo();
         }
       },
-      invalidatesTags: ["Cart"],
     }),
 
     removeItem: builder.mutation<
