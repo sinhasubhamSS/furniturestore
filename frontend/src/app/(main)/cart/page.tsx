@@ -1,7 +1,6 @@
-// src/app/cart/page.tsx (or wherever your route is)
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useGetCartQuery,
   useUpdateQuantityMutation,
@@ -16,15 +15,7 @@ import { ChevronUp, ChevronDown } from "lucide-react";
 
 const CartPage = () => {
   const [showDetails, setShowDetails] = useState(false);
-
-  // Observe getCart cache so optimistic patches render instantly
-  const { data, isLoading, error } = useGetCartQuery(undefined, {
-    selectFromResult: ({ data, isLoading, error }) => ({
-      data,
-      isLoading,
-      error,
-    }),
-  });
+  const { data, isLoading, error } = useGetCartQuery();
 
   const [updateQty] = useUpdateQuantityMutation();
   const [removeItem] = useRemoveItemMutation();
@@ -32,7 +23,7 @@ const CartPage = () => {
   const dispatch = useDispatch();
 
   const handleProceedToCheckout = () => {
-    if (!data || !data.items || data.items.length === 0) {
+    if (!data?.items?.length) {
       alert("Your cart is empty!");
       return;
     }
@@ -47,7 +38,7 @@ const CartPage = () => {
     router.push("/checkout");
   };
 
-  if (isLoading) {
+  if (isLoading)
     return (
       <div className="flex justify-center items-center min-h-screen bg-[var(--color-primary)] px-4">
         <div className="text-center bg-[var(--color-card)] p-6 md:p-8 rounded-xl md:rounded-2xl shadow-lg w-full max-w-sm">
@@ -58,9 +49,8 @@ const CartPage = () => {
         </div>
       </div>
     );
-  }
 
-  if (error) {
+  if (error)
     return (
       <div className="min-h-screen bg-[var(--color-primary)] flex items-center justify-center px-4">
         <div className="text-center bg-[var(--color-card)] p-6 md:p-8 rounded-xl md:rounded-2xl shadow-lg w-full max-w-sm">
@@ -68,18 +58,14 @@ const CartPage = () => {
           <p className="text-[var(--text-error)] font-semibold text-sm md:text-lg mb-4">
             Error loading cart
           </p>
-          <Button
-            onClick={() => window.location.reload()}
-            className="text-sm md:text-base font-medium"
-          >
+          <Button onClick={() => window.location.reload()} className="text-sm md:text-base font-medium">
             Retry
           </Button>
         </div>
       </div>
     );
-  }
 
-  if (!data || !data.items || data.items.length === 0) {
+  if (!data?.items?.length)
     return (
       <div className="min-h-screen bg-[var(--color-primary)] flex items-center justify-center px-4">
         <div className="text-center bg-[var(--color-card)] p-8 md:p-12 rounded-xl md:rounded-2xl shadow-lg w-full max-w-md">
@@ -87,19 +73,13 @@ const CartPage = () => {
           <h2 className="text-xl md:text-3xl font-bold mb-3 md:mb-4 text-[var(--color-foreground)]">
             Your cart is empty
           </h2>
-          <p className="text-[var(--text-accent)] mb-6 md:mb-8 text-sm md:text-lg">
-            Add some furniture to get started!
-          </p>
-          <Button
-            onClick={() => router.push("/products")}
-            className="w-full py-3 md:py-4 font-semibold text-sm md:text-lg shadow-lg hover:shadow-xl"
-          >
+          <p className="text-[var(--text-accent)] mb-6 md:mb-8 text-sm md:text-lg">Add some furniture to get started!</p>
+          <Button onClick={() => router.push("/products")} className="w-full py-3 md:py-4 font-semibold text-sm md:text-lg shadow-lg hover:shadow-xl">
             Continue Shopping
           </Button>
         </div>
       </div>
     );
-  }
 
   return (
     <div className="min-h-screen bg-[var(--color-primary)] pb-32 md:pb-8">
@@ -107,57 +87,48 @@ const CartPage = () => {
         <div className="py-4 md:py-8">
           <div className="flex items-center justify-between mb-4 md:mb-0">
             <div>
-              <h1 className="text-2xl md:text-4xl font-bold text-[var(--color-foreground)] mb-1">
-                My Cart
-              </h1>
+              <h1 className="text-2xl md:text-4xl font-bold text-[var(--color-foreground)] mb-1">My Cart</h1>
               <p className="text-[var(--text-accent)] text-sm md:text-base">
                 {data.totalItems} {data.totalItems === 1 ? "item" : "items"}
               </p>
             </div>
-            <Button
-              variant="ghost"
-              onClick={() => router.push("/products")}
-              className="hidden md:flex items-center gap-2 font-semibold"
-            >
+            <Button variant="ghost" onClick={() => router.push("/products")} className="hidden md:flex items-center gap-2 font-semibold">
               <span>←</span>
               <span>Continue Shopping</span>
             </Button>
           </div>
 
-          <Button
-            variant="outline"
-            onClick={() => router.push("/products")}
-            className="md:hidden w-full py-2.5 font-medium text-sm"
-          >
+          <Button variant="outline" onClick={() => router.push("/products")} className="md:hidden w-full py-2.5 font-medium text-sm">
             ← Continue Shopping
           </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
           <div className="lg:col-span-2 space-y-3 md:space-y-4">
-            {data.items.map((item) =>
-              item.product ? (
-                <ProductCartItem
-                  key={`${item.product._id}-${item.variantId}`}
-                  product={item.product}
-                  productId={item.product._id} // pass explicit id
-                  variantId={item.variantId}
-                  quantity={item.quantity}
-                  onRemove={() =>
-                    removeItem({
-                      productId: item.product!._id,
-                      variantId: item.variantId,
-                    })
-                  }
-                  onQuantityChange={(qty) =>
-                    updateQty({
-                      productId: item.product!._id,
-                      variantId: item.variantId,
-                      quantity: qty,
-                    })
-                  }
-                />
-              ) : null
+            {data.items.map(
+              (item) =>
+                item.product && (
+                  <ProductCartItem
+                    key={`${item.product._id}-${item.variantId}`}
+                    product={item.product}
+                    productId={item.product._id}
+                    variantId={item.variantId}
+                    quantity={item.quantity}
+                    onRemove={() =>
+                      removeItem({
+                        productId: item.product!._id,
+                        variantId: item.variantId,
+                      })
+                    }
+                    onQuantityChange={(qty) =>
+                      updateQty({
+                        productId: item.product!._id,
+                        variantId: item.variantId,
+                        quantity: qty,
+                      })
+                    }
+                  />
+                )
             )}
           </div>
 
@@ -169,40 +140,24 @@ const CartPage = () => {
 
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between items-center py-2">
-                  <span className="text-[var(--color-foreground)] font-medium">
-                    Subtotal ({data.totalItems} items)
-                  </span>
-                  <span className="text-[var(--color-foreground)] font-semibold">
-                    ₹{data.cartSubtotal.toFixed(2)}
-                  </span>
+                  <span className="text-[var(--color-foreground)] font-medium">Subtotal ({data.totalItems} items)</span>
+                  <span className="text-[var(--color-foreground)] font-semibold">₹{data.cartSubtotal.toFixed(2)}</span>
                 </div>
 
                 <div className="flex justify-between items-center py-2">
-                  <span className="text-[var(--color-foreground)] font-medium">
-                    GST
-                  </span>
-                  <span className="text-[var(--color-foreground)] font-semibold">
-                    ₹{data.cartGST.toFixed(2)}
-                  </span>
+                  <span className="text-[var(--color-foreground)] font-medium">GST</span>
+                  <span className="text-[var(--color-foreground)] font-semibold">₹{data.cartGST.toFixed(2)}</span>
                 </div>
 
                 <div className="border-t-2 border-[var(--color-border-custom)] pt-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-xl font-bold text-[var(--color-foreground)]">
-                      Total
-                    </span>
-                    <span className="text-2xl font-bold text-[var(--color-accent)]">
-                      ₹{data.cartTotal.toFixed(2)}
-                    </span>
+                    <span className="text-xl font-bold text-[var(--color-foreground)]">Total</span>
+                    <span className="text-2xl font-bold text-[var(--color-accent)]">₹{data.cartTotal.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
-              <Button
-                onClick={handleProceedToCheckout}
-                disabled={!data.items || data.items.length === 0}
-                className="w-full py-4 font-bold text-lg shadow-lg hover:shadow-xl"
-              >
+              <Button onClick={handleProceedToCheckout} disabled={!data.items || data.items.length === 0} className="w-full py-4 font-bold text-lg shadow-lg hover:shadow-xl">
                 🛒 Proceed to Checkout
               </Button>
             </div>
@@ -212,53 +167,32 @@ const CartPage = () => {
 
       {/* Mobile Bottom Checkout */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-[var(--color-card)] border-t border-[var(--color-border-custom)] shadow-2xl z-50">
-        <div
-          className={`transition-all duration-300 overflow-hidden ${
-            showDetails ? "max-h-48" : "max-h-0"
-          }`}
-        >
+        <div className={`transition-all duration-300 overflow-hidden ${showDetails ? "max-h-48" : "max-h-0"}`}>
           <div className="p-4 border-b border-[var(--color-border-custom)] bg-[var(--color-secondary)]">
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-[var(--color-foreground)]">
-                  Subtotal ({data.totalItems} items)
-                </span>
-                <span className="font-semibold text-[var(--color-foreground)]">
-                  ₹{data.cartSubtotal.toFixed(2)}
-                </span>
+                <span className="text-[var(--color-foreground)]">Subtotal ({data.totalItems} items)</span>
+                <span className="font-semibold text-[var(--color-foreground)]">₹{data.cartSubtotal.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between">
                 <span className="text-[var(--color-foreground)]">GST</span>
-                <span className="font-semibold text-[var(--color-foreground)]">
-                  ₹{data.cartGST.toFixed(2)}
-                </span>
+                <span className="font-semibold text-[var(--color-foreground)]">₹{data.cartGST.toFixed(2)}</span>
               </div>
 
               <div className="border-t border-[var(--color-border-custom)] pt-2 flex justify-between">
-                <span className="font-bold text-[var(--color-foreground)]">
-                  Total
-                </span>
-                <span className="font-bold text-[var(--color-accent)] text-lg">
-                  ₹{data.cartTotal.toFixed(2)}
-                </span>
+                <span className="font-bold text-[var(--color-foreground)]">Total</span>
+                <span className="font-bold text-[var(--color-accent)] text-lg">₹{data.cartTotal.toFixed(2)}</span>
               </div>
             </div>
           </div>
         </div>
 
         <div className="p-4">
-          <button
-            onClick={() => setShowDetails(!showDetails)}
-            className="w-full flex items-center justify-between mb-3 py-2 px-2 hover:bg-[var(--color-secondary)] rounded transition-colors"
-          >
+          <button onClick={() => setShowDetails(!showDetails)} className="w-full flex items-center justify-between mb-3 py-2 px-2 hover:bg-[var(--color-secondary)] rounded transition-colors">
             <div className="flex items-center gap-3">
-              <span className="text-sm text-[var(--text-accent)]">
-                {data.totalItems} {data.totalItems === 1 ? "item" : "items"}
-              </span>
-              <span className="text-lg font-bold text-[var(--color-accent)]">
-                ₹{data.cartTotal.toFixed(0)}
-              </span>
+              <span className="text-sm text-[var(--text-accent)]">{data.totalItems} {data.totalItems === 1 ? "item" : "items"}</span>
+              <span className="text-lg font-bold text-[var(--color-accent)]">₹{data.cartTotal.toFixed(0)}</span>
             </div>
             <div className="flex items-center gap-1 text-xs text-[var(--text-accent)] font-medium">
               <span>{showDetails ? "Hide" : "View"} details</span>
@@ -266,13 +200,7 @@ const CartPage = () => {
             </div>
           </button>
 
-          <Button
-            onClick={handleProceedToCheckout}
-            disabled={!data.items || data.items.length === 0}
-            className="w-full py-3.5 font-bold text-base shadow-lg"
-          >
-            🛒 Proceed to Checkout
-          </Button>
+          <Button onClick={handleProceedToCheckout} disabled={!data.items || data.items.length === 0} className="w-full py-3.5 font-bold text-base shadow-lg">🛒 Proceed to Checkout</Button>
         </div>
       </div>
     </div>

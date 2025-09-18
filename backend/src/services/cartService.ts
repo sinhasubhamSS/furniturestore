@@ -49,20 +49,17 @@ class CartService {
 
   // ✅ Get cart with populated data
   async getCart(userId: string) {
-    const cart = await Cart.findOne({ user: userId })
-      .populate({
-        path: "items.product",
-        select: "name title variants category slug price lowestDiscountedPrice",
-        populate: {
-          path: "category",
-          select: "name",
-        },
-      })
-      .lean();
+    const cart = await Cart.findOne({ user: userId }).populate({
+      path: "items.product",
+      select: "name title variants category slug price lowestDiscountedPrice",
+      populate: {
+        path: "category",
+        select: "name",
+      },
+    });
 
     if (!cart) {
-      // Return empty cart structure
-      return {
+    return {
         _id: null,
         user: userId,
         items: [],
@@ -75,7 +72,29 @@ class CartService {
       };
     }
 
-    return cart;
+    // Ensure fresh calculation
+    await cart.calculateTotals();
+
+    const cartObj = cart.toObject();
+
+    cartObj.items = cartObj.items.map((item: any) => {
+      if (item.product && Array.isArray(item.product.variants)) {
+        item.product.variants = item.product.variants.filter(
+          (v: any) => v._id.toString() === item.variantId.toString()
+        );
+      }
+      return item;
+    });
+
+    return {
+      _id: cartObj._id,
+      user: cartObj.user,
+      items: cartObj.items,
+      totalItems: cartObj.totalItems,
+      cartSubtotal: cartObj.cartSubtotal,
+      cartGST: cartObj.cartGST,
+      cartTotal: cartObj.cartTotal,
+    };
   }
 
   // ✅ Update quantity with variant support
@@ -98,12 +117,12 @@ class CartService {
         item.variantId.toString() === variantId
     );
 
-
     if (itemIndex === -1) {
       throw new AppError("Item not found in cart", 404);
     }
 
     cart.items[itemIndex].quantity = quantity;
+
     await cart.calculateTotals();
 
     return this.getCart(userId);

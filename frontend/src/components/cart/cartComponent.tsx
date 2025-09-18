@@ -16,14 +16,7 @@ type Props = {
 };
 
 const ProductCartItem = React.memo(
-  ({
-    product,
-    productId,
-    variantId,
-    quantity,
-    onRemove,
-    onQuantityChange,
-  }: Props) => {
+  ({ product, variantId, quantity, onRemove, onQuantityChange }: Props) => {
     const selectedVariant = product.variants?.find((v) => v._id === variantId);
 
     if (!selectedVariant) {
@@ -122,8 +115,8 @@ const ProductCartItem = React.memo(
 
             <div className="flex justify-start mt-2">
               <button
-                className="font-semibold text-red-600 hover:text-red-800 cursor-pointer text-sm transition-colors"
                 onClick={onRemove}
+                className="font-semibold text-red-600 hover:text-red-800 cursor-pointer text-sm transition-colors"
               >
                 Remove
               </button>

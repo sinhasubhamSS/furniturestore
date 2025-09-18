@@ -19,6 +19,7 @@ export type Variant = {
     public_id: string;
   }[];
   price?: number;
+  basePrice?: number; // Original price before any discount
   hasDiscount: boolean;
   discountPercent: number;
   discountValidUntil?: string; // ISO date string from API
