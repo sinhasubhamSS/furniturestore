@@ -59,7 +59,7 @@ class CartService {
     });
 
     if (!cart) {
-    return {
+      return {
         _id: null,
         user: userId,
         items: [],
@@ -72,19 +72,11 @@ class CartService {
       };
     }
 
-    // Ensure fresh calculation
     await cart.calculateTotals();
 
     const cartObj = cart.toObject();
 
-    cartObj.items = cartObj.items.map((item: any) => {
-      if (item.product && Array.isArray(item.product.variants)) {
-        item.product.variants = item.product.variants.filter(
-          (v: any) => v._id.toString() === item.variantId.toString()
-        );
-      }
-      return item;
-    });
+    // Removed variant filtering block to send full variants
 
     return {
       _id: cartObj._id,
