@@ -12,8 +12,8 @@ const router = Router();
 
 router.post("/add", authVerify, addToWishlist);
 router.delete("/remove", authVerify, removeFromWishlist);
-router.get("/", authVerify, getWishlist);
-router.get("/check", authVerify, isInWishlist);
+router.get("/",  getWishlist);
+router.get("/check", isInWishlist);
 
 // Full products with populate
 router.get("/products", authVerify, getWishlistWithProducts);

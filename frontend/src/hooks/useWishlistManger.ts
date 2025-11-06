@@ -1,15 +1,14 @@
 // hooks/useWishlistManager.ts
-'use client';
+"use client";
 
-import { useDispatch, useSelector } from "react-redux";
-import { useMemo, useCallback } from "react";
+import { useDispatch, useSelector, shallowEqual } from "react-redux";
+import { useMemo, useCallback, useEffect } from "react";
 import { RootState } from "@/redux/store";
-import { shallowEqual } from "react-redux";
 import {
   addToWishlistOptimistic,
   removeFromWishlistOptimistic,
   setWishlistItems,
-  setProductLoading, // ✅ Import new action
+  setProductLoading,
   setError,
 } from "@/redux/slices/wishlistSlice";
 import {
@@ -17,81 +16,115 @@ import {
   useRemoveFromWishlistMutation,
   useWishlistidsQuery,
 } from "@/redux/services/user/wishlistApi";
-import { useEffect } from "react";
 
 export const useWishlistManager = () => {
   const dispatch = useDispatch();
 
-  // ✅ Select wishlist data with shallowEqual
-  const { items: wishlistIds, count, loadingItems, error } = useSelector(
-    (state: RootState) => state.wishlist,
-    shallowEqual
-  );
+  // Defaults to safe types to prevent runtime issues on first render
+  const {
+    items: wishlistIdsFromState = [],
+    count = 0,
+    loadingItems = {},
+    error = null,
+  } = useSelector((s: RootState) => s.wishlist, shallowEqual);
 
+  const { data: apiWishlistIds } = useWishlistidsQuery();
   const [addToWishlistAPI] = useAddToWishlistMutation();
   const [removeFromWishlistAPI] = useRemoveFromWishlistMutation();
-  const { data: apiWishlistIds } = useWishlistidsQuery();
 
   useEffect(() => {
-    if (apiWishlistIds) {
-      dispatch(setWishlistItems(apiWishlistIds));
+    if (apiWishlistIds === undefined || apiWishlistIds === null) return;
+
+    let normalized: string[] = [];
+
+    if (Array.isArray(apiWishlistIds)) {
+      normalized = apiWishlistIds.map(String);
+    } else if (Array.isArray((apiWishlistIds as any).productIds)) {
+      normalized = (apiWishlistIds as any).productIds.map(String);
+    } else {
+      normalized = [];
     }
+
+    dispatch(setWishlistItems(normalized));
   }, [apiWishlistIds, dispatch]);
 
-  // ✅ Updated with per-product loading
-  const addToWishlist = useCallback(async (productId: string) => {
-    dispatch(addToWishlistOptimistic(productId));
-    dispatch(setProductLoading({ productId, loading: true })); // ✅ Per-product loading
+  const addToWishlist = useCallback(
+    async (productId: string) => {
+      const id = String(productId);
+      dispatch(addToWishlistOptimistic(id));
+      dispatch(setProductLoading({ productId: id, loading: true }));
 
-    try {
-      await addToWishlistAPI({ productId }).unwrap();
-      dispatch(setError(null));
-    } catch (error: any) {
-      dispatch(removeFromWishlistOptimistic(productId));
-      dispatch(setError(error.message || "Failed to add to wishlist"));
-      console.error("❌ Add to wishlist failed:", error);
-    } finally {
-      dispatch(setProductLoading({ productId, loading: false })); // ✅ Clear per-product loading
-    }
-  }, [addToWishlistAPI, dispatch]);
-
-  const removeFromWishlist = useCallback(async (productId: string) => {
-    dispatch(removeFromWishlistOptimistic(productId));
-    dispatch(setProductLoading({ productId, loading: true })); // ✅ Per-product loading
-
-    try {
-      await removeFromWishlistAPI({ productId }).unwrap();
-      dispatch(setError(null));
-    } catch (error: any) {
-      dispatch(addToWishlistOptimistic(productId));
-      dispatch(setError(error.message || "Failed to remove from wishlist"));
-      console.error("❌ Remove from wishlist failed:", error);
-    } finally {
-      dispatch(setProductLoading({ productId, loading: false })); // ✅ Clear per-product loading
-    }
-  }, [removeFromWishlistAPI, dispatch]);
-
-  const isInWishlist = useCallback(
-    (productId: string) => wishlistIds.includes(productId),
-    [wishlistIds]
+      try {
+        await addToWishlistAPI({ productId: id }).unwrap();
+        dispatch(setError(null));
+      } catch (err: any) {
+        dispatch(removeFromWishlistOptimistic(id));
+        dispatch(setError(err?.message || "Failed to add to wishlist"));
+        console.error("❌ Add to wishlist failed:", err);
+        throw err;
+      } finally {
+        dispatch(setProductLoading({ productId: id, loading: false }));
+      }
+    },
+    [addToWishlistAPI, dispatch]
   );
 
-  // ✅ New function to check per-product loading
+  const removeFromWishlist = useCallback(
+    async (productId: string) => {
+      const id = String(productId);
+      dispatch(removeFromWishlistOptimistic(id));
+      dispatch(setProductLoading({ productId: id, loading: true }));
+
+      try {
+        await removeFromWishlistAPI({ productId: id }).unwrap();
+        dispatch(setError(null));
+      } catch (err: any) {
+        dispatch(addToWishlistOptimistic(id));
+        dispatch(setError(err?.message || "Failed to remove from wishlist"));
+        console.error("❌ Remove from wishlist failed:", err);
+        throw err;
+      } finally {
+        dispatch(setProductLoading({ productId: id, loading: false }));
+      }
+    },
+    [removeFromWishlistAPI, dispatch]
+  );
+
+  const isInWishlist = useCallback(
+    (productId: string) => {
+      const id = String(productId);
+      return (
+        Array.isArray(wishlistIdsFromState) && wishlistIdsFromState.includes(id)
+      );
+    },
+    [wishlistIdsFromState]
+  );
+
   const isProductLoading = useCallback(
-    (productId: string) => !!loadingItems[productId],
+    (productId: string) => !!loadingItems[String(productId)],
     [loadingItems]
   );
 
   return useMemo(
     () => ({
-      wishlistIds,
+      wishlistIds: Array.isArray(wishlistIdsFromState)
+        ? wishlistIdsFromState
+        : [],
       count,
       error,
       addToWishlist,
       removeFromWishlist,
       isInWishlist,
-      isProductLoading, // ✅ Return per-product loading function
+      isProductLoading,
     }),
-    [wishlistIds, count, error, addToWishlist, removeFromWishlist, isInWishlist, isProductLoading]
+    [
+      wishlistIdsFromState,
+      count,
+      error,
+      addToWishlist,
+      removeFromWishlist,
+      isInWishlist,
+      isProductLoading,
+    ]
   );
 };

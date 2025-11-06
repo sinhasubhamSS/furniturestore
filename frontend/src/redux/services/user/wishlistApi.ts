@@ -8,35 +8,59 @@ export const wishlistApi = createApi({
   baseQuery: axiosBaseQuery(),
   tagTypes: ["Wishlist"],
   endpoints: (builder) => ({
-    // ✅ Fixed: Correct return type and URL
+    // Full product list (populated) for wishlist
     getWishlistWithProducts: builder.query<DisplayProduct[], void>({
       query: () => ({
-        url: "/wishlist/products", // ✅ Matches backend route
+        url: "/wishlist/products",
         method: "GET",
       }),
       transformResponse: (response: any) => {
-        console.log("📦 Wishlist API Response:", response.data);
-        return response.data; // ✅ Backend returns DisplayProduct[] directly
+        // backend returns ApiResponse { status, data: DisplayProduct[], message }
+        const data = response?.data ?? [];
+        if (!Array.isArray(data)) return [];
+        return data as DisplayProduct[];
       },
       providesTags: ["Wishlist"],
     }),
 
-    // ✅ Get wishlist IDs only
+    // Get wishlist IDs only (normalize to string[])
     Wishlistids: builder.query<string[], void>({
       query: () => ({
-        url: `/wishlist`, // ✅ Matches backend route
+        url: `/wishlist`,
         method: "GET",
       }),
       transformResponse: (response: any) => {
-        console.log("Wishlist IDs:", response.data);
-        return response.data;
+        // Expecting ApiResponse { status, data: { items: [], productIds: [] } }
+        const data = response?.data;
+
+        // If already an array returned directly -> map to strings
+        if (Array.isArray(data)) {
+          return data.map(String);
+        }
+
+        // If data.productIds exists and is array -> use it
+        if (data && Array.isArray(data.productIds)) {
+          return data.productIds.map(String);
+        }
+
+        // If data.items is array of objects -> try extract productId field
+        if (data && Array.isArray(data.items)) {
+          const ids = data.items
+            .map((it: any) => it.productId ?? it)
+            .filter(Boolean)
+            .map(String);
+          return ids;
+        }
+
+        // Fallback to empty array
+        return [];
       },
       providesTags: ["Wishlist"],
     }),
 
     addToWishlist: builder.mutation<void, { productId: string }>({
       query: ({ productId }) => ({
-        url: "/wishlist/add", // ✅ Matches backend route
+        url: "/wishlist/add",
         method: "POST",
         data: { productId },
       }),
@@ -45,7 +69,7 @@ export const wishlistApi = createApi({
 
     removeFromWishlist: builder.mutation<void, { productId: string }>({
       query: ({ productId }) => ({
-        url: "/wishlist/remove", // ✅ Matches backend route
+        url: "/wishlist/remove",
         method: "DELETE",
         data: { productId },
       }),

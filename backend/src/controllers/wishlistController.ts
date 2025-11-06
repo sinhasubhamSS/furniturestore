@@ -32,16 +32,26 @@ export const removeFromWishlist = catchAsync(
 
 export const getWishlist = catchAsync(
   async (req: AuthRequest, res: Response) => {
-  
     const userId = req.userId;
-    if (!userId) throw new AppError("User not authenticated", 403);
 
+    // For anonymous users: return empty list (public-friendly)
+    if (!userId) {
+      return res
+        .status(200)
+        .json(new ApiResponse(200, { items: [], productIds: [] }, "OK"));
+    }
+
+    // wishlistService.getWishlist returns string[] of productIds
     const result = await wishlistService.getWishlist(userId);
-    res
+
+    // Normalize & return compact shape
+    const productIds = Array.isArray(result) ? result.map(String) : [];
+    return res
       .status(200)
-      .json(new ApiResponse(200, result, "Wishlist fetched successfully"));
+      .json(new ApiResponse(200, { items: [], productIds }, "Wishlist fetched successfully"));
   }
 );
+
 
 export const getWishlistWithProducts = catchAsync(
   async (req: AuthRequest, res: Response) => {
