@@ -16,36 +16,22 @@ import Input from "@/components/ui/Input";
 interface AddressSectionProps {
   onSelectionChange: (deliverable: boolean, pricingData?: any) => void;
   items: any[];
-  type?: string | null; //check hear type cannot be null it will wither cart or direct
+  type?: string | null;
 }
 
-const AddressSection = ({
-  onSelectionChange,
-  items,
-  type,
-}: AddressSectionProps) => {
+const AddressSection = ({ onSelectionChange, items }: AddressSectionProps) => {
   const { data: addresses = [], isLoading } = useGetAddressesQuery();
   const [createAddress] = useCreateAddressMutation();
-
-  // ✅ FIXED: Use only pricing API for delivery check
   const [getCheckoutPricing] = useGetCheckoutPricingMutation();
 
-  const selectedFromRedux = useSelector(
-    (state: RootState) => state.checkout.selectedAddress
-  );
-
+  const selectedFromRedux = useSelector((state: RootState) => state.checkout.selectedAddress);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newAddress, setNewAddress] = useState(false);
-  const [deliveryStatus, setDeliveryStatus] = useState<{
-    checking: boolean;
-    deliverable: boolean | null;
-    message: string;
-    pricingData: any | null;
-  }>({
+  const [deliveryStatus, setDeliveryStatus] = useState({
     checking: false,
-    deliverable: null,
+    deliverable: null as boolean | null,
     message: "",
-    pricingData: null,
+    pricingData: null as any | null,
   });
 
   const dispatch = useDispatch();
@@ -73,28 +59,17 @@ const AddressSection = ({
 
   const watchedPincode = watch("pincode");
 
-  // ✅ SYNC LOCAL STATE WITH REDUX
   useEffect(() => {
     if (selectedFromRedux?._id) {
       setSelectedId(selectedFromRedux._id);
     }
   }, [selectedFromRedux]);
 
-  // ✅ UNIFIED: Single delivery + pricing check
-  const checkDeliveryAndPricing = async (
-    pincode: string,
-    orderItems?: any[]
-  ): Promise<{ deliverable: boolean; pricingData?: any }> => {
+  const checkDeliveryAndPricing = async (pincode: string, orderItems?: any[]) => {
     if (!pincode || pincode.length !== 6) return { deliverable: false };
     if (!orderItems?.length) return { deliverable: false };
 
-    setDeliveryStatus((prev) => ({
-      ...prev,
-      checking: true,
-      deliverable: null,
-      message: "Checking delivery and pricing...",
-      pricingData: null,
-    }));
+    setDeliveryStatus(prev => ({ ...prev, checking: true, deliverable: null, message: "Checking..." }));
 
     try {
       const mappedItems = orderItems.map((item) => ({
@@ -103,50 +78,39 @@ const AddressSection = ({
         quantity: item.quantity,
       }));
 
-      const response = await getCheckoutPricing({
-        items: mappedItems,
-        pincode,
-      }).unwrap();
-
+      const response = await getCheckoutPricing({ items: mappedItems, pincode }).unwrap();
       const isDeliverable = response.isServiceable !== false;
 
       setDeliveryStatus({
         checking: false,
         deliverable: isDeliverable,
-        message: isDeliverable
-          ? "Delivery available"
-          : response.deliveryInfo?.message || "Delivery not available",
+        message: isDeliverable ? "Delivery available" : response.deliveryInfo?.message || "Not deliverable",
         pricingData: response,
       });
 
       return { deliverable: isDeliverable, pricingData: response };
-    } catch (error: any) {
-      console.error("❌ [ADDRESS] Delivery check failed:", error);
-
+    } catch (error) {
+      console.error("[ADDRESS] Delivery check failed:", error);
       setDeliveryStatus({
         checking: false,
         deliverable: false,
-        message: "Unable to check delivery availability",
+        message: "Unable to check delivery",
         pricingData: null,
       });
-
       return { deliverable: false };
     }
   };
 
-  // ✅ DEBOUNCED: Watch pincode changes for form input
+  // debounce pincode
   useEffect(() => {
-    const timeoutId = setTimeout(async () => {
+    const t = setTimeout(async () => {
       if (watchedPincode && /^\d{6}$/.test(watchedPincode) && items.length) {
         await checkDeliveryAndPricing(watchedPincode, items);
-        // Don't call onSelectionChange here for form input
       }
-    }, 800);
-
-    return () => clearTimeout(timeoutId);
+    }, 700);
+    return () => clearTimeout(t);
   }, [watchedPincode, items]);
 
-  // ✅ HANDLE ADDRESS SELECTION
   const handleAddressSelection = async (address: Address) => {
     setSelectedId(address._id);
     dispatch(setSelectedAddress(address));
@@ -161,9 +125,7 @@ const AddressSection = ({
 
   const onSubmit = async (data: Partial<Address>) => {
     if (!deliveryStatus.deliverable) {
-      alert(
-        "This address is not deliverable. Please choose a different pincode."
-      );
+      alert("This address is not deliverable. Please choose a different pincode.");
       return;
     }
 
@@ -184,76 +146,56 @@ const AddressSection = ({
   };
 
   return (
-    <div className="p-6 border border-gray-200 rounded-xl bg-white">
-      <h2 className="text-2xl font-bold mb-4 text-gray-800">
-        Delivery Address
-      </h2>
+    <section aria-labelledby="delivery-address" style={{ background: "var(--color-card)", padding: 16, borderRadius: 10, boxShadow: "var(--elevation-1)" }}>
+      <h2 id="delivery-address" style={{ color: "var(--color-foreground)", fontSize: 18, fontWeight: 700, marginBottom: 12 }}>Delivery Address</h2>
 
       {isLoading ? (
-        <p className="text-gray-500 text-sm">Loading addresses...</p>
+        <p style={{ color: "var(--text-accent)" }}>Loading addresses...</p>
       ) : addresses.length > 0 ? (
-        <div className="space-y-3 mb-6">
+        <div style={{ display: "grid", gap: 8 }}>
           {addresses.map((addr: Address) => (
             <label
               key={addr._id}
-              className={`flex items-start gap-3 cursor-pointer p-4 border rounded-lg transition-colors ${
-                selectedId === addr._id
-                  ? "border-blue-500 bg-blue-50"
-                  : "hover:bg-gray-50 border-gray-200"
-              }`}
+              style={{
+                display: "flex",
+                gap: 12,
+                cursor: "pointer",
+                padding: 12,
+                borderRadius: 10,
+                alignItems: "flex-start",
+                background: selectedId === addr._id ? "var(--color-card-secondary)" : "transparent",
+                boxShadow: selectedId === addr._id ? "0 0 0 4px rgba(107,60,26,0.06)" : "none"
+              }}
             >
               <input
                 type="radio"
                 name="address"
                 checked={selectedId === addr._id}
                 onChange={() => handleAddressSelection(addr)}
-                className="mt-1 accent-blue-600 scale-125"
+                style={{ accentColor: "var(--color-accent)", transform: "scale(1.04)", marginTop: 2 }}
+                aria-label={`Select address ${addr.fullName}`}
               />
-              <div className="flex-1">
-                <p className="text-base font-medium">{addr.fullName}</p>
-                <p className="text-sm text-gray-600 leading-snug">
-                  {addr.addressLine1}
-                  {addr.addressLine2 && `, ${addr.addressLine2}`}, {addr.city},{" "}
-                  {addr.state} - {addr.pincode}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">📱 {addr.mobile}</p>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, color: "var(--color-foreground)" }}>{addr.fullName}</div>
+                <div style={{ color: "var(--text-accent)", fontSize: 13, marginTop: 4 }}>{addr.addressLine1}{addr.addressLine2 ? `, ${addr.addressLine2}` : ""}, {addr.city}, {addr.state} - {addr.pincode}</div>
+                <div style={{ color: "var(--text-accent)", fontSize: 12, marginTop: 6 }}>📱 {addr.mobile}</div>
 
-                {/* ✅ ENHANCED DELIVERY STATUS */}
                 {selectedId === addr._id && (
-                  <div className="mt-2">
+                  <div style={{ marginTop: 8 }}>
                     {deliveryStatus.checking ? (
-                      <span className="text-sm text-blue-600 flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                        Checking delivery and pricing...
-                      </span>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", color: "var(--color-accent)" }}>
+                        <div style={{ width: 14, height: 14, border: "2px solid var(--color-accent)", borderTopColor: "transparent", borderRadius: 999, animation: "spin 1s linear infinite" }} />
+                        <div style={{ fontSize: 13 }}>Checking delivery and pricing...</div>
+                      </div>
                     ) : deliveryStatus.deliverable === true ? (
-                      <div className="text-sm bg-green-50 border border-green-200 rounded p-2">
-                        <div className="text-green-700 font-semibold">
-                          ✅ Deliverable
-                        </div>
-                        {deliveryStatus.pricingData && (
-                          <div className="text-green-600 text-xs mt-1">
-                            Delivery: ₹
-                            {deliveryStatus.pricingData.deliveryCharge || 0} •
-                            Days:{" "}
-                            {deliveryStatus.pricingData.deliveryInfo
-                              ?.estimatedDays || 0}{" "}
-                            • COD:{" "}
-                            {deliveryStatus.pricingData.deliveryInfo
-                              ?.codAvailable
-                              ? "Yes"
-                              : "No"}
-                          </div>
-                        )}
+                      <div style={{ background: "#ecf9f0", padding: 8, borderRadius: 8 }}>
+                        <div style={{ fontWeight: 700, color: "#256c3f" }}>✅ Deliverable</div>
+                        {deliveryStatus.pricingData && <div style={{ fontSize: 13, color: "#2d6b3f", marginTop: 6 }}>Delivery: ₹{deliveryStatus.pricingData.deliveryCharge || 0} • Days: {deliveryStatus.pricingData.deliveryInfo?.estimatedDays || "-"} • COD: {deliveryStatus.pricingData.deliveryInfo?.codAvailable ? "Yes" : "No"}</div>}
                       </div>
                     ) : deliveryStatus.deliverable === false ? (
-                      <div className="text-sm bg-red-50 border border-red-200 rounded p-2">
-                        <div className="text-red-700 font-semibold">
-                          ❌ Not Deliverable
-                        </div>
-                        <div className="text-red-600 text-xs mt-1">
-                          {deliveryStatus.message}
-                        </div>
+                      <div style={{ background: "#fff4f4", padding: 8, borderRadius: 8 }}>
+                        <div style={{ fontWeight: 700, color: "var(--text-error)" }}>❌ Not Deliverable</div>
+                        <div style={{ fontSize: 13, color: "var(--text-error)", marginTop: 6 }}>{deliveryStatus.message}</div>
                       </div>
                     ) : null}
                   </div>
@@ -263,174 +205,43 @@ const AddressSection = ({
           ))}
         </div>
       ) : (
-        <p className="text-red-600 text-sm mb-6">
-          No addresses found. Please add one.
-        </p>
+        <div style={{ color: "var(--text-error)" }}>No addresses found. Please add one.</div>
       )}
 
-      <button
-        onClick={() => setNewAddress(!newAddress)}
-        className="mb-6 text-blue-600 font-medium underline hover:no-underline text-sm"
-      >
-        {newAddress ? "❌ Cancel" : "➕ Add new address"}
-      </button>
+      <div style={{ marginTop: 12 }}>
+        <button onClick={() => setNewAddress(!newAddress)} style={{ background: "transparent", border: "none", color: "var(--color-accent)", fontWeight: 700 }}>
+          {newAddress ? "Cancel" : "➕ Add new address"}
+        </button>
+      </div>
 
       {newAddress && (
-        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                name="fullName"
-                label="Full Name *"
-                placeholder="Enter full name"
-                register={register("fullName", {
-                  required: "Full name is required",
-                })}
-                error={errors.fullName?.message}
-              />
-
-              <Input
-                name="mobile"
-                label="Mobile Number *"
-                placeholder="Enter mobile number"
-                register={register("mobile", {
-                  required: "Mobile is required",
-                  pattern: {
-                    value: /^[6-9]\d{9}$/,
-                    message: "Invalid mobile number",
-                  },
-                })}
-                error={errors.mobile?.message}
-              />
-
-              <div className="sm:col-span-2">
-                <Input
-                  name="addressLine1"
-                  label="Address Line 1 *"
-                  placeholder="House No, Street Name"
-                  register={register("addressLine1", {
-                    required: "Address is required",
-                  })}
-                  error={errors.addressLine1?.message}
-                />
-              </div>
-
-              <Input
-                name="addressLine2"
-                label="Address Line 2"
-                placeholder="Area, Locality"
-                register={register("addressLine2")}
-                error={errors.addressLine2?.message}
-              />
-
-              <Input
-                name="landmark"
-                label="Landmark"
-                placeholder="Near landmark"
-                register={register("landmark")}
-                error={errors.landmark?.message}
-              />
-
-              <Input
-                name="city"
-                label="City *"
-                placeholder="Enter city"
-                register={register("city", { required: "City is required" })}
-                error={errors.city?.message}
-              />
-
-              <Input
-                name="state"
-                label="State *"
-                placeholder="Enter state"
-                register={register("state", { required: "State is required" })}
-                error={errors.state?.message}
-              />
-
-              <div className="relative">
-                <Input
-                  name="pincode"
-                  label="Pincode *"
-                  placeholder="Enter 6-digit pincode"
-                  register={register("pincode", {
-                    required: "Pincode is required",
-                    pattern: { value: /^\d{6}$/, message: "Must be 6 digits" },
-                  })}
-                  error={errors.pincode?.message}
-                />
-
-                {/* ✅ ENHANCED REAL-TIME DELIVERY STATUS */}
-                {watchedPincode && watchedPincode.length === 6 && (
-                  <div className="mt-2">
-                    {deliveryStatus.checking ? (
-                      <div className="flex items-center gap-2 text-blue-600 text-sm">
-                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                        Checking delivery availability...
-                      </div>
-                    ) : deliveryStatus.deliverable === true ? (
-                      <div className="text-sm bg-green-50 border border-green-200 rounded p-2 text-green-700">
-                        <div className="font-semibold">
-                          ✅ Delivery Available
-                        </div>
-                        {deliveryStatus.pricingData && (
-                          <div className="text-xs mt-1">
-                            Delivery: ₹
-                            {deliveryStatus.pricingData.deliveryCharge || 0} |
-                            Days:{" "}
-                            {deliveryStatus.pricingData.deliveryInfo
-                              ?.estimatedDays || 0}{" "}
-                            | COD:{" "}
-                            {deliveryStatus.pricingData.deliveryInfo
-                              ?.codAvailable
-                              ? "Available"
-                              : "Not Available"}
-                          </div>
-                        )}
-                      </div>
-                    ) : deliveryStatus.deliverable === false ? (
-                      <div className="text-sm bg-red-50 border border-red-200 rounded p-2 text-red-700">
-                        <div className="font-semibold">❌ Not Deliverable</div>
-                        <div className="text-xs mt-1">
-                          {deliveryStatus.message}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-              </div>
+        <form onSubmit={handleSubmit(onSubmit)} style={{ marginTop: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
+            <Input name="fullName" label="Full Name *" placeholder="Enter full name" register={register("fullName", { required: "Full name is required" })} error={errors.fullName?.message} />
+            <Input name="mobile" label="Mobile *" placeholder="Enter mobile number" register={register("mobile", { required: "Mobile required", pattern: { value: /^[6-9]\d{9}$/, message: "Invalid mobile" } })} error={errors.mobile?.message} />
+            <div style={{ gridColumn: "1 / -1" }}>
+              <Input name="addressLine1" label="Address Line 1 *" placeholder="House No, Street" register={register("addressLine1", { required: true })} error={errors.addressLine1?.message} />
             </div>
+            <Input name="addressLine2" label="Address Line 2" placeholder="Area, Locality" register={register("addressLine2")} error={errors.addressLine2?.message} />
+            <Input name="landmark" label="Landmark" placeholder="Near landmark" register={register("landmark")} error={errors.landmark?.message} />
+            <Input name="city" label="City *" placeholder="Enter city" register={register("city", { required: true })} error={errors.city?.message} />
+            <Input name="state" label="State *" placeholder="Enter state" register={register("state", { required: true })} error={errors.state?.message} />
+            <Input name="pincode" label="Pincode *" placeholder="6-digit pincode" register={register("pincode", { required: true, pattern: { value: /^\d{6}$/, message: "Must be 6 digits" } })} error={errors.pincode?.message} />
+          </div>
 
-            <div className="flex items-center gap-2 mt-4">
-              <input
-                type="checkbox"
-                id="isDefault"
-                {...register("isDefault")}
-                className="w-4 h-4 accent-blue-600"
-              />
-              <label htmlFor="isDefault" className="text-sm text-gray-700">
-                Make this my default address
-              </label>
-            </div>
+          <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
+            <input id="isDefault" type="checkbox" {...register("isDefault")} style={{ accentColor: "var(--color-accent)" }} />
+            <label htmlFor="isDefault" style={{ color: "var(--text-accent)" }}>Make default</label>
+          </div>
 
-            <button
-              type="submit"
-              disabled={isSubmitting || !deliveryStatus.deliverable}
-              className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors ${
-                deliveryStatus.deliverable && !isSubmitting
-                  ? "bg-blue-600 hover:bg-blue-700 text-white"
-                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
-              }`}
-            >
-              {isSubmitting
-                ? "Saving Address..."
-                : !deliveryStatus.deliverable
-                ? "Address Not Deliverable"
-                : "Save Address"}
+          <div style={{ marginTop: 12 }}>
+            <button type="submit" disabled={isSubmitting || deliveryStatus.deliverable === false} style={{ background: deliveryStatus.deliverable ? "var(--color-accent)" : "var(--color-hover-card)", color: "var(--text-light)", padding: "10px 14px", borderRadius: 8, fontWeight: 700 }}>
+              {isSubmitting ? "Saving..." : deliveryStatus.deliverable === false ? "Address Not Deliverable" : "Save Address"}
             </button>
-          </form>
-        </div>
+          </div>
+        </form>
       )}
-    </div>
+    </section>
   );
 };
 

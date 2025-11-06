@@ -9,16 +9,24 @@ import {
 } from "@/redux/services/user/cartApi";
 import { useGetProductByIDQuery } from "@/redux/services/user/publicProductApi";
 import { useGetCheckoutPricingMutation } from "@/redux/services/user/orderApi";
-import CheckoutSummary, { CheckoutItem } from "@/components/checkout/CheckoutSummary";
+import CheckoutSummary, {
+  CheckoutItem,
+} from "@/components/checkout/CheckoutSummary";
 import AddressSection from "@/components/checkout/AddressSection";
 import { RootState } from "@/redux/store";
 import {
   updateQuantity,
-  updateItemQuantity, // ✅ Add this import
+  updateItemQuantity,
   updateFees,
   setAdvanceEligibility,
 } from "@/redux/slices/checkoutSlice";
 import { CheckoutPricingResponse } from "@/types/order";
+
+/**
+ * CheckoutPage
+ * - Left: AddressSection (on top) + CheckoutSummary (below selected address)
+ * - Right: OrderTotals (sticky) with total quantity & final price + CTA
+ */
 
 export default function CheckoutPage() {
   const dispatch = useDispatch();
@@ -30,13 +38,14 @@ export default function CheckoutPage() {
 
   const [deliveryAvailable, setDeliveryAvailable] = useState(true);
   const [deliveryInfo, setDeliveryInfo] = useState<any>(null);
-  const [pricingData, setPricingData] = useState<CheckoutPricingResponse | undefined>(undefined);
+  const [pricingData, setPricingData] = useState<
+    CheckoutPricingResponse | undefined
+  >(undefined);
   const [loadingPricing, setLoadingPricing] = useState(false);
-
-  // ✅ Prevent double API calls
   const quantityUpdateInProgress = useRef(false);
 
-  const productId = type === "direct_purchase" && items.length > 0 ? items[0].productId : null;
+  const productId =
+    type === "direct_purchase" && items.length > 0 ? items[0].productId : null;
 
   const { data: product, isLoading: productLoading } = useGetProductByIDQuery(
     productId || "",
@@ -54,20 +63,27 @@ export default function CheckoutPage() {
   const [updateQty] = useUpdateQuantityMutation();
   const [getCheckoutPricing] = useGetCheckoutPricingMutation();
 
+  // subtotal computation (same as before)
   const subtotal = useMemo(() => {
     if (type === "direct_purchase" && items.length && product) {
       const item = items[0];
       const variant = product.variants?.find((v) => v._id === item.variantId);
       if (!variant) return 0;
-      const price = variant.hasDiscount ? variant.discountedPrice ?? 0 : variant.price ?? 0;
+      const price = variant.hasDiscount
+        ? variant.discountedPrice ?? 0
+        : variant.price ?? 0;
       return price * item.quantity;
     }
 
     if (type === "cart_purchase" && cartData?.items?.length) {
       return cartData.items.reduce((sum, item) => {
-        const variant = item.product?.variants.find((v) => v._id === item.variantId);
+        const variant = item.product?.variants.find(
+          (v) => v._id === item.variantId
+        );
         if (!variant) return sum;
-        const price = variant.hasDiscount ? variant.discountedPrice ?? 0 : variant.price ?? 0;
+        const price = variant.hasDiscount
+          ? variant.discountedPrice ?? 0
+          : variant.price ?? 0;
         return sum + price * item.quantity;
       }, 0);
     }
@@ -75,37 +91,40 @@ export default function CheckoutPage() {
     return 0;
   }, [type, items, product, cartData]);
 
+  // checkout items shape (same)
   const checkoutItems: CheckoutItem[] = useMemo(() => {
-  if (type === "direct_purchase" && items.length > 0 && product) {
-    const item = items[0];
-    const selectedVariant = product.variants?.find((v) => v._id === item.variantId);
-
-    if (selectedVariant) {
-      return [{
-        product,
-        variantId: selectedVariant._id!,
-        quantity: item.quantity,
-      }];
+    if (type === "direct_purchase" && items.length > 0 && product) {
+      const item = items[0];
+      const selectedVariant = product.variants?.find(
+        (v) => v._id === item.variantId
+      );
+      if (selectedVariant) {
+        return [
+          {
+            product,
+            variantId: selectedVariant._id!,
+            quantity: item.quantity,
+          },
+        ];
+      }
+    } else if (type === "cart_purchase" && cartData?.items?.length) {
+      return cartData.items
+        .filter((item) => item.product !== undefined)
+        .map((item) => ({
+          product: item.product!,
+          variantId: item.variantId,
+          quantity: item.quantity,
+        }));
     }
-  } else if (type === "cart_purchase" && cartData?.items?.length) {
-    return cartData.items
-      .filter(item => item.product !== undefined)  // filter out undefined products
-      .map(item => ({
-        product: item.product!,           // assert non-null here
-        variantId: item.variantId,
-        quantity: item.quantity,
-      }));
-  }
-  return [];
-}, [type, items, product, cartData]);
+    return [];
+  }, [type, items, product, cartData]);
 
-
-  // ✅ Pricing fetch
+  // fetch pricing when address chosen (same logic)
   useEffect(() => {
-    if (!isRehydrated || !selectedAddress?.pincode || items.length === 0) {
+    if (!isRehydrated || !selectedAddress?.pincode || items.length === 0)
       return;
-    }
 
+    let cancelled = false;
     const fetchPricing = async () => {
       setLoadingPricing(true);
       try {
@@ -120,59 +139,77 @@ export default function CheckoutPage() {
           pincode: selectedAddress.pincode,
         }).unwrap();
 
+        if (cancelled) return;
+
         setPricingData(response);
         setDeliveryAvailable(response.isServiceable !== false);
         setDeliveryInfo(response.deliveryInfo || null);
 
-        // ✅ SECURE: Use backend values with validation
-        if (response.packagingFee !== undefined && response.deliveryCharge !== undefined) {
-          dispatch(updateFees({
-            packagingFee: response.packagingFee,
-            deliveryCharge: response.deliveryCharge,
-            totalAmount: response.checkoutTotal,
-          }));
+        if (
+          response.packagingFee !== undefined &&
+          response.deliveryCharge !== undefined
+        ) {
+          dispatch(
+            updateFees({
+              packagingFee: response.packagingFee,
+              deliveryCharge: response.deliveryCharge,
+              totalAmount: response.checkoutTotal,
+            })
+          );
         }
 
         if (response.advanceEligible) {
-          dispatch(setAdvanceEligibility({
-            eligible: response.advanceEligible,
-            orderValue: response.subtotal || subtotal,
-            percentage: response.advancePercentage,
-            advanceAmount: response.advanceAmount,
-            remainingAmount: response.remainingAmount,
-          }));
+          dispatch(
+            setAdvanceEligibility({
+              eligible: response.advanceEligible,
+              orderValue: response.subtotal || subtotal,
+              percentage: response.advancePercentage,
+              advanceAmount: response.advanceAmount,
+              remainingAmount: response.remainingAmount,
+            })
+          );
         }
       } catch (error: any) {
-        console.error("❌ [CHECKOUT] Pricing fetch failed:", error);
+        console.error("[CHECKOUT] Pricing fetch failed:", error);
         setPricingData(undefined);
         setDeliveryAvailable(false);
       } finally {
-        setLoadingPricing(false);
+        if (!cancelled) setLoadingPricing(false);
       }
     };
 
     fetchPricing();
-  }, [selectedAddress?.pincode, items, cartData, isRehydrated, getCheckoutPricing, dispatch, subtotal]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedAddress?.pincode,
+    items,
+    cartData,
+    isRehydrated,
+    getCheckoutPricing,
+    dispatch,
+    subtotal,
+  ]);
 
+  // redirect if no checkout data
   useEffect(() => {
     if (!isRehydrated) return;
     if (!type || items.length === 0) {
-      console.warn("No checkout data found, redirecting...");
       router.push("/cart");
     }
   }, [type, items, router, isRehydrated]);
 
-  // ✅ FIXED: Quantity update with immediate Redux update + API sync
+  // quantity change (same)
   const handleQuantityChange = async (index: number, newQuantity: number) => {
     const item = checkoutItems[index];
     if (!item) return;
-
-    const variant = item.product.variants?.find((v) => v._id === item.variantId);
+    const variant = item.product.variants?.find(
+      (v) => v._id === item.variantId
+    );
     if (!variant) return;
 
     const clamped = Math.max(1, Math.min(newQuantity, variant.stock ?? 0));
-
-    // ✅ Prevent rapid successive calls
     if (quantityUpdateInProgress.current) return;
 
     try {
@@ -181,31 +218,25 @@ export default function CheckoutPage() {
       if (type === "direct_purchase") {
         dispatch(updateQuantity(clamped));
       } else if (type === "cart_purchase") {
-        // ✅ 1. Update Redux immediately for instant UI response
-        dispatch(updateItemQuantity({
-          productId: item.product._id,
-          variantId: item.variantId,
-          quantity: clamped,
-        }));
+        dispatch(
+          updateItemQuantity({
+            productId: item.product._id,
+            variantId: item.variantId,
+            quantity: clamped,
+          })
+        );
 
-        // ✅ 2. Update backend
         await updateQty({
           productId: item.product._id,
           variantId: item.variantId,
           quantity: clamped,
         }).unwrap();
 
-        // ✅ 3. Refetch cart to stay in sync
         await refetchCart();
       }
     } catch (err: any) {
-      console.error("❌ [CHECKOUT] Failed to update quantity:", err);
-      
-      // ✅ Revert Redux state if API failed
-      if (type === "cart_purchase") {
-        await refetchCart(); // This restores correct state from backend
-      }
-      
+      console.error("[CHECKOUT] Failed to update quantity:", err);
+      if (type === "cart_purchase") await refetchCart();
       alert("Failed to update cart quantity. Please try again.");
     } finally {
       quantityUpdateInProgress.current = false;
@@ -217,16 +248,19 @@ export default function CheckoutPage() {
       alert("Please select a delivery address");
       return;
     }
-
     if (!deliveryAvailable) {
-      alert("Selected address is not deliverable. Please choose a different address.");
+      alert(
+        "Selected address is not deliverable. Please choose a different address."
+      );
       return;
     }
-
     router.push("/checkout/payment");
   };
 
-  const handleAddressSelection = (deliverable: boolean, pricingData?: CheckoutPricingResponse) => {
+  const handleAddressSelection = (
+    deliverable: boolean,
+    pricingData?: CheckoutPricingResponse
+  ) => {
     setDeliveryAvailable(deliverable);
     if (pricingData) {
       setPricingData(pricingData);
@@ -234,28 +268,82 @@ export default function CheckoutPage() {
     }
   };
 
-  // Loading states
+  // helper: compute total quantity
+  const totalQuantity = useMemo(() => {
+    return checkoutItems.reduce((s, it) => s + (it.quantity || 0), 0);
+  }, [checkoutItems]);
+
+  // helper: final price (prefer pricingData.checkoutTotal if available)
+  const finalPrice = useMemo(() => {
+    return pricingData?.checkoutTotal ?? subtotal;
+  }, [pricingData, subtotal]);
+
+  // Loading skeleton
   if (!isRehydrated || cartLoading || productLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
+      <div
+        className="flex justify-center items-center min-h-screen"
+        style={{ background: "var(--color-primary)" }}
+      >
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading checkout...</p>
+          <div
+            className="animate-spin rounded-full h-12 w-12 border-b-2"
+            style={{ borderColor: "var(--color-accent)" }}
+          />
+          <p className="mt-4" style={{ color: "var(--text-accent)" }}>
+            Loading checkout...
+          </p>
         </div>
       </div>
     );
   }
 
+  // empty state
   if (checkoutItems.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center bg-white p-8 rounded-xl shadow-lg">
-          <div className="text-gray-400 text-6xl mb-4">🛒</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Nothing to Checkout</h2>
-          <p className="text-gray-600 mb-6">Add some items to your cart to continue.</p>
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "var(--color-primary)" }}
+      >
+        <div
+          style={{
+            background: "var(--color-card)",
+            padding: 28,
+            borderRadius: 14,
+            boxShadow: "var(--elevation-1)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 48,
+              color: "var(--text-accent)",
+              marginBottom: 8,
+            }}
+          >
+            🛒
+          </div>
+          <h2
+            style={{
+              fontSize: 20,
+              fontWeight: 700,
+              color: "var(--text-dark)",
+              marginBottom: 8,
+            }}
+          >
+            Nothing to Checkout
+          </h2>
+          <p style={{ color: "var(--text-accent)", marginBottom: 12 }}>
+            Add some items to your cart to continue.
+          </p>
           <button
             onClick={() => router.push("/products")}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            style={{
+              background: "var(--color-accent)",
+              color: "var(--text-light)",
+              padding: "10px 14px",
+              borderRadius: 8,
+              fontWeight: 700,
+            }}
           >
             Continue Shopping
           </button>
@@ -265,52 +353,170 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div
+      style={{ background: "var(--color-primary)" }}
+      className="min-h-screen py-6 px-4"
+    >
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-center text-3xl font-bold mb-10 text-gray-800">
+        <h1
+          style={{ color: "var(--text-dark)" }}
+          className="text-2xl font-bold mb-4"
+        >
           Checkout
-          <span className="text-sm text-gray-500 block mt-1">
-            {type === "direct_purchase" ? "Direct Purchase" : "Cart Purchase"}
-          </span>
         </h1>
 
-        <div className="grid lg:grid-cols-[2fr_1fr] gap-8">
+        <div className="grid lg:grid-cols-[1fr_340px] gap-6">
+          {/* LEFT: Address + (selected) CheckoutSummary */}
           <div>
-            <AddressSection onSelectionChange={handleAddressSelection} items={items} />
-          </div>
-
-          <div className="sticky top-10 self-start bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-            {/* ✅ NO FLICKER: Always render CheckoutSummary */}
-            <CheckoutSummary
-              items={checkoutItems}
-              subtotal={subtotal}
-              allowQuantityEdit={true}
-              onQuantityChange={handleQuantityChange}
-              pricingData={pricingData}
-              loadingPricing={loadingPricing}
-              deliveryInfo={deliveryInfo}
-              deliveryAvailable={deliveryAvailable}
-              hasSelectedAddress={!!selectedAddress}
+            <AddressSection
+              onSelectionChange={handleAddressSelection}
+              items={items}
+              type={type}
             />
 
-            <button
-              className={`mt-6 w-full rounded-lg py-3 font-semibold text-white transition-colors ${
-                selectedAddress && deliveryAvailable
-                  ? "bg-blue-600 hover:bg-blue-700"
-                  : "bg-gray-300 cursor-not-allowed"
-              }`}
-              onClick={handleProceedToPayment}
-              disabled={!selectedAddress || !deliveryAvailable}
-            >
-              {!selectedAddress
-                ? "Select Address to View Charges"
-                : !deliveryAvailable
-                ? "Delivery Not Available"
-                : loadingPricing
-                ? "Calculating Total..."
-                : `Proceed to Payment • ₹${pricingData?.checkoutTotal?.toFixed(2) || subtotal.toFixed(2)}`}
-            </button>
+            {/* Show product summary below selected address (if any address selected) */}
+            <div className="mt-4">
+              <h2
+                style={{ color: "var(--text-dark)" }}
+                className="text-lg font-semibold mb-2"
+              >
+                Order Items
+              </h2>
+              <CheckoutSummary
+                items={checkoutItems}
+                subtotal={subtotal}
+                allowQuantityEdit
+                onQuantityChange={handleQuantityChange}
+                pricingData={pricingData}
+                loadingPricing={loadingPricing}
+                deliveryInfo={deliveryInfo}
+                deliveryAvailable={deliveryAvailable}
+                hasSelectedAddress={!!selectedAddress}
+              />
+            </div>
           </div>
+
+          {/* RIGHT: Totals & CTA */}
+          <aside className="sticky top-20 self-start">
+            <div
+              style={{
+                background: "var(--color-card)",
+                padding: 18,
+                borderRadius: 12,
+                boxShadow: "var(--elevation-1)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 13, color: "var(--text-accent)" }}>
+                    Items
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 700,
+                      color: "var(--text-dark)",
+                    }}
+                  >
+                    {totalQuantity}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, color: "var(--text-accent)" }}>
+                    Total
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 800,
+                      color: "var(--color-accent)",
+                    }}
+                  >
+                    ₹{finalPrice?.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+
+              {/* small breakdown */}
+              <div
+                style={{
+                  borderTop: `1px solid var(--color-border-custom)`,
+                  paddingTop: 12,
+                  marginBottom: 12,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: 8,
+                  }}
+                >
+                  <span style={{ color: "var(--text-accent)" }}>Subtotal</span>
+                  <span>₹{subtotal.toFixed(2)}</span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: 8,
+                  }}
+                >
+                  <span style={{ color: "var(--text-accent)" }}>Packaging</span>
+                  <span>₹{(pricingData?.packagingFee ?? 0).toFixed(2)}</span>
+                </div>
+                <div
+                  style={{ display: "flex", justifyContent: "space-between" }}
+                >
+                  <span style={{ color: "var(--text-accent)" }}>Delivery</span>
+                  <span>
+                    {loadingPricing
+                      ? "Checking..."
+                      : pricingData?.deliveryCharge === 0
+                      ? "FREE"
+                      : `₹${(pricingData?.deliveryCharge ?? 0).toFixed(2)}`}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={handleProceedToPayment}
+                disabled={
+                  !selectedAddress || !deliveryAvailable || loadingPricing
+                }
+                style={{
+                  width: "100%",
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  fontWeight: 800,
+                  background:
+                    !selectedAddress || !deliveryAvailable || loadingPricing
+                      ? "var(--color-hover-card)"
+                      : "var(--color-accent)",
+                  color: "var(--text-light)",
+                  cursor:
+                    !selectedAddress || !deliveryAvailable || loadingPricing
+                      ? "not-allowed"
+                      : "pointer",
+                }}
+              >
+                {!selectedAddress
+                  ? "Select Address"
+                  : !deliveryAvailable
+                  ? "Delivery Not Available"
+                  : loadingPricing
+                  ? "Calculating..."
+                  : `Proceed • ₹${finalPrice?.toFixed(2)}`}
+              </button>
+            </div>
+          </aside>
         </div>
       </div>
     </div>

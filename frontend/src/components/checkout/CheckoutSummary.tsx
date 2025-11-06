@@ -1,3 +1,5 @@
+"use client";
+
 import Image from "next/image";
 import { useState, useMemo } from "react";
 import React from "react";
@@ -11,296 +13,349 @@ export type CheckoutItem = {
 
 interface CheckoutSummaryProps {
   items: CheckoutItem[];
-  subtotal: number;
+  subtotal?: number; // optional: parent can pass subtotal for totals calculation
   allowQuantityEdit?: boolean;
-  onQuantityChange?: (index: number, quantity: number) => void;
+  onQuantityChange?: (index: number, quantity: number) => void | Promise<void>;
   pricingData?: any;
   loadingPricing?: boolean;
   deliveryInfo?: any;
   deliveryAvailable?: boolean;
   hasSelectedAddress?: boolean;
+  /** If true, show subtotal/packaging/delivery/total inside this component.
+   * Default false because your right-side totals already show them. */
+  showTotals?: boolean;
 }
 
-// ✅ React.memo prevents unnecessary re-renders
-const CheckoutSummary = React.memo(({
-  items,
-  subtotal,
-  allowQuantityEdit = false,
-  onQuantityChange,
-  pricingData,
-  loadingPricing = false,
-  deliveryInfo = null,
-  deliveryAvailable = true,
-  hasSelectedAddress = false,
-}: CheckoutSummaryProps) => {
-  const [showBreakdown, setShowBreakdown] = useState(false);
+const CheckoutSummary = React.memo(
+  ({
+    items,
+    subtotal,
+    allowQuantityEdit = false,
+    onQuantityChange,
+    pricingData,
+    loadingPricing = false,
+    deliveryAvailable = true,
+    hasSelectedAddress = false,
+    showTotals = false,
+  }: CheckoutSummaryProps) => {
+    const [showBreakdown, setShowBreakdown] = useState(false);
 
-  // ✅ SAFE: Helper function to prevent toFixed errors
-  const safeToFixed = (value: number | undefined | null, decimals: number = 2): string => {
-    if (typeof value !== "number" || value === null || value === undefined || isNaN(value)) {
-      return (0).toFixed(decimals);
-    }
-    return value.toFixed(decimals);
-  };
+    const safeToFixed = (value: number | undefined | null, decimals = 2) => {
+      if (
+        typeof value !== "number" ||
+        value === null ||
+        value === undefined ||
+        isNaN(value)
+      )
+        return (0).toFixed(decimals);
+      return value.toFixed(decimals);
+    };
 
-  // ✅ Memoized values for performance
-  const { packagingFee, deliveryCharge, grandTotal } = useMemo(() => ({
-    packagingFee: pricingData?.packagingFee ?? 0,
-    deliveryCharge: pricingData?.deliveryCharge ?? 0,
-    grandTotal: pricingData?.checkoutTotal ?? subtotal,
-  }), [pricingData, subtotal]);
-
-  const handleWhatsAppContact = () => {
-    const message = encodeURIComponent(
-      `Hi! I need help with delivery to my location. My cart total is ₹${safeToFixed(grandTotal)}. Can you please check if delivery is possible?`
+    const { packagingFee, deliveryCharge, grandTotal } = useMemo(
+      () => ({
+        packagingFee: pricingData?.packagingFee ?? 0,
+        deliveryCharge: pricingData?.deliveryCharge ?? 0,
+        grandTotal: pricingData?.checkoutTotal ?? subtotal ?? 0,
+      }),
+      [pricingData, subtotal]
     );
-    const whatsappNumber = "919876543210";
-    window.open(`https://wa.me/${whatsappNumber}?text=${message}`, "_blank");
-  };
 
-  if (!items.length) {
-    return <p className="text-center text-gray-500">Your cart is empty</p>;
-  }
+    if (!items || items.length === 0) {
+      return <p style={{ color: "var(--text-accent)" }}>No items in order</p>;
+    }
 
-  return (
-    <div className="max-w-xl mx-auto bg-white text-gray-900 p-6 rounded-xl shadow-lg border border-gray-200">
-      <h2 className="text-2xl font-bold mb-6">Order Summary</h2>
+    return (
+      <aside
+        role="region"
+        aria-labelledby="order-summary-heading"
+        style={{
+          background: "var(--color-surface)",
+          padding: 12,
+          borderRadius: 10,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 8,
+          }}
+        >
+          <h3
+            id="order-summary-heading"
+            style={{ fontSize: 15, fontWeight: 700, color: "var(--text-dark)" }}
+          >
+            Items ({items.length})
+          </h3>
 
-      {/* Items List - Always visible */}
-      <div className="space-y-4 max-h-80 overflow-auto mb-6">
-        {items.map(({ product, variantId, quantity }, idx) => {
-          const selectedVariant = product.variants?.find((v) => v._id === variantId);
-          if (!selectedVariant) return null;
-
-          const finalPrice = selectedVariant.hasDiscount
-            ? selectedVariant.discountedPrice ?? 0
-            : selectedVariant.price ?? 0;
-          const itemTotal = finalPrice * quantity;
-
-          return (
-            <div
-              key={`${product._id}-${variantId}`}
-              className="flex gap-4 items-start p-3 border border-gray-100 rounded-lg"
-            >
-              <Image
-                src={selectedVariant.images?.[0]?.url || "/placeholder.jpg"}
-                alt={product.name}
-                width={80}
-                height={80}
-                className="rounded-md object-cover border"
-              />
-
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold">{product.name}</h3>
-                <p className="text-sm text-gray-600 mb-1">
-                  {selectedVariant.color} • {selectedVariant.size}
-                </p>
-
-                <div className="mb-2">
-                  {selectedVariant.hasDiscount ? (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-green-600 text-base">
-                        ₹{safeToFixed(selectedVariant.discountedPrice)}
-                      </span>
-                      <span className="text-sm line-through text-gray-500">
-                        ₹{safeToFixed(selectedVariant.price)}
-                      </span>
-                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                        {selectedVariant.discountPercent ?? 0}% OFF
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="font-semibold text-gray-900 text-base">
-                      ₹{safeToFixed(selectedVariant.price)}
-                    </span>
-                  )}
-
-                  {quantity > 1 && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      × {quantity} = ₹{safeToFixed(itemTotal)}
-                    </p>
-                  )}
-                </div>
-
-                <p className="text-xs text-gray-500 mb-2">
-                  Stock: {selectedVariant.stock ?? 0} available
-                </p>
-
-                {allowQuantityEdit && onQuantityChange && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 flex items-center justify-center text-sm font-medium"
-                      disabled={quantity <= 1}
-                      onClick={() => onQuantityChange(idx, quantity - 1)}
-                    >
-                      −
-                    </button>
-                    <span className="w-8 text-center font-medium">{quantity}</span>
-                    <button
-                      className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 flex items-center justify-center text-sm font-medium"
-                      disabled={quantity >= (selectedVariant.stock ?? 0)}
-                      onClick={() => onQuantityChange(idx, quantity + 1)}
-                    >
-                      +
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ✅ NO FLICKER: Price section always rendered */}
-      <div className="border-t border-gray-200 pt-4">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-lg font-semibold text-gray-900">Total Amount:</span>
-          <div className="text-right">
-            {/* ✅ Show loading only in price area, not entire component */}
-            {loadingPricing ? (
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-blue-600">Calculating...</span>
-              </div>
-            ) : (
-              <div className="text-xl font-bold text-green-600">
-                ₹{safeToFixed(grandTotal)}
-              </div>
-            )}
-            <button
-              onClick={() => setShowBreakdown(!showBreakdown)}
-              className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-            >
-              {showBreakdown ? "Hide" : "Show"} breakdown
-              <span className={`transform transition-transform ${showBreakdown ? "rotate-180" : ""}`}>▼</span>
-            </button>
-          </div>
+          {/* Details toggle only toggles a lightweight breakdown UI (not main totals) */}
+          <button
+            onClick={() => setShowBreakdown((s) => !s)}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "var(--color-accent)",
+              cursor: "pointer",
+            }}
+            aria-expanded={showBreakdown}
+            aria-controls="order-items-breakdown"
+          >
+            {showBreakdown ? "Hide" : "Details"}
+          </button>
         </div>
 
-        {/* ✅ Breakdown section */}
-        {showBreakdown && (
-          <div className="space-y-3 mb-4 bg-gray-50 rounded-lg p-4">
-            <div className="flex justify-between text-base">
-              <span className="text-gray-700">
-                Item Subtotal ({items.length} item{items.length > 1 ? "s" : ""}):
-              </span>
-              <span className="font-medium">₹{safeToFixed(subtotal)}</span>
-            </div>
+        <div
+          style={{ display: "grid", gap: 8, maxHeight: 320, overflow: "auto" }}
+        >
+          {items.map(({ product, variantId, quantity }, idx) => {
+            const selectedVariant = product.variants?.find(
+              (v) => v._id === variantId
+            );
+            if (!selectedVariant) return null;
 
-            <div className="flex justify-between text-base">
-              <span className="text-gray-700">Packaging Fee:</span>
-              <span className="font-medium text-blue-600">
-                {loadingPricing ? (
-                  <span className="flex items-center gap-1">
-                    <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                    ...
-                  </span>
-                ) : (
-                  `₹${safeToFixed(packagingFee)}`
-                )}
-              </span>
-            </div>
+            const finalPrice = selectedVariant.hasDiscount
+              ? selectedVariant.discountedPrice ?? 0
+              : selectedVariant.price ?? 0;
+            const itemTotal = finalPrice * quantity;
 
-            {!hasSelectedAddress ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-lg">📍</span>
-                  <span className="font-medium text-amber-800">Select delivery address</span>
-                </div>
-                <p className="text-amber-700 text-sm">
-                  Please select your delivery address to see shipping charges.
-                </p>
-              </div>
-            ) : (
-              <div className="flex justify-between text-base">
-                <span className="text-gray-700">
-                  Delivery{pricingData?.deliveryInfo?.estimatedDays
-                    ? ` (${pricingData.deliveryInfo.estimatedDays} days)`
-                    : ""}:
-                </span>
-                <span className="font-medium">
-                  {loadingPricing ? (
-                    <span className="flex items-center gap-1">
-                      <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                      Checking...
-                    </span>
-                  ) : !deliveryAvailable ? (
-                    <span className="text-red-600 font-semibold">Not Available</span>
-                  ) : deliveryCharge === 0 ? (
-                    <span className="text-green-600 font-semibold">FREE</span>
-                  ) : (
-                    `₹${safeToFixed(deliveryCharge)}`
-                  )}
-                </span>
-              </div>
-            )}
-
-            <div className="border-t border-gray-300 pt-2 mt-2">
-              <div className="flex justify-between text-lg font-bold">
-                <span className="text-gray-900">Total Amount:</span>
-                <span className="text-green-600">₹{safeToFixed(grandTotal)}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Rest of components unchanged */}
-        {!deliveryAvailable && hasSelectedAddress && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-            <div className="text-red-800 text-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">❌</span>
-                <span className="font-semibold">
-                  Delivery not available to your selected address
-                </span>
-              </div>
-              <p className="text-xs mb-3 text-red-700">
-                We currently don't deliver to this area. Try selecting a different address or contact us.
-              </p>
-              <button
-                onClick={handleWhatsAppContact}
-                className="flex items-center gap-2 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+            return (
+              <div
+                key={`${product._id}-${variantId}`}
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "center",
+                  padding: 8,
+                  borderRadius: 8,
+                  background: "var(--color-surface)",
+                }}
               >
-                <span>💬</span>
-                Contact us on WhatsApp
-              </button>
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    background: "var(--color-primary)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 6,
+                    flexShrink: 0,
+                  }}
+                  aria-hidden="true"
+                >
+                  <Image
+                    src={selectedVariant.images?.[0]?.url || "/placeholder.jpg"}
+                    alt={product.name}
+                    width={64}
+                    height={64}
+                    style={{ objectFit: "contain" }}
+                  />
+                </div>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                    title={product.name}
+                  >
+                    {product.name}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-accent)",
+                      marginTop: 4,
+                    }}
+                  >
+                    {selectedVariant.color
+                      ? `${selectedVariant.color}${
+                          selectedVariant.size
+                            ? ` • ${selectedVariant.size}`
+                            : ""
+                        }`
+                      : selectedVariant.size || ""}
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginTop: 6,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: "var(--color-accent)",
+                      }}
+                    >
+                      ₹{safeToFixed(finalPrice)}
+                    </div>
+
+                    <div
+                      style={{
+                        marginLeft: "auto",
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                      }}
+                    >
+                      {allowQuantityEdit && onQuantityChange ? (
+                        <>
+                          <button
+                            aria-label={`Decrease quantity for ${product.name}`}
+                            onClick={() =>
+                              onQuantityChange(idx, Math.max(1, quantity - 1))
+                            }
+                            disabled={quantity <= 1}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 999,
+                              background: "var(--color-surface-secondary)",
+                              border: "none",
+                              cursor: quantity <= 1 ? "not-allowed" : "pointer",
+                              fontSize: 14,
+                            }}
+                          >
+                            −
+                          </button>
+                          <div
+                            style={{
+                              minWidth: 28,
+                              textAlign: "center",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {quantity}
+                          </div>
+                          <button
+                            aria-label={`Increase quantity for ${product.name}`}
+                            onClick={() => onQuantityChange(idx, quantity + 1)}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 999,
+                              background: "var(--color-surface-secondary)",
+                              border: "none",
+                              cursor: "pointer",
+                              fontSize: 14,
+                            }}
+                          >
+                            +
+                          </button>
+                        </>
+                      ) : (
+                        <div
+                          style={{ fontSize: 12, color: "var(--text-accent)" }}
+                        >
+                          x{quantity}
+                        </div>
+                      )}
+
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "var(--text-accent)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        ₹{safeToFixed(itemTotal)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Optional totals block: shown only when showTotals=true */}
+        {showTotals && (
+          <div
+            id="order-items-breakdown"
+            style={{
+              borderTop: `1px solid var(--color-border-custom)`,
+              paddingTop: 10,
+              marginTop: 10,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 6,
+              }}
+            >
+              <span style={{ color: "var(--text-accent)", fontSize: 13 }}>
+                Subtotal
+              </span>
+              <span style={{ fontWeight: 700 }}>₹{safeToFixed(subtotal)}</span>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 8,
+              }}
+            >
+              <span style={{ color: "var(--text-accent)", fontSize: 13 }}>
+                Packaging
+              </span>
+              <span>₹{safeToFixed(packagingFee)}</span>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 8,
+              }}
+            >
+              <span style={{ color: "var(--text-accent)", fontSize: 13 }}>
+                Delivery
+              </span>
+              <span>
+                {loadingPricing
+                  ? "Checking..."
+                  : deliveryCharge === 0
+                  ? "FREE"
+                  : `₹${safeToFixed(deliveryCharge)}`}
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: 8,
+                paddingTop: 8,
+                borderTop: `1px solid var(--color-border-custom)`,
+              }}
+            >
+              <span style={{ fontWeight: 800 }}>Total</span>
+              <span style={{ fontWeight: 800, color: "var(--color-accent)" }}>
+                ₹{safeToFixed(grandTotal)}
+              </span>
             </div>
           </div>
         )}
-
-        {hasSelectedAddress &&
-          deliveryAvailable &&
-          pricingData?.deliveryInfo &&
-          !showBreakdown && (
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="text-sm">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-medium text-blue-900">
-                    🚚 {pricingData.deliveryInfo.courierPartner || "Standard Delivery"}
-                  </span>
-                  <span className="text-blue-700 font-medium">
-                    COD: {pricingData.deliveryInfo.codAvailable ? "✅" : "❌"}
-                  </span>
-                </div>
-                <p className="text-blue-700">
-                  Estimated delivery: {pricingData.deliveryInfo.estimatedDays} days
-                </p>
-                <p className="text-blue-600 text-xs mt-1">
-                  📦 Includes ₹{safeToFixed(packagingFee)} packaging fee
-                </p>
-              </div>
-            </div>
-          )}
-
-        {!hasSelectedAddress && (
-          <p className="text-xs text-gray-500 mt-2 text-center">
-            *Total includes ₹{safeToFixed(packagingFee)} packaging fee. Shipping calculated after address selection.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-});
+      </aside>
+    );
+  }
+);
 
 CheckoutSummary.displayName = "CheckoutSummary";
 export default CheckoutSummary;
