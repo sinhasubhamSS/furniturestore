@@ -67,19 +67,37 @@ const ProductsPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--color-primary)" }}>
-        <div className="animate-spin rounded-full h-10 w-10 border-b-4" style={{ borderColor: "var(--color-accent)" }} />
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "var(--color-primary)" }}
+      >
+        <div
+          className="animate-spin rounded-full h-10 w-10 border-b-4"
+          style={{ borderColor: "var(--color-accent)" }}
+        />
       </div>
     );
   }
 
   if (isError) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--color-primary)" }}>
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "var(--color-primary)" }}
+      >
         <div className="text-center">
           <div className="text-red-500 text-4xl mb-3">⚠️</div>
-          <p className="text-red-600 text-lg font-semibold">Failed to load products</p>
-          <button onClick={() => window.location.reload()} className="mt-3 px-4 py-2 rounded-md" style={{ background: "var(--color-accent)", color: "var(--text-light)" }}>
+          <p className="text-red-600 text-lg font-semibold">
+            Failed to load products
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-3 px-4 py-2 rounded-md"
+            style={{
+              background: "var(--color-accent)",
+              color: "var(--text-light)",
+            }}
+          >
             Try Again
           </button>
         </div>
@@ -88,21 +106,31 @@ const ProductsPage = () => {
   }
 
   return (
-    <div style={{ background: "var(--color-primary)" }} className="min-h-[calc(100vh-64px)] py-6 px-0">
-      <div className="max-w-7xl mx-auto px-4">
+    <div
+      style={{ background: "var(--color-primary)" }}
+      className="min-h-[calc(100vh-64px)] py-4 px-0"
+    >
+      <div className="">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <div>
-            <h1 className="text-lg font-semibold" style={{ color: "var(--text-dark)" }}>
+        {/* Header - keep everything on one row; allow left title to truncate on small screens */}
+        <div className="flex items-center justify-between gap-3 mb-4">
+          {/* Left: title - allow truncation when space is low */}
+          <div className="min-w-0">
+            <h1
+              className="text-lg font-semibold truncate"
+              style={{ color: "var(--text-dark)" }}
+              title={selectedCategoryName || "All Products"}
+            >
               {selectedCategoryName || "All Products"}
             </h1>
-            {/* <p className="text-sm" style={{ color: "var(--text-accent)" }}>
-              {data?.totalResults ?? data?.products?.length ?? 0} results
-            </p> */}
           </div>
 
-          <div className="flex items-center gap-2 px-4">
-            <SortDropdown currentSort={sortFromUrl} onSortChange={handleSortChange} />
+          {/* Right: sort - do not let it shrink or wrap */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <SortDropdown
+              currentSort={sortFromUrl}
+              onSortChange={handleSortChange}
+            />
           </div>
         </div>
 
@@ -132,10 +160,14 @@ const ProductsPage = () => {
         )} */}
 
         {/* GRID: gap 0 between items */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-0 px-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-[1px] px-0 sm:px-4">
           {filteredProducts.length > 0 ? (
             filteredProducts.map((product) => (
-              <Link key={product._id} href={`/products/${product.slug}`} className="block h-full">
+              <Link
+                key={product._id}
+                href={`/products/${product.slug}`}
+                className="block h-full"
+              >
                 {/* remove internal padding to let cards touch each other horizontally */}
                 <div className="h-full">
                   <ProductCardListing product={product} />
@@ -143,7 +175,10 @@ const ProductsPage = () => {
               </Link>
             ))
           ) : (
-            <div className="col-span-full text-center py-20" style={{ color: "var(--text-accent)" }}>
+            <div
+              className="col-span-full text-center py-20"
+              style={{ color: "var(--text-accent)" }}
+            >
               No products found
             </div>
           )}
@@ -152,9 +187,25 @@ const ProductsPage = () => {
         {/* Pagination */}
         {(data?.totalPages || 1) > 1 && filteredProducts.length > 0 && (
           <div className="flex justify-center gap-3 mt-6">
-            <Button onClick={() => setPage((p) => Math.max(p - 1, 1))} disabled={page === 1} variant="outline">← Previous</Button>
-            <span className="self-center" style={{ color: "var(--text-dark)" }}>Page {page} of {data?.totalPages || 1}</span>
-            <Button onClick={() => setPage((p) => Math.min(p + 1, data?.totalPages || 1))} disabled={page === (data?.totalPages || 1)} variant="outline">Next →</Button>
+            <Button
+              onClick={() => setPage((p) => Math.max(p - 1, 1))}
+              disabled={page === 1}
+              variant="outline"
+            >
+              ← Previous
+            </Button>
+            <span className="self-center" style={{ color: "var(--text-dark)" }}>
+              Page {page} of {data?.totalPages || 1}
+            </span>
+            <Button
+              onClick={() =>
+                setPage((p) => Math.min(p + 1, data?.totalPages || 1))
+              }
+              disabled={page === (data?.totalPages || 1)}
+              variant="outline"
+            >
+              Next →
+            </Button>
           </div>
         )}
       </div>

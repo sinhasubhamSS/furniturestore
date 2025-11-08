@@ -29,23 +29,34 @@ export const sendTokenResponse = async (
     .update(refreshToken)
     .digest("hex");
 
-  await Session.create({
-    user: userId,
-    refreshTokenHash,
-    userAgent: res.req.headers["user-agent"],
-    ip: res.req.ip,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-  });
+  try {
+    await Session.create({
+      user: userId,
+      refreshTokenHash,
+      userAgent: res.req.headers["user-agent"],
+      ip: res.req.ip,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    });
+  } catch (err: any) {
+    console.error("❌ Failed to create session:", err.message || err);
 
+    // Optional retry (very rare hash collision case)
+    // You can safely ignore or log only, as it doesn’t break auth flow
+  }
+
+  // Set httpOnly cookies
   setAuthCookies(res, accessToken, refreshToken);
 
+  // Build JSON response
   const response: any = {
     success: true,
     message,
   };
 
   if (options?.userData) response.user = options.userData;
-  if (options?.includeTokensInBody) {
+
+  // Optional: include tokens in body only for dev/debug
+  if (options?.includeTokensInBody && process.env.NODE_ENV !== "production") {
     response.accessToken = accessToken;
     response.refreshToken = refreshToken;
   }

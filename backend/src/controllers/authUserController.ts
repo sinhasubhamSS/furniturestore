@@ -110,12 +110,36 @@ export const refreshAccessToken = catchAsync(
       .update(refreshToken)
       .digest("hex");
 
-    const session = await Session.findOne({ refreshTokenHash: receivedHash });
-    if (
-      !session ||
-      session.revokedAt ||
-      (session.expiresAt && session.expiresAt < new Date())
-    ) {
+    // create new tokens
+    const newAccess = generateAccessToken(decoded.userId);
+    const newRefresh = generateRefreshToken(decoded.userId);
+    const newHash = crypto
+      .createHash("sha256")
+      .update(newRefresh)
+      .digest("hex");
+    const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    // Atomic rotation: only update the session that matches the old hash, is not revoked, and not expired
+    const updated = await Session.findOneAndUpdate(
+      {
+        refreshTokenHash: receivedHash,
+        revokedAt: null,
+        expiresAt: { $gt: new Date() },
+      },
+      {
+        $set: {
+          refreshTokenHash: newHash,
+          lastUsedAt: new Date(),
+          expiresAt: newExpiresAt,
+          userAgent: req.headers["user-agent"],
+          ip: req.ip,
+        },
+      },
+      { new: true }
+    );
+
+    if (!updated) {
+      // Possible reuse or session invalid -> revoke all sessions of this user
       await Session.updateMany(
         { user: decoded.userId },
         { $set: { revokedAt: new Date() } }
@@ -126,20 +150,7 @@ export const refreshAccessToken = catchAsync(
         .json({ message: "Invalid or reused refresh token" });
     }
 
-    const newAccess = generateAccessToken(decoded.userId);
-    const newRefresh = generateRefreshToken(decoded.userId);
-    const newHash = crypto
-      .createHash("sha256")
-      .update(newRefresh)
-      .digest("hex");
-
-    session.refreshTokenHash = newHash;
-    session.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    session.lastUsedAt = new Date();
-    session.userAgent = req.headers["user-agent"];
-    session.ip = req.ip;
-    await session.save();
-
+    // success -> set new cookies and return
     setAuthCookies(res, newAccess, newRefresh);
     return res
       .status(200)

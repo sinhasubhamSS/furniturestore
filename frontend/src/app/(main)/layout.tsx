@@ -18,7 +18,7 @@ export default function MainLayout({
       {/* Main Content Area */}
       <main className="flex-grow pt-16">
         <div className="w-full">
-          <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8">
+          <div className="max-w-[1440px] sm:mx-auto px-0 sm:px-4 md:px-6 lg:px-8">
             {children}
           </div>
         </div>
