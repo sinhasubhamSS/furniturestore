@@ -8,12 +8,26 @@ import {
   ProductQueryParams,
   homeProduct,
 } from "@/types/Product";
+
+const DEFAULT_LIST_FIELDS = [
+  "_id",
+  "slug",
+  "name",
+  "title",
+  "thumbnail", // thumbnail or small image url
+  "category",
+  "variants", // we will trim variants server-side to only first in listing
+];
+
+// optional: maximum number of fields to allow in request params (frontend safety)
+const MAX_FIELDS = 20;
+
 export const userProductApi = createApi({
   reducerPath: "userProductApi",
   baseQuery: axiosBaseQuery(),
   tagTypes: ["UserProducts"],
   endpoints: (builder) => ({
-    // ✅ Enhanced with sortBy support
+    // ✅ Enhanced with fields + sortBy support
     getPublishedProducts: builder.query<
       UserProductResponse,
       ProductQueryParams
@@ -24,52 +38,125 @@ export const userProductApi = createApi({
         limit = 10,
         filter = {},
         sortBy = "latest",
-      } = {}) => ({
-        url: `/products/all`,
-        method: "GET",
-        params: {
-          page,
-          limit,
-          sortBy, // ✅ Add sortBy parameter
-          ...filter, // ✅ Spreads filter object (category, etc.)
-        },
-      }),
+        fields, // optional: string[] or comma string
+      } = {}) => {
+        // if caller provided fields array/string, use it, else use default minimal list
+        let fieldsParam: string | undefined;
+        if (fields) {
+          // normalize array or comma string
+          const arr =
+            typeof fields === "string"
+              ? fields
+                  .split(",")
+                  .map((f) => f.trim())
+                  .filter(Boolean)
+              : Array.isArray(fields)
+              ? fields
+              : [];
+
+          // enforce max count
+          const safe = arr.slice(0, MAX_FIELDS);
+          if (safe.length) fieldsParam = safe.join(",");
+        }
+
+        // fallback to default minimal fields if none specified
+        if (!fieldsParam) {
+          fieldsParam = DEFAULT_LIST_FIELDS.join(",");
+        }
+
+        return {
+          url: `/products/all`,
+          method: "GET",
+          params: {
+            page,
+            limit,
+            sortBy,
+            fields: fieldsParam,
+            ...filter,
+          },
+        };
+      },
       transformResponse: (res: { data: UserProductResponse }) => {
         return res.data;
       },
       providesTags: ["UserProducts"],
     }),
 
-    // ✅ Enhanced search with sort support (Future)
+    // searchProducts — also support fields (optional)
     searchProducts: builder.query<
       UserProductResponse,
-      { query: string; page?: number; limit?: number; sortBy?: string }
+      {
+        query?: string;
+        page?: number;
+        limit?: number;
+        sortBy?: string;
+        fields?: string[] | string;
+      }
     >({
       query: ({
-        query: searchQuery,
+        query: searchQuery = "",
         page = 1,
         limit = 10,
         sortBy = "latest",
-      }) => ({
-        url: "/products/search",
-        method: "GET",
-        params: { q: searchQuery, page, limit, sortBy },
-      }),
+        fields,
+      } = {}) => {
+        let fieldsParam: string | undefined;
+        if (fields) {
+          const arr =
+            typeof fields === "string"
+              ? fields.split(",").map((f) => f.trim())
+              : fields;
+          fieldsParam = (arr || []).slice(0, MAX_FIELDS).join(",");
+        } else {
+          fieldsParam = DEFAULT_LIST_FIELDS.join(",");
+        }
+
+        return {
+          url: "/products/search",
+          method: "GET",
+          params: { q: searchQuery, page, limit, sortBy, fields: fieldsParam },
+        };
+      },
       transformResponse: (res: { data: UserProductResponse }) => {
         return res.data;
       },
     }),
 
-    // ✅ Enhanced category products with sort support (Future)
+    // getProductsByCategory — support fields
     getProductsByCategory: builder.query<
       UserProductResponse,
-      { slug: string; page?: number; limit?: number; sortBy?: string }
+      {
+        slug?: string;
+        page?: number;
+        limit?: number;
+        sortBy?: string;
+        fields?: string[] | string;
+      }
     >({
-      query: ({ slug, page = 1, limit = 10, sortBy = "latest" }) => ({
-        url: `/products/category/${slug}`,
-        method: "GET",
-        params: { page, limit, sortBy },
-      }),
+      query: ({
+        slug,
+        page = 1,
+        limit = 10,
+        sortBy = "latest",
+        fields,
+      } = {}) => {
+        let fieldsParam: string | undefined;
+        if (fields) {
+          const arr =
+            typeof fields === "string"
+              ? fields.split(",").map((f) => f.trim())
+              : fields;
+          fieldsParam = (arr || []).slice(0, MAX_FIELDS).join(",");
+        } else {
+          fieldsParam = DEFAULT_LIST_FIELDS.join(",");
+        }
+
+        return {
+          url: `/products/category/${slug}`,
+          method: "GET",
+          params: { page, limit, sortBy, fields: fieldsParam },
+        };
+      },
       transformResponse: (res: { data: UserProductResponse }) => {
         return res.data;
       },
@@ -78,7 +165,7 @@ export const userProductApi = createApi({
       ],
     }),
 
-    // Rest of your methods stay the same...
+    // get single product (detail) — here we generally want full data, so don't send fields by default
     getProductBySlug: builder.query<DisplayProduct, string>({
       query: (slug) => ({
         url: `/products/slug/${slug}`,

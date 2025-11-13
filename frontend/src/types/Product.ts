@@ -5,8 +5,8 @@ export type homeProduct = {
   slug: string;
   image: string;
   price: number;
-  discountedPrice: number;}
-
+  discountedPrice: number;
+};
 
 export type Variant = {
   _id?: string;
@@ -110,4 +110,5 @@ export interface ProductQueryParams {
     hasDiscount?: boolean; // Future: discount filter
   };
   sortBy?: "latest" | "price_low" | "price_high" | "discount"; // ✅ NEW: Sort options
+  fields?: string | string[];
 }
