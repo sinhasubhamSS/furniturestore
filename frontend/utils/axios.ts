@@ -76,8 +76,9 @@ axiosClient.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         if (typeof window !== "undefined") {
-          window.location.href = "/auth/login";
-        }
+  window.location.href = `/auth/login?from=${encodeURIComponent(window.location.pathname)}`;
+}
+
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
