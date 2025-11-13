@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { useLogin } from "@/hooks/useLogin";
 import Input from "@/components/ui/Input";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 
@@ -21,12 +21,28 @@ const LoginPage = () => {
 
   const { login, loading, error } = useLogin();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // read `from` param (e.g. /checkout)
+  const rawFrom = (searchParams?.get("from") as string) || "/";
+
+  // sanitize redirect target to prevent open-redirects
+  const getSafeRedirect = (raw: string) => {
+    if (!raw) return "/";
+    // allow only internal paths that start with a single slash (no protocol)
+    if (raw.startsWith("/") && !raw.startsWith("//")) return raw;
+    return "/";
+  };
 
   const onSubmit = async (data: LoginFormValues) => {
     const res = await login(data);
     if (res?.user?._id) {
       toast.success("Login successful! 🎉");
-      router.push("/");
+
+      // redirect back to original protected page (safe)
+      const safe = getSafeRedirect(rawFrom);
+      // use replace so back button doesn't take user back to login
+      router.replace(safe);
     }
   };
 
@@ -81,7 +97,7 @@ const LoginPage = () => {
 
         <div className="mt-4 text-sm text-center">
           <span className="text-[var(--foreground)]">
-            Don&apos;t have an account?{" "}
+            Don't have an account?{" "}
           </span>
           <Link
             href="/auth/signup"
