@@ -24,12 +24,20 @@ const ProductsPage = () => {
     return filters;
   }, [categoryFromUrl]);
 
-  const { data, isLoading, isError } = useGetPublishedProductsQuery({
-    page,
-    limit: 12,
-    filter: apiFilters,
-    sortBy: sortFromUrl as "latest" | "price_low" | "price_high" | "discount",
-  });
+  const { data, isLoading, isError } = useGetPublishedProductsQuery(
+    {
+      page,
+      limit: 12,
+      filter: apiFilters,
+      sortBy: sortFromUrl as "latest" | "price_low" | "price_high" | "discount",
+    },
+    {
+      // ⭐ YEH WALA PART  — hook ke second argument me hi allowed hai
+      refetchOnMountOrArgChange: false,
+      refetchOnReconnect: true,
+      refetchOnFocus: false,
+    }
+  );
 
   const { data: categories } = useGetCategoriesQuery();
 

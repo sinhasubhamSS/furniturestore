@@ -18,6 +18,7 @@ export const userProductApi = createApi({
       UserProductResponse,
       ProductQueryParams
     >({
+      keepUnusedDataFor: 32,
       query: ({
         page = 1,
         limit = 10,
@@ -70,7 +71,6 @@ export const userProductApi = createApi({
         params: { page, limit, sortBy },
       }),
       transformResponse: (res: { data: UserProductResponse }) => {
-        console.log("📦 Category Products Response:", res.data);
         return res.data;
       },
       providesTags: (_result, _error, { slug }) => [
@@ -85,7 +85,6 @@ export const userProductApi = createApi({
         method: "GET",
       }),
       transformResponse: (res: { data: DisplayProduct }) => {
-        console.log("📦 Product by slug response:", res.data);
         return res.data;
       },
       providesTags: (_result, _error, slug) => [
@@ -99,7 +98,6 @@ export const userProductApi = createApi({
         method: "GET",
       }),
       transformResponse: (res: { data: DisplayProduct }) => {
-        console.log("📦 Product by ID response:", res.data);
         return res.data;
       },
       providesTags: (_result, _error, id) => [{ type: "UserProducts", id }],
@@ -112,7 +110,6 @@ export const userProductApi = createApi({
         params: { limit },
       }),
       transformResponse: (response: { data: homeProduct[] }) => {
-        console.log("📦 Latest Products Response:", response.data);
         return response.data;
       },
     }),

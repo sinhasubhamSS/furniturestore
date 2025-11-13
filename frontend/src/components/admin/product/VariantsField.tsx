@@ -53,6 +53,7 @@ const VariantForm: React.FC<VariantFormProps> = ({
         folder="variants"
         maxFiles={5}
         onUpload={(images) => setValue(`variants.${index}.images`, images)}
+        // <ImageUploader onUpload={(images) => setValue(`variants.${index}.images`, images.map(img => img.url))} />
         defaultUrls={getValues(`variants.${index}.images`) || []}
       />
 
