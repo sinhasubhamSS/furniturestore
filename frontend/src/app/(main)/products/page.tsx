@@ -8,6 +8,7 @@ import { useGetCategoriesQuery } from "@/redux/services/admin/adminCategoryapi";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import SortDropdown from "@/components/filter/SortDropdown";
+import ProductCardSkeleton from "@/components/skleton/productList";
 
 const ProductsPage = () => {
   const searchParams = useSearchParams();
@@ -74,15 +75,35 @@ const ProductsPage = () => {
   };
 
   if (isLoading) {
+    const skeletonCount = 12; // same as your limit
+
     return (
       <div
-        className="min-h-screen flex items-center justify-center"
         style={{ background: "var(--color-primary)" }}
+        className="min-h-[calc(100vh-64px)] py-4 px-0"
       >
-        <div
-          className="animate-spin rounded-full h-10 w-10 border-b-4"
-          style={{ borderColor: "var(--color-accent)" }}
-        />
+        {/* Skeleton Header */}
+        <div className="flex items-center justify-between gap-3 mb-4 px-4">
+          {/* left title skeleton */}
+          <div className="h-6 bg-gray-300 rounded w-40 animate-pulse" />
+
+          {/* right sort skeleton */}
+          <div className="h-8 bg-gray-300 rounded w-28 animate-pulse" />
+        </div>
+
+        {/* Skeleton Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-[1px] px-0 sm:px-4">
+          {Array.from({ length: skeletonCount }).map((_, i) => (
+            <ProductCardSkeleton key={i} />
+          ))}
+        </div>
+
+        {/* Skeleton Pagination */}
+        <div className="flex justify-center gap-3 mt-6">
+          <div className="h-8 w-24 bg-gray-300 rounded animate-pulse" />
+          <div className="h-8 w-16 bg-gray-300 rounded animate-pulse" />
+          <div className="h-8 w-24 bg-gray-300 rounded animate-pulse" />
+        </div>
       </div>
     );
   }
