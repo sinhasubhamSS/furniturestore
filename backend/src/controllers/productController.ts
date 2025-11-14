@@ -79,34 +79,41 @@ export const getAllProductsAdmin = catchAsync(
 
 export const getAllProducts = catchAsync(
   async (req: AuthRequest, res: Response) => {
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
+    const page = Math.max(1, Number(req.query.page) || 1);
+
+    // clamp limit to avoid heavy responses
+    const rawLimit = Number(req.query.limit) || 10;
+    const MAX_LIMIT = 100;
+    const limit = Math.min(Math.max(1, rawLimit), MAX_LIMIT);
+
     const isAdmin = req.user?.role === "admin";
 
-    // ✅ Extract sort parameters from frontend
-    const sortBy = req.query.sortBy?.toString() || "latest";
+    // Extract sort parameter from frontend (default: latest)
+    const sortBy = (req.query.sortBy as string) || "latest";
 
-    // Build filter object from query parameters
+    // Build filter object (simple category filter)
     const filter: any = {};
-
     if (req.query.category) {
-      filter.category = req.query.category;
+      filter.category = String(req.query.category);
     }
 
+    // Call service (simple version — no fields CSV complexity)
     const products = await productService.getAllProducts(
       filter,
       page,
       limit,
       isAdmin,
       false,
-      sortBy // ✅ Pass sort parameter to service
+      sortBy
     );
 
-    res
+    return res
       .status(200)
       .json(new ApiResponse(200, products, "Products fetched successfully"));
   }
 );
+
+
 
 export const getProductBySlug = catchAsync(
   async (req: AuthRequest, res: Response) => {

@@ -220,8 +220,7 @@ class ProductService {
       );
 
       // Assign variants with Mongoose DocumentArray .set()
-     product.variants.splice(0, product.variants.length, ...processedVariants);
-
+      product.variants.splice(0, product.variants.length, ...processedVariants);
 
       // Update aggregate fields
       product.price = Math.min(...processedVariants.map((v) => v.price ?? 0));
@@ -280,20 +279,22 @@ class ProductService {
    * @param populateCreatedBy - Whether to populate creator info
    */
   // ProductService.js - Debug getAllProducts method
+  // service: src/services/product.service.ts (or your service class file)
+  // Make sure Product and Category models are imported correctly in this file.
+
   async getAllProducts(
     filter: any = {},
     page: number = 1,
     limit: number = 10,
     isAdmin: boolean = false,
     populateCreatedBy: boolean = false,
-    sortBy: string = "latest" // ✅ NEW PARAMETER
+    sortBy: string = "latest"
   ) {
     const mongoFilter: any = {};
 
     // Handle category filter - convert slug to ObjectId
     if (filter.category) {
       const category = await Category.findOne({ slug: filter.category });
-
       if (category) {
         mongoFilter.category = category._id;
       } else {
@@ -307,30 +308,64 @@ class ProductService {
       }
     }
 
-    // ✅ NEW: Build dynamic sort options
+    // Build dynamic sort options (use your existing helper)
     const sortOptions = this.buildSortOptions(sortBy);
 
-    // ✅ CRITICAL: Build the query with dynamic sort
-    const query = this.buildProductQuery(
-      mongoFilter,
-      isAdmin,
-      populateCreatedBy
-    ).sort(sortOptions); // ✅ CHANGED: Dynamic sort instead of hardcoded
+    // SIMPLE fixed projection for listing (keeps payload small)
+    // service: src/services/product.service.ts
 
-    // ✅ CRITICAL: Apply pagination to the query
-    const paginated = this.applyPagination(query, page, limit);
+// SIMPLE fixed projection for listing (ensure variants.images included)
+const LISTING_PROJECTION: any = {
+  _id: 1,
+  slug: 1,
+  name: 1,
+  title: 1,
+  // do NOT project category.* here to avoid path collision with populate()
+  // category will be filled by populate('category', 'name')
+  "variants._id": 1,
+  "variants.images": 1,
+  "variants.basePrice": 1,
+  "variants.price": 1,
+  "variants.stock": 1,
+  createdAt: 1,
+  updatedAt: 1,
+};
 
-    // ✅ Now execute the queries
+    // Build base query using existing builder (this.buildProductQuery)
+    let query = this.buildProductQuery(mongoFilter, isAdmin, populateCreatedBy);
+
+    // Apply projection, sort, pagination
+    query = query.select(LISTING_PROJECTION).sort(sortOptions);
+
+    const skip = (page - 1) * limit;
+    query = query.skip(skip).limit(limit);
+
+    // Execute queries in parallel and use lean() for performance
     const [products, total] = await Promise.all([
-      paginated.lean(),
+      query.lean(),
       Product.countDocuments(mongoFilter),
     ]);
 
+    // Trim variants array to only first variant for listing to reduce payload
+    const trimmedProducts = (products || []).map((p: any) => {
+      if (Array.isArray(p.variants) && p.variants.length > 1) {
+        p.variants = [p.variants[0]];
+      }
+      // Normalize category object to { _id, name } if it's populated
+      if (p.category && typeof p.category === "object") {
+        p.category = {
+          _id: p.category._id,
+          name: p.category.name ?? p.category,
+        };
+      }
+      return p;
+    });
+
     return {
-      products,
+      products: trimmedProducts,
       page,
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.max(1, Math.ceil(total / limit)),
       totalItems: total,
     };
   }
