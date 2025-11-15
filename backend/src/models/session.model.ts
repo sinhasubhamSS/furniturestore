@@ -8,7 +8,7 @@ export interface ISession extends Document {
   createdAt: Date;
   lastUsedAt?: Date;
   expiresAt: Date;
-  revokedAt?: Date | null; // added
+  revokedAt?: Date | null;
 }
 
 const sessionSchema = new Schema<ISession>(
@@ -18,15 +18,23 @@ const sessionSchema = new Schema<ISession>(
       ref: "User",
       required: true,
       index: true,
-    }, // index
-    refreshTokenHash: { type: String, required: true, unique: true }, // unique
+    },
+    refreshTokenHash: { type: String, required: true, unique: true },
     userAgent: { type: String },
     ip: { type: String },
     lastUsedAt: { type: Date, default: Date.now },
     expiresAt: { type: Date, required: true },
-    revokedAt: { type: Date, default: null }, // added
+    revokedAt: { type: Date, default: null },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
-export const Session = mongoose.model<ISession>("Session", sessionSchema);
+// Auto-delete when expiresAt passes (expire immediately after the date/time)
+sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+// Auto-delete revoked sessions after 5 days (5*24*60*60 seconds)
+sessionSchema.index({ revokedAt: 1 }, { expireAfterSeconds: 5 * 24 * 60 * 60 });
+
+export const Session =
+  mongoose.models.Session || mongoose.model<ISession>("Session", sessionSchema);
+export default Session;

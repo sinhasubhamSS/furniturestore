@@ -16,7 +16,9 @@ import {
   generateRefreshToken,
 } from "../utils/auth/generateTokens";
 
-// Register
+/**
+ * Register
+ */
 export const registerUser = catchAsync(async (req: Request, res: Response) => {
   const { name, email, password, avatar } = req.body;
   if (!name || !email || !password)
@@ -35,6 +37,12 @@ export const registerUser = catchAsync(async (req: Request, res: Response) => {
     role: "buyer",
   });
 
+  console.log("✅ register: created user", {
+    userId: newUser._id.toString(),
+    email: newUser.email,
+  });
+
+  // send tokens only after session persistence handled by sendTokenResponse
   await sendTokenResponse(
     res,
     newUser._id.toString(),
@@ -50,15 +58,30 @@ export const registerUser = catchAsync(async (req: Request, res: Response) => {
   );
 });
 
-// Login
+/**
+ * Login
+ */
 export const loginUser = catchAsync(async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
   const user = await User.findOne({ email }).select("+password");
-  if (!user) throw new AppError("Invalid credentials", 401);
+  if (!user) {
+    console.warn("-> login failed: user not found", { email, ip: req.ip });
+    throw new AppError("Invalid credentials", 401);
+  }
 
   const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) throw new AppError("Invalid credentials", 401);
+  if (!isMatch) {
+    console.warn("-> login failed: invalid password", { email, ip: req.ip });
+    throw new AppError("Invalid credentials", 401);
+  }
+
+  console.log(
+    "-> login success, creating session for user:",
+    user._id.toString(),
+    "ip:",
+    req.ip
+  );
 
   await sendTokenResponse(res, user._id.toString(), "Login successful", {
     userData: {
@@ -71,25 +94,56 @@ export const loginUser = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-// Logout (revoke current session + clear cookies)
+/**
+ * Logout (revoke current session + clear cookies)
+ */
 export const logoutUser = catchAsync(async (req: Request, res: Response) => {
-  const rt = req.cookies?.refreshToken;
-  if (rt) {
-    const hash = crypto.createHash("sha256").update(rt).digest("hex");
-    await Session.updateOne(
-      { refreshTokenHash: hash },
-      { $set: { revokedAt: new Date() } }
-    );
+  try {
+    const rt = req.cookies?.refreshToken;
+    if (rt) {
+      const hash = crypto.createHash("sha256").update(rt).digest("hex");
+      // revoke only the matching session
+      const result = await Session.updateOne(
+        { refreshTokenHash: hash, revokedAt: null },
+        { $set: { revokedAt: new Date() } }
+      );
+      // mongoose update result shape varies by version; show what we can
+      const modifiedCount =
+        (result as any).modifiedCount ?? (result as any).nModified ?? result;
+      console.log("✅ logout: session revoke result:", modifiedCount);
+    } else {
+      console.log("-> logout: no refresh cookie present");
+    }
+
+    clearAuthCookies(res);
+    return res
+      .status(200)
+      .json(new ApiResponse(200, null, "Logout successful"));
+  } catch (err: any) {
+    console.error("-> logout error:", err?.message || err);
+    // always clear cookies client-side even if DB revoke fails
+    clearAuthCookies(res);
+    return res.status(500).json(new ApiResponse(500, null, "Logout failed"));
   }
-  clearAuthCookies(res);
-  res.status(200).json(new ApiResponse(200, null, "Logout successful"));
 });
 
-// Refresh (rotation + reuse detection)
+/**
+ * Refresh (rotation + reuse detection)
+ * Replaced with safer rotation flow + logging
+ */
 export const refreshAccessToken = catchAsync(
   async (req: Request, res: Response) => {
+    // quick debug log
+    console.log("-> refreshAttempt", {
+      hasCookie: !!req.cookies?.refreshToken,
+      ip: req.ip,
+      ua: req.headers["user-agent"],
+      uptime: process.uptime(),
+    });
+
     const refreshToken = req.cookies?.refreshToken;
     if (!refreshToken) {
+      console.warn("-> refresh: no refresh cookie");
       clearAuthCookies(res);
       return res.status(401).json({ message: "Refresh token not found" });
     }
@@ -100,7 +154,8 @@ export const refreshAccessToken = catchAsync(
         refreshToken,
         process.env.REFRESH_TOKEN_SECRET as string
       ) as { userId: string };
-    } catch {
+    } catch (err: any) {
+      console.warn("-> refresh: jwt verify failed:", err?.message || err);
       clearAuthCookies(res);
       return res.status(401).json({ message: "Invalid refresh token" });
     }
@@ -110,7 +165,7 @@ export const refreshAccessToken = catchAsync(
       .update(refreshToken)
       .digest("hex");
 
-    // create new tokens
+    // prepare new tokens (we will rotate only if DB update succeeds)
     const newAccess = generateAccessToken(decoded.userId);
     const newRefresh = generateRefreshToken(decoded.userId);
     const newHash = crypto
@@ -119,31 +174,69 @@ export const refreshAccessToken = catchAsync(
       .digest("hex");
     const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    // Atomic rotation: only update the session that matches the old hash, is not revoked, and not expired
-    const updated = await Session.findOneAndUpdate(
-      {
-        refreshTokenHash: receivedHash,
-        revokedAt: null,
-        expiresAt: { $gt: new Date() },
-      },
-      {
-        $set: {
-          refreshTokenHash: newHash,
-          lastUsedAt: new Date(),
-          expiresAt: newExpiresAt,
-          userAgent: req.headers["user-agent"],
-          ip: req.ip,
+    // Attempt atomic rotation
+    let updated;
+    try {
+      updated = await Session.findOneAndUpdate(
+        {
+          refreshTokenHash: receivedHash,
+          revokedAt: null,
+          expiresAt: { $gt: new Date() },
         },
-      },
-      { new: true }
-    );
+        {
+          $set: {
+            // rotate: replace with newHash + update metadata
+            refreshTokenHash: newHash,
+            lastUsedAt: new Date(),
+            expiresAt: newExpiresAt,
+            userAgent: req.headers["user-agent"],
+            ip: req.ip,
+          },
+        },
+        { new: true }
+      );
+    } catch (err: any) {
+      console.error(
+        "-> refresh: DB error during rotation:",
+        err?.message || err
+      );
+      clearAuthCookies(res);
+      return res.status(500).json({ message: "Server error" });
+    }
 
     if (!updated) {
-      // Possible reuse or session invalid -> revoke all sessions of this user
-      await Session.updateMany(
-        { user: decoded.userId },
-        { $set: { revokedAt: new Date() } }
-      );
+      // Rotation failed: decide whether to revoke all or just this session.
+      try {
+        const maybeSession = await Session.findOne({
+          refreshTokenHash: receivedHash,
+        });
+
+        if (maybeSession) {
+          // session exists => strong signal of reuse or double-use; revoke all (security)
+          console.warn(
+            "-> refresh: token reuse suspected — revoking all sessions for user:",
+            decoded.userId
+          );
+          await Session.updateMany(
+            { user: decoded.userId },
+            { $set: { revokedAt: new Date() } }
+          );
+        } else {
+          // session not found => could be race/expired or DB timing issue.
+          // Safer to NOT revoke other sessions. Just clear cookies and return 401.
+          console.warn(
+            "-> refresh: rotation failed but session not found (race/expired). Not revoking other sessions."
+          );
+        }
+      } catch (uErr: any) {
+        console.error(
+          "-> refresh: error during reuse handling:",
+          uErr?.message || uErr
+        );
+        // As a fallback, do not revoke all here to avoid accidental logouts,
+        // but you may choose otherwise if you prefer strict behavior.
+      }
+
       clearAuthCookies(res);
       return res
         .status(401)
@@ -152,13 +245,22 @@ export const refreshAccessToken = catchAsync(
 
     // success -> set new cookies and return
     setAuthCookies(res, newAccess, newRefresh);
+
+    console.log("✅ refresh: rotated session", {
+      userId: decoded.userId,
+      sessionId: updated._id?.toString(),
+      hashPreview: newHash.slice(0, 8),
+    });
+
     return res
       .status(200)
       .json({ success: true, message: "Access token refreshed" });
   }
 );
 
-// Profile
+/**
+ * Profile
+ */
 export const getMyProfile = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const userId = req.userId;
