@@ -154,10 +154,8 @@ const productSchema = new Schema<IProduct, IProductModel>(
   {
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true },
-
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true },
-
     variants: {
       type: [variantSchema],
       required: true,
@@ -166,7 +164,6 @@ const productSchema = new Schema<IProduct, IProductModel>(
         message: "At least one variant is required",
       },
     },
-
     specifications: [
       {
         section: { type: String, required: true },
@@ -178,30 +175,22 @@ const productSchema = new Schema<IProduct, IProductModel>(
         ],
       },
     ],
-
     measurements: {
       width: { type: Number },
       height: { type: Number },
       depth: { type: Number },
       weight: { type: Number },
     },
-
     colors: { type: [String], default: [] },
     sizes: { type: [String], default: [] },
-
     warranty: { type: String, default: "" },
     disclaimer: { type: String, default: "" },
-
     category: { type: Schema.Types.ObjectId, ref: "Category", required: true },
-
     price: { type: Number, required: true },
     lowestDiscountedPrice: { type: Number, required: false },
     maxSavings: { type: Number, default: 0 },
-
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
-
     isPublished: { type: Boolean, default: false },
-
     reviewStats: {
       averageRating: { type: Number, default: 0, min: 0, max: 5 },
       totalReviews: { type: Number, default: 0, min: 0 },
@@ -216,7 +205,6 @@ const productSchema = new Schema<IProduct, IProductModel>(
       reviewsWithImages: { type: Number, default: 0, min: 0 },
       lastUpdated: { type: Date, default: Date.now },
     },
-
     reviewSettings: {
       allowReviews: { type: Boolean, default: true },
       requireVerification: { type: Boolean, default: false },
@@ -239,7 +227,6 @@ productSchema.pre("save", function (next) {
       remove: /[\*+\~.()'"!:@]/g,
     });
   }
-
   if (this.variants && this.variants.length) {
     this.price = Math.min(...this.variants.map((v) => v.price ?? 0));
     this.lowestDiscountedPrice = Math.min(
