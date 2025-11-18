@@ -49,6 +49,10 @@ const variantSchema = new Schema<IVariant>({
     {
       url: { type: String, required: true },
       public_id: { type: String, required: true },
+      thumbSmart: { type: String },
+      thumbSafe: { type: String },
+      blurDataURL: { type: String },
+      isPrimary: { type: Boolean, default: false }, // <-- new
     },
   ],
 });
