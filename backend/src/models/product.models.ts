@@ -1,7 +1,15 @@
 import { Schema, model, Model, models, Document, Types } from "mongoose";
 import slugify from "slugify";
 
-// Variant Interface including discount fields
+/* ---------- Variant image + variant interfaces ---------- */
+export interface IVariantImage {
+  url: string;
+  public_id: string;
+  thumbSafe?: string;
+  blurDataURL?: string;
+  isPrimary?: boolean;
+}
+
 export interface IVariant extends Document {
   sku: string;
   color: string;
@@ -20,77 +28,13 @@ export interface IVariant extends Document {
 
   stock: number;
   reservedStock: number;
-  images: {
-    url: string;
-    public_id: string;
-  }[];
+  images: IVariantImage[];
 }
 
-// Variant Schema with discount fields and default values
-const variantSchema = new Schema<IVariant>({
-  sku: { type: String, required: true },
-  color: { type: String, required: true },
-  size: { type: String, required: true },
-
-  basePrice: { type: Number, required: true },
-  gstRate: { type: Number, required: true },
-
-  price: { type: Number, default: 0 },
-  discountedPrice: { type: Number, default: 0 },
-  savings: { type: Number, default: 0 },
-
-  hasDiscount: { type: Boolean, default: false },
-  discountPercent: { type: Number, default: 0, min: 0, max: 70 },
-  discountValidUntil: { type: Date },
-
-  stock: { type: Number, required: true, default: 0 },
-  reservedStock: { type: Number, default: 0 },
-  images: [
-    {
-      url: { type: String, required: true },
-      public_id: { type: String, required: true },
-      thumbSmart: { type: String },
-      thumbSafe: { type: String },
-      blurDataURL: { type: String },
-      isPrimary: { type: Boolean, default: false }, // <-- new
-    },
-  ],
-});
-
-// Pre-save hook for variant to calculate price, discountedPrice and savings
-variantSchema.pre("save", function (this: IVariant, next) {
-  this.price = this.basePrice + (this.basePrice * this.gstRate) / 100;
-
-  const isDiscountValid =
-    this.hasDiscount &&
-    this.discountPercent > 0 &&
-    (!this.discountValidUntil || this.discountValidUntil > new Date());
-
-  if (isDiscountValid) {
-    const discountAmount = (this.basePrice * this.discountPercent) / 100;
-    const discountedBasePrice = this.basePrice - discountAmount;
-
-    this.discountedPrice =
-      discountedBasePrice + (discountedBasePrice * this.gstRate) / 100;
-    this.savings = this.price - this.discountedPrice;
-  } else {
-    this.discountedPrice = this.price;
-    this.savings = 0;
-    this.hasDiscount = false;
-  }
-
-  this.price = Math.round(this.price * 100) / 100;
-  this.discountedPrice = Math.round(this.discountedPrice * 100) / 100;
-  this.savings = Math.round(this.savings * 100) / 100;
-
-  next();
-});
-
-// Product Interface
+/* ---------- Product interface ---------- */
 export interface IProduct extends Document {
   name: string;
   slug: string;
-
   title: string;
   description: string;
 
@@ -107,7 +51,6 @@ export interface IProduct extends Document {
   };
 
   variants: Types.DocumentArray<IVariant>;
-
   colors: string[];
   sizes: string[];
 
@@ -116,12 +59,37 @@ export interface IProduct extends Document {
 
   category: Types.ObjectId;
 
-  price: number; // Lowest variant price
-  lowestDiscountedPrice: number; // Lowest discounted price among variants
+  price: number;
+  lowestDiscountedPrice?: number;
   maxSavings: number;
 
+  // denorm + SEO
+  primaryVariantId?: Types.ObjectId;
+  primaryLocked?: boolean;
+
+  repImage?: string;
+  repImagePublicId?: string;
+  repThumbSmart?: string;
+  repThumbSafe?: string;
+  repBlurDataURL?: string;
+
+  repPrice?: number;
+  repDiscountedPrice?: number;
+  repSavings?: number;
+  repInStock?: boolean;
+
+  totalStock?: number;
+  inStock?: boolean;
+
+  metaTitle?: string;
+  metaDescription?: string;
+  canonicalUrl?: string;
+  ogImage?: string;
+  searchTags?: string[];
+  visibleOnHomepage?: boolean;
+  lastUpdatedForListing?: Date;
+
   createdBy: Types.ObjectId;
-  createdAt: Date;
   isPublished: boolean;
 
   reviewStats: {
@@ -146,20 +114,87 @@ export interface IProduct extends Document {
   };
 }
 
-// Static methods interface
+/* ---------- Model statics ---------- */
 interface IProductModel extends Model<IProduct> {
   updateReviewStats(productId: string, stats: any): Promise<IProduct | null>;
   getByRatingRange(minRating: number, maxRating?: number): Promise<IProduct[]>;
   getTopRated(limit?: number): Promise<IProduct[]>;
+  pickRepresentative(doc: any): any | null;
+  recomputeDenorm(productDoc: any): Promise<IProduct | null>;
 }
 
-// Product Schema
+/* ---------- Schemas ---------- */
+const variantImageSchema = new Schema<IVariantImage>(
+  {
+    url: { type: String, required: true },
+    public_id: { type: String, required: true },
+    thumbSafe: { type: String },
+    blurDataURL: { type: String },
+    isPrimary: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const variantSchema = new Schema<IVariant>(
+  {
+    sku: { type: String, required: true },
+    color: { type: String, required: true },
+    size: { type: String, required: true },
+
+    basePrice: { type: Number, required: true },
+    gstRate: { type: Number, required: true },
+
+    price: { type: Number, default: 0 },
+    discountedPrice: { type: Number, default: 0 },
+    savings: { type: Number, default: 0 },
+
+    hasDiscount: { type: Boolean, default: false },
+    discountPercent: { type: Number, default: 0, min: 0, max: 70 },
+    discountValidUntil: { type: Date },
+
+    stock: { type: Number, required: true, default: 0 },
+    reservedStock: { type: Number, default: 0 },
+
+    images: { type: [variantImageSchema], default: [] },
+  },
+  { _id: true }
+);
+
+variantSchema.pre("save", function (this: IVariant, next) {
+  this.price = this.basePrice + (this.basePrice * this.gstRate) / 100;
+
+  const isDiscountValid =
+    this.hasDiscount &&
+    this.discountPercent > 0 &&
+    (!this.discountValidUntil || this.discountValidUntil > new Date());
+
+  if (isDiscountValid) {
+    const discountAmount = (this.basePrice * this.discountPercent) / 100;
+    const discountedBasePrice = this.basePrice - discountAmount;
+    this.discountedPrice =
+      discountedBasePrice + (discountedBasePrice * this.gstRate) / 100;
+    this.savings = this.price - this.discountedPrice;
+  } else {
+    this.discountedPrice = this.price;
+    this.savings = 0;
+    this.hasDiscount = false;
+  }
+
+  this.price = Math.round(this.price * 100) / 100;
+  this.discountedPrice = Math.round(this.discountedPrice * 100) / 100;
+  this.savings = Math.round(this.savings * 100) / 100;
+
+  next();
+});
+
 const productSchema = new Schema<IProduct, IProductModel>(
   {
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true },
+
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true },
+
     variants: {
       type: [variantSchema],
       required: true,
@@ -168,6 +203,7 @@ const productSchema = new Schema<IProduct, IProductModel>(
         message: "At least one variant is required",
       },
     },
+
     specifications: [
       {
         section: { type: String, required: true },
@@ -179,22 +215,58 @@ const productSchema = new Schema<IProduct, IProductModel>(
         ],
       },
     ],
+
     measurements: {
       width: { type: Number },
       height: { type: Number },
       depth: { type: Number },
       weight: { type: Number },
     },
+
     colors: { type: [String], default: [] },
     sizes: { type: [String], default: [] },
+
     warranty: { type: String, default: "" },
     disclaimer: { type: String, default: "" },
+
     category: { type: Schema.Types.ObjectId, ref: "Category", required: true },
+
     price: { type: Number, required: true },
     lowestDiscountedPrice: { type: Number, required: false },
     maxSavings: { type: Number, default: 0 },
+
+    // denorm + seo
+    primaryVariantId: { type: Schema.Types.ObjectId },
+    primaryLocked: { type: Boolean, default: false },
+
+    repImage: { type: String },
+    repImagePublicId: { type: String },
+    repThumbSmart: { type: String },
+    repThumbSafe: { type: String },
+    repBlurDataURL: { type: String },
+
+    repPrice: { type: Number },
+    repDiscountedPrice: { type: Number },
+    repSavings: { type: Number, default: 0 },
+    repInStock: { type: Boolean, default: false },
+
+    totalStock: { type: Number, default: 0 },
+    inStock: { type: Boolean, default: false },
+
+    metaTitle: { type: String },
+    metaDescription: { type: String },
+    canonicalUrl: { type: String },
+    ogImage: { type: String },
+
+    searchTags: { type: [String], default: [] },
+    visibleOnHomepage: { type: Boolean, default: false },
+
+    lastUpdatedForListing: { type: Date, default: Date.now },
+
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+
     isPublished: { type: Boolean, default: false },
+
     reviewStats: {
       averageRating: { type: Number, default: 0, min: 0, max: 5 },
       totalReviews: { type: Number, default: 0, min: 0 },
@@ -209,6 +281,7 @@ const productSchema = new Schema<IProduct, IProductModel>(
       reviewsWithImages: { type: Number, default: 0, min: 0 },
       lastUpdated: { type: Date, default: Date.now },
     },
+
     reviewSettings: {
       allowReviews: { type: Boolean, default: true },
       requireVerification: { type: Boolean, default: false },
@@ -222,8 +295,9 @@ const productSchema = new Schema<IProduct, IProductModel>(
   }
 );
 
-// Pre-save hook for slug and price aggregation including discount
-productSchema.pre("save", function (next) {
+/* ---------- pre-save: slug, aggregates, defensive fill ---------- */
+//check here lowestdiscountedproce
+productSchema.pre("save", function (this: IProduct, next) {
   if (this.isModified("name")) {
     this.slug = slugify(this.name, {
       lower: true,
@@ -231,44 +305,67 @@ productSchema.pre("save", function (next) {
       remove: /[\*+\~.()'"!:@]/g,
     });
   }
-  if (this.variants && this.variants.length) {
-    this.price = Math.min(...this.variants.map((v) => v.price ?? 0));
-    this.lowestDiscountedPrice = Math.min(
-      ...this.variants.map((v) => v.discountedPrice ?? 0)
-    );
-    this.maxSavings = Math.max(...this.variants.map((v) => v.savings ?? 0));
 
-    this.colors = [...new Set(this.variants.map((v) => v.color))];
-    this.sizes = [...new Set(this.variants.map((v) => v.size))];
+  if (this.variants && this.variants.length) {
+    // price aggregates
+    this.price =
+      Math.min(...this.variants.map((v: any) => v.price ?? Infinity)) ||
+      this.price;
+    this.lowestDiscountedPrice =
+      Math.min(
+        ...this.variants.map((v: any) => v.discountedPrice ?? Infinity)
+      ) || this.lowestDiscountedPrice;
+    this.maxSavings = Math.max(
+      ...this.variants.map((v: any) => v.savings ?? 0),
+      this.maxSavings
+    );
+
+    this.colors = [...new Set(this.variants.map((v: any) => v.color))];
+    this.sizes = [...new Set(this.variants.map((v: any) => v.size))];
+  }
+
+  // defensive fill: if rep fields missing, try fill from first variant image
+  try {
+    if (
+      (!this.repThumbSmart || !this.repThumbSafe || !this.repImage) &&
+      this.variants?.length
+    ) {
+      const img = this.variants[0].images?.[0];
+      if (img) {
+        this.repImage = this.repImage || img.url;
+        this.repImagePublicId = this.repImagePublicId || img.public_id;
+
+        this.repThumbSafe = this.repThumbSafe || img.thumbSafe;
+        this.repBlurDataURL = this.repBlurDataURL || img.blurDataURL;
+      }
+    }
+  } catch (e) {
+    // ignore
   }
 
   next();
 });
 
-// Virtual fields
-// productSchema.virtual("totalStock").get(function (this: IProduct) {
-//   return this.variants.reduce((sum, v) => sum + v.stock, 0);
-// });
-
-// productSchema.virtual("inStock").get(function (this: IProduct) {
-//   return this.variants.some((v) => v.stock > 0);
-// });
-
-// productSchema.virtual("hasAnyDiscount").get(function (this: IProduct) {
-//   return this.variants.some((v) => v.hasDiscount);
-// });
-
-// productSchema.virtual("totalSavings").get(function (this: IProduct) {
-//   return this.variants.reduce((sum, v) => sum + (v.savings ?? 0), 0);
-// });
-
-// Indexes for performance
+/* ---------- indexes ---------- */
 productSchema.index({ slug: 1 }, { unique: true });
 productSchema.index({ category: 1 });
 productSchema.index({ price: 1 });
 productSchema.index({ lowestDiscountedPrice: 1 });
 productSchema.index({ maxSavings: -1 });
 productSchema.index({ isPublished: 1 });
+productSchema.index({ primaryVariantId: 1 });
+productSchema.index({ repInStock: 1, inStock: 1 });
+productSchema.index({ repPrice: 1, repDiscountedPrice: 1 });
+productSchema.index({
+  metaTitle: "text",
+  metaDescription: "text",
+  searchTags: "text",
+  name: "text",
+  title: "text",
+});
+
+/* ---------- statics ---------- */
+
 productSchema.statics.updateReviewStats = async function (
   productId: string,
   stats: any
@@ -293,7 +390,6 @@ productSchema.statics.updateReviewStats = async function (
   );
 };
 
-// Get products by rating range
 productSchema.statics.getByRatingRange = function (
   minRating: number,
   maxRating: number = 5
@@ -305,7 +401,6 @@ productSchema.statics.getByRatingRange = function (
   }).sort({ "reviewStats.averageRating": -1 });
 };
 
-// Get top-rated products
 productSchema.statics.getTopRated = function (limit: number = 10) {
   return this.find({
     "reviewStats.totalReviews": { $gte: 5 },
@@ -315,30 +410,99 @@ productSchema.statics.getTopRated = function (limit: number = 10) {
     .limit(limit);
 };
 
-// Additional Utility Methods
-productSchema.statics.getInStockProducts = function () {
-  return this.find({
-    "variants.stock": { $gt: 0 },
-    isPublished: true,
-  });
+// pickRepresentative: admin override respected; otherwise choose best in-stock then lowest discounted price
+productSchema.statics.pickRepresentative = function (doc: any) {
+  if (!doc) return null;
+
+  // if admin locked primaryVariant, prefer that exact variant (even if OOS)
+  if (doc.primaryVariantId) {
+    const v = doc.variants.id(doc.primaryVariantId);
+    if (v) {
+      const img =
+        (v.images && v.images.find((i: any) => i.isPrimary)) ||
+        v.images?.[0] ||
+        {};
+      return {
+        vid: v._id,
+        img,
+        price: v.price,
+        discountedPrice: v.discountedPrice,
+        savings: v.savings,
+        inStock: (v.stock || 0) > 0,
+      };
+    }
+  }
+
+  // otherwise choose automatically preferring inStock variants
+  const arr = (doc.variants || []).map((v: any) => ({
+    v,
+    score:
+      ((v.stock || 0) > 0 ? 10000 : 0) -
+      (v.discountedPrice || v.price || 0) +
+      (v.savings || 0),
+  }));
+  arr.sort((a: any, b: any) => b.score - a.score);
+  const best = arr[0]?.v;
+  if (!best) return null;
+  const firstImg =
+    (best.images && best.images.find((i: any) => i.isPrimary)) ||
+    best.images?.[0] ||
+    {};
+  return {
+    vid: best._id,
+    img: firstImg,
+    price: best.price,
+    discountedPrice: best.discountedPrice,
+    savings: best.savings,
+    inStock: (best.stock || 0) > 0,
+  };
 };
 
-productSchema.statics.getLowStockProducts = function (threshold: number = 10) {
-  return this.aggregate([
-    { $unwind: "$variants" },
-    { $match: { "variants.stock": { $lte: threshold }, isPublished: true } },
-    {
-      $group: {
-        _id: "$_id",
-        name: { $first: "$name" },
-        lowStockVariants: { $push: "$variants" },
-        totalLowStockItems: { $sum: "$variants.stock" },
-      },
-    },
-  ]);
+// recomputeDenorm: update denorm fields, respects primaryLocked: if primaryLocked true, do not overwrite primaryVariantId
+productSchema.statics.recomputeDenorm = async function (productDoc: any) {
+  const Product = this;
+  let doc = productDoc;
+  if (!productDoc.toObject) doc = await Product.findById(productDoc);
+  if (!doc) return null;
+
+  // compute totalStock accounting reservedStock
+  const totalStock = (doc.variants || []).reduce(
+    (s: number, v: any) =>
+      s + Math.max(0, (v.stock || 0) - (v.reservedStock || 0)),
+    0
+  );
+  const anyInStock = totalStock > 0;
+
+  const rep = Product.pickRepresentative(doc);
+  const update: any = {
+    totalStock,
+    inStock: anyInStock,
+    lastUpdatedForListing: new Date(),
+  };
+
+  if (rep) {
+    // if admin locked primaryVariant, we should not overwrite primaryVariantId
+    if (!doc.primaryLocked) update.primaryVariantId = rep.vid;
+    // always update representative snapshot fields
+    update.repPrice = rep.price;
+    update.repDiscountedPrice = rep.discountedPrice;
+    update.repSavings = rep.savings || 0;
+    update.repInStock = rep.inStock;
+
+    if (rep.img) {
+      update.repImage = rep.img.url || update.repImage;
+      update.repImagePublicId = rep.img.public_id || update.repImagePublicId;
+      update.repThumbSmart = rep.img.thumbSmart || update.repThumbSmart;
+      update.repThumbSafe = rep.img.thumbSafe || update.repThumbSafe;
+      update.repBlurDataURL = rep.img.blurDataURL || update.repBlurDataURL;
+      update.ogImage = update.ogImage || rep.img.thumbSafe || rep.img.url;
+    }
+  }
+
+  return await Product.findByIdAndUpdate(doc._id, update, { new: true });
 };
 
-// Export model
+/* ---------- export model ---------- */
 let Product: IProductModel;
 if (models.Product) {
   Product = models.Product as IProductModel;
