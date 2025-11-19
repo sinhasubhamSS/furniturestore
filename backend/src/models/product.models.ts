@@ -35,6 +35,7 @@ export interface IVariant extends Document {
 export interface IProduct extends Document {
   name: string;
   slug: string;
+
   title: string;
   description: string;
 
@@ -51,6 +52,7 @@ export interface IProduct extends Document {
   };
 
   variants: Types.DocumentArray<IVariant>;
+
   colors: string[];
   sizes: string[];
 
@@ -59,8 +61,8 @@ export interface IProduct extends Document {
 
   category: Types.ObjectId;
 
-  price: number;
-  lowestDiscountedPrice?: number;
+  price: number; // Lowest variant price
+  lowestDiscountedPrice?: number; // Lowest discounted price among variants
   maxSavings: number;
 
   // denorm + SEO
@@ -69,7 +71,6 @@ export interface IProduct extends Document {
 
   repImage?: string;
   repImagePublicId?: string;
-  repThumbSmart?: string;
   repThumbSafe?: string;
   repBlurDataURL?: string;
 
@@ -88,6 +89,10 @@ export interface IProduct extends Document {
   searchTags?: string[];
   visibleOnHomepage?: boolean;
   lastUpdatedForListing?: Date;
+
+  // timestamps
+  createdAt?: Date;
+  updatedAt?: Date;
 
   createdBy: Types.ObjectId;
   isPublished: boolean;
@@ -160,6 +165,7 @@ const variantSchema = new Schema<IVariant>(
   { _id: true }
 );
 
+/* ---------- variant pre-save ---------- */
 variantSchema.pre("save", function (this: IVariant, next) {
   this.price = this.basePrice + (this.basePrice * this.gstRate) / 100;
 
@@ -187,6 +193,7 @@ variantSchema.pre("save", function (this: IVariant, next) {
   next();
 });
 
+/* ---------- Product schema ---------- */
 const productSchema = new Schema<IProduct, IProductModel>(
   {
     name: { type: String, required: true, trim: true },
@@ -241,7 +248,6 @@ const productSchema = new Schema<IProduct, IProductModel>(
 
     repImage: { type: String },
     repImagePublicId: { type: String },
-    repThumbSmart: { type: String },
     repThumbSafe: { type: String },
     repBlurDataURL: { type: String },
 
@@ -296,7 +302,6 @@ const productSchema = new Schema<IProduct, IProductModel>(
 );
 
 /* ---------- pre-save: slug, aggregates, defensive fill ---------- */
-//check here lowestdiscountedproce
 productSchema.pre("save", function (this: IProduct, next) {
   if (this.isModified("name")) {
     this.slug = slugify(this.name, {
@@ -326,15 +331,11 @@ productSchema.pre("save", function (this: IProduct, next) {
 
   // defensive fill: if rep fields missing, try fill from first variant image
   try {
-    if (
-      (!this.repThumbSmart || !this.repThumbSafe || !this.repImage) &&
-      this.variants?.length
-    ) {
+    if ((!this.repThumbSafe || !this.repImage) && this.variants?.length) {
       const img = this.variants[0].images?.[0];
       if (img) {
         this.repImage = this.repImage || img.url;
         this.repImagePublicId = this.repImagePublicId || img.public_id;
-
         this.repThumbSafe = this.repThumbSafe || img.thumbSafe;
         this.repBlurDataURL = this.repBlurDataURL || img.blurDataURL;
       }
@@ -398,7 +399,9 @@ productSchema.statics.getByRatingRange = function (
     "reviewStats.averageRating": { $gte: minRating, $lte: maxRating },
     "reviewStats.totalReviews": { $gt: 0 },
     isPublished: true,
-  }).sort({ "reviewStats.averageRating": -1 });
+  }).sort({
+    "reviewStats.averageRating": -1,
+  });
 };
 
 productSchema.statics.getTopRated = function (limit: number = 10) {
@@ -433,7 +436,7 @@ productSchema.statics.pickRepresentative = function (doc: any) {
     }
   }
 
-  // otherwise choose automatically preferring inStock variants
+  // otherwise choose automatically preferring inStock variants then lowest discountedPrice + savings
   const arr = (doc.variants || []).map((v: any) => ({
     v,
     score:
@@ -458,7 +461,7 @@ productSchema.statics.pickRepresentative = function (doc: any) {
   };
 };
 
-// recomputeDenorm: update denorm fields, respects primaryLocked: if primaryLocked true, do not overwrite primaryVariantId
+// recomputeDenorm: update denorm fields, respects primaryLocked
 productSchema.statics.recomputeDenorm = async function (productDoc: any) {
   const Product = this;
   let doc = productDoc;
@@ -481,9 +484,7 @@ productSchema.statics.recomputeDenorm = async function (productDoc: any) {
   };
 
   if (rep) {
-    // if admin locked primaryVariant, we should not overwrite primaryVariantId
     if (!doc.primaryLocked) update.primaryVariantId = rep.vid;
-    // always update representative snapshot fields
     update.repPrice = rep.price;
     update.repDiscountedPrice = rep.discountedPrice;
     update.repSavings = rep.savings || 0;
@@ -492,7 +493,6 @@ productSchema.statics.recomputeDenorm = async function (productDoc: any) {
     if (rep.img) {
       update.repImage = rep.img.url || update.repImage;
       update.repImagePublicId = rep.img.public_id || update.repImagePublicId;
-      update.repThumbSmart = rep.img.thumbSmart || update.repThumbSmart;
       update.repThumbSafe = rep.img.thumbSafe || update.repThumbSafe;
       update.repBlurDataURL = rep.img.blurDataURL || update.repBlurDataURL;
       update.ogImage = update.ogImage || rep.img.thumbSafe || rep.img.url;
