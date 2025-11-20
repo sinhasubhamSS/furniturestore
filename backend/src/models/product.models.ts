@@ -301,8 +301,9 @@ const productSchema = new Schema<IProduct, IProductModel>(
   }
 );
 
-/* ---------- pre-save: slug, aggregates, defensive fill ---------- */
+/* ---------- pre-save: slug, aggregates and sync rep from representative variant ---------- */
 productSchema.pre("save", function (this: IProduct, next) {
+  // slugify if name changed
   if (this.isModified("name")) {
     this.slug = slugify(this.name, {
       lower: true,
@@ -311,8 +312,8 @@ productSchema.pre("save", function (this: IProduct, next) {
     });
   }
 
+  // aggregates
   if (this.variants && this.variants.length) {
-    // price aggregates
     this.price =
       Math.min(...this.variants.map((v: any) => v.price ?? Infinity)) ||
       this.price;
@@ -329,19 +330,51 @@ productSchema.pre("save", function (this: IProduct, next) {
     this.sizes = [...new Set(this.variants.map((v: any) => v.size))];
   }
 
-  // defensive fill: if rep fields missing, try fill from first variant image
+  // sync representative variant snapshot so listing price/image match chosen variant
   try {
-    if ((!this.repThumbSafe || !this.repImage) && this.variants?.length) {
-      const img = this.variants[0].images?.[0];
-      if (img) {
-        this.repImage = this.repImage || img.url;
-        this.repImagePublicId = this.repImagePublicId || img.public_id;
-        this.repThumbSafe = this.repThumbSafe || img.thumbSafe;
-        this.repBlurDataURL = this.repBlurDataURL || img.blurDataURL;
+    const Model: any = (this.constructor as any);
+    const pickFn = typeof Model.pickRepresentative === "function" ? Model.pickRepresentative : null;
+    let rep: any = null;
+
+    if (pickFn) {
+      rep = pickFn(this);
+    } else {
+      // fallback to first variant
+      const v0 = this.variants?.[0];
+      if (v0) {
+        const img = (v0.images && v0.images.find((i: any) => i.isPrimary)) || v0.images?.[0] || {};
+        rep = {
+          vid: v0._id,
+          img,
+          price: v0.price,
+          discountedPrice: v0.discountedPrice,
+          savings: v0.savings,
+          inStock: (v0.stock || 0) > 0,
+        };
+      }
+    }
+
+    if (rep) {
+      if (!this.primaryLocked) {
+        this.primaryVariantId = rep.vid;
+      }
+
+      this.repPrice = rep.price;
+      this.repDiscountedPrice = rep.discountedPrice;
+      this.repSavings = rep.savings || 0;
+      this.repInStock = !!rep.inStock;
+
+      if (rep.img) {
+        // prefer existing top-level values if already set (admin override)
+        this.repImage = this.repImage || rep.img.url;
+        this.repImagePublicId = this.repImagePublicId || rep.img.public_id;
+        this.repThumbSafe = this.repThumbSafe || rep.img.thumbSafe;
+        this.repBlurDataURL = this.repBlurDataURL || rep.img.blurDataURL;
+        this.ogImage = this.ogImage || rep.img.thumbSafe || rep.img.url;
       }
     }
   } catch (e) {
-    // ignore
+    // ignore errors and continue save
   }
 
   next();
@@ -399,9 +432,7 @@ productSchema.statics.getByRatingRange = function (
     "reviewStats.averageRating": { $gte: minRating, $lte: maxRating },
     "reviewStats.totalReviews": { $gt: 0 },
     isPublished: true,
-  }).sort({
-    "reviewStats.averageRating": -1,
-  });
+  }).sort({ "reviewStats.averageRating": -1 });
 };
 
 productSchema.statics.getTopRated = function (limit: number = 10) {
@@ -484,7 +515,9 @@ productSchema.statics.recomputeDenorm = async function (productDoc: any) {
   };
 
   if (rep) {
+    // if admin locked primaryVariant, we should not overwrite primaryVariantId
     if (!doc.primaryLocked) update.primaryVariantId = rep.vid;
+    // always update representative snapshot fields
     update.repPrice = rep.price;
     update.repDiscountedPrice = rep.discountedPrice;
     update.repSavings = rep.savings || 0;
