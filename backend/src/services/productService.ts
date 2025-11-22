@@ -1,3 +1,4 @@
+// src/services/productService.ts
 import { FilterQuery, Types } from "mongoose";
 import cloudinary from "../config/cloudinary";
 import Category from "../models/category.model";
@@ -6,45 +7,63 @@ import { IProductInput } from "../types/productservicetype";
 import { AppError } from "../utils/AppError";
 import slugify from "slugify";
 import { generateSKU } from "../utils/genetateSku";
-import { SortByOptions } from "../types/productservicetype";
-import { IVariant } from "../types/productservicetype"; // Adjust the path as necessary
+import { IVariant } from "../types/productservicetype";
+
+/**
+ * ProductService
+ * - kept same class-style you had
+ * - important changes:
+ *   - LISTING_PROJECTION uses rep* denormalized fields (fast for listing & SSR)
+ *   - buildSortOptions uses rep* fields
+ *   - deleteRemovedImages runs deletes in parallel (faster)
+ *   - create/edit call Product.recomputeDenorm(...) after saves
+ *   - getLatestProducts uses rep snapshot when available
+ *   - mapToListingDTO central mapper for listing consistency
+ */
 
 class ProductService {
-  // ==================== PRIVATE/UTILITY METHODS ====================
-
+  // -------------------- helpers --------------------
   private buildSlug(name: string) {
     return slugify(name, { lower: true, strict: true });
   }
 
+  // delete removed cloudinary images in parallel (safer + faster)
   private async deleteRemovedImages(
-    oldImages: { public_id: string }[],
-    newImages: { public_id: string }[]
+    oldImages: { public_id: string }[] = [],
+    newImages: { public_id: string }[] = []
   ) {
-    const newIds = newImages.map((img) => img.public_id);
-    const toDelete = oldImages.filter((img) => !newIds.includes(img.public_id));
-    for (const img of toDelete) {
-      try {
-        await cloudinary.uploader.destroy(img.public_id);
-      } catch (err) {
-        console.error("Cloudinary deletion error:", err);
-      }
-    }
+    const newIds = new Set((newImages || []).map((img) => img.public_id));
+    const toDelete = (oldImages || []).filter(
+      (img) => !newIds.has(img.public_id)
+    );
+
+    if (toDelete.length === 0) return;
+
+    // run parallel, catch/log errors per image
+    await Promise.all(
+      toDelete.map(async (img) => {
+        try {
+          await cloudinary.uploader.destroy(img.public_id);
+        } catch (e) {
+          console.error("cloudinary delete error", img.public_id, e);
+        }
+      })
+    );
   }
 
+  // simple pagination helper
   private applyPagination(query: any, page = 1, limit = 10) {
     const skip = (page - 1) * limit;
     return query.skip(skip).limit(limit);
   }
 
-  // ✅ CENTRALIZED QUERY BUILDER - DRY Principle
+  // centralized builder: respects isAdmin and optional creator populate
   private buildProductQuery(
     filter: FilterQuery<IProductInput> = {},
     isAdmin: boolean = false,
     populateCreatedBy: boolean = false
   ) {
-    // Admin can see all, users only published
     const finalFilter = isAdmin ? filter : { ...filter, isPublished: true };
-
     let query = Product.find(finalFilter).populate("category", "name");
 
     if (populateCreatedBy) {
@@ -53,32 +72,51 @@ class ProductService {
 
     return query;
   }
-  // ==================== PRIVATE/UTILITY METHODS ==================== में add करें
 
+  // -------------------- sorting --------------------
+  // use rep* fields for listing sorts so UI sort matches listing price shown
   private buildSortOptions(sortBy: string): { [key: string]: 1 | -1 } {
     switch (sortBy) {
       case "price_low":
-        return { price: 1 }; // Lowest price first
-
+        return { repDiscountedPrice: 1, repPrice: 1 };
       case "price_high":
-        return { price: -1 }; // Highest price first
-
+        return { repDiscountedPrice: -1, repPrice: -1 };
       case "discount":
-        return { maxSavings: -1 }; // Highest savings first
-
+        return { repSavings: -1 };
+      case "best":
+        return { repInStock: -1, repDiscountedPrice: 1 };
       case "latest":
       default:
-        return { createdAt: -1 }; // Newest first
+        return { createdAt: -1 };
     }
   }
 
-  // ==================== ADMIN-ONLY METHODS ====================
+  // -------------------- mapping helpers --------------------
+  // central DTO for listing -> keep frontend stable and small
+  private mapToListingDTO(p: any) {
+    return {
+      _id: p._id,
+      name: p.name,
+      slug: p.slug,
+      title: p.title,
+      image: p.repThumbSafe || p.repImage || "",
+      price: p.repPrice ?? p.price ?? null,
+      discountedPrice: p.repDiscountedPrice ?? p.lowestDiscountedPrice ?? null,
+      inStock: !!p.repInStock,
+      totalStock: p.totalStock ?? 0,
+      metaTitle: p.metaTitle,
+      metaDescription: p.metaDescription,
+      createdAt: (p as any).createdAt || null,
+    };
+  }
 
+  // -------------------- admin ops --------------------
   async createProduct(productData: IProductInput, userId: string) {
     if (!productData.variants || productData.variants.length === 0) {
       throw new AppError("At least one variant is required", 400);
     }
 
+    // process variants: sku, price, discountedPrice, savings, stock normalize
     const processedVariants = productData.variants.map((variant) => {
       if (!variant.images || variant.images.length === 0) {
         throw new AppError("Each variant must have at least one image", 400);
@@ -111,22 +149,27 @@ class ProductService {
         price: Math.round(price * 100) / 100,
         discountedPrice: Math.round(discountedPrice * 100) / 100,
         savings: Math.round(savings * 100) / 100,
-        stock: variant.stock || 0,
-      };
+        stock: variant.stock ?? 0,
+      } as IVariant;
     });
 
-    const minPrice = Math.min(...processedVariants.map((v) => v.price));
-    const minDiscountedPrice = Math.min(
-      ...processedVariants.map((v) => v.discountedPrice)
+    // top-level aggregates
+    const minPrice = Math.min(
+      ...processedVariants.map((v) => v.price ?? Infinity)
     );
-    const maxSavings = Math.max(...processedVariants.map((v) => v.savings));
+    const minDiscountedPrice = Math.min(
+      ...processedVariants.map((v) => v.discountedPrice ?? Infinity)
+    );
+    const maxSavings = Math.max(
+      ...processedVariants.map((v) => v.savings ?? 0)
+    );
     const colors = [...new Set(processedVariants.map((v) => v.color))];
     const sizes = [...new Set(processedVariants.map((v) => v.size))];
 
     const productDocument: IProductInput = {
       ...productData,
       slug: this.buildSlug(productData.name),
-      variants: processedVariants,
+      variants: processedVariants as any,
       price: minPrice,
       lowestDiscountedPrice: minDiscountedPrice,
       maxSavings,
@@ -137,6 +180,14 @@ class ProductService {
     };
 
     const product = await Product.create(productDocument);
+
+    // ensure rep* snapshot and totals are correct after create
+    try {
+      await Product.recomputeDenorm(product._id);
+    } catch (e) {
+      console.error("recomputeDenorm error after create", e);
+    }
+
     return product;
   }
 
@@ -151,29 +202,34 @@ class ProductService {
     });
     if (!product) throw new AppError("Product not found or unauthorized", 404);
 
-    // Update slug on name change
+    // slug if name changed
     if (updateData.name && updateData.name !== product.name) {
       product.slug = this.buildSlug(updateData.name);
     }
 
-    // Variants update handling
+    // variant updates (if provided)
     if (updateData.variants) {
       if (updateData.variants.length === 0) {
         throw new AppError("At least one variant is required", 400);
       }
 
-      // Delete images removed in update for each old variant compared to new
+      // delete removed images (compare old -> new). safe even if new shorter.
+      // note: this loops per-variant index matching. if your frontend reorders variants, adjust logic to compare by public_id or sku.
       for (let i = 0; i < product.variants.length; i++) {
         const oldVariant = product.variants[i];
         const newVariant = updateData.variants[i];
         if (newVariant) {
-          await this.deleteRemovedImages(oldVariant.images, newVariant.images);
+          await this.deleteRemovedImages(
+            oldVariant.images as any,
+            newVariant.images as any
+          );
         } else {
-          await this.deleteRemovedImages(oldVariant.images, []);
+          // whole variant removed -> delete all its images
+          await this.deleteRemovedImages(oldVariant.images as any, []);
         }
       }
 
-      // Recalculate pricing and fields for each new variant
+      // recalc processed variants (same logic as create)
       const processedVariants: IVariant[] = updateData.variants.map(
         (variant) => {
           if (!variant.images || variant.images.length === 0) {
@@ -214,27 +270,34 @@ class ProductService {
             price: Math.round(price * 100) / 100,
             discountedPrice: Math.round(discountedPrice * 100) / 100,
             savings: Math.round(savings * 100) / 100,
-            stock: variant.stock || 0,
-          };
+            stock: variant.stock ?? 0,
+          } as IVariant;
         }
       );
 
-      // Assign variants with Mongoose DocumentArray .set()
-      product.variants.splice(0, product.variants.length, ...processedVariants);
+      // replace variants in-place (DocumentArray)
+      product.variants.splice(
+        0,
+        product.variants.length,
+        ...(processedVariants as any)
+      );
 
-      // Update aggregate fields
-      product.price = Math.min(...processedVariants.map((v) => v.price ?? 0));
+      // update aggregates
+      product.price = Math.min(
+        ...processedVariants.map((v) => v.price ?? Infinity)
+      );
       product.lowestDiscountedPrice = Math.min(
-        ...processedVariants.map((v) => v.discountedPrice ?? 0)
+        ...processedVariants.map((v) => v.discountedPrice ?? Infinity)
       );
       product.maxSavings = Math.max(
-        ...processedVariants.map((v) => v.savings ?? 0)
+        ...processedVariants.map((v) => v.savings ?? 0),
+        product.maxSavings
       );
       product.colors = [...new Set(processedVariants.map((v) => v.color))];
       product.sizes = [...new Set(processedVariants.map((v) => v.size))];
     }
 
-    // Fields allowed to be updated
+    // apply other updatable fields (safe list)
     const updatableFields: (keyof IProductInput)[] = [
       "name",
       "title",
@@ -246,15 +309,20 @@ class ProductService {
       "category",
       "isPublished",
     ];
-
-    // Apply updates
     updatableFields.forEach((field) => {
-      if (updateData[field] !== undefined) {
-        (product as any)[field] = updateData[field];
+      if ((updateData as any)[field] !== undefined) {
+        (product as any)[field] = (updateData as any)[field];
       }
     });
 
     await product.save();
+
+    // recompute denorm AFTER save (ensure rep* and totals are in sync)
+    try {
+      await Product.recomputeDenorm(product._id);
+    } catch (e) {
+      console.error("recomputeDenorm error after edit", e);
+    }
 
     return product.toObject();
   }
@@ -265,23 +333,11 @@ class ProductService {
       createdBy: userId,
     });
     if (!product) throw new AppError("Product not found or unauthorized", 404);
+    // optionally: delete all cloudinary images for safety (not implemented here)
     return product;
   }
 
-  // ==================== UNIFIED GET METHODS ====================
-
-  /**
-   * ✅ UNIFIED - Get all products with filters
-   * @param filter - MongoDB filter object
-   * @param page - Page number
-   * @param limit - Items per page
-   * @param isAdmin - Admin access flag
-   * @param populateCreatedBy - Whether to populate creator info
-   */
-  // ProductService.js - Debug getAllProducts method
-  // service: src/services/product.service.ts (or your service class file)
-  // Make sure Product and Category models are imported correctly in this file.
-
+  // -------------------- listing & read methods --------------------
   async getAllProducts(
     filter: any = {},
     page: number = 1,
@@ -292,77 +348,60 @@ class ProductService {
   ) {
     const mongoFilter: any = {};
 
-    // Handle category filter - convert slug to ObjectId
+    // category slug -> id
     if (filter.category) {
       const category = await Category.findOne({ slug: filter.category });
       if (category) {
         mongoFilter.category = category._id;
       } else {
-        return {
-          products: [],
-          page,
-          limit,
-          totalPages: 0,
-          totalItems: 0,
-        };
+        return { products: [], page, limit, totalPages: 0, totalItems: 0 };
       }
     }
 
-    // Build dynamic sort options (use your existing helper)
     const sortOptions = this.buildSortOptions(sortBy);
 
-    // SIMPLE fixed projection for listing (keeps payload small)
-    // service: src/services/product.service.ts
+    // LISTING_PROJECTION uses rep* denormalized snapshot (fast)
+    const LISTING_PROJECTION: any = {
+      _id: 1,
+      slug: 1,
+      name: 1,
+      title: 1,
+      repImage: 1,
+      repThumbSafe: 1,
+      repPrice: 1,
+      repDiscountedPrice: 1,
+      repSavings: 1,
+      repInStock: 1,
+      totalStock: 1,
+      inStock: 1,
+      price: 1,
+      lowestDiscountedPrice: 1,
+      metaTitle: 1,
+      metaDescription: 1,
+      searchTags: 1,
+      visibleOnHomepage: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    };
 
-// SIMPLE fixed projection for listing (ensure variants.images included)
-const LISTING_PROJECTION: any = {
-  _id: 1,
-  slug: 1,
-  name: 1,
-  title: 1,
-  // do NOT project category.* here to avoid path collision with populate()
-  // category will be filled by populate('category', 'name')
-  "variants._id": 1,
-  "variants.images": 1,
-  "variants.basePrice": 1,
-  "variants.price": 1,
-  "variants.stock": 1,
-  createdAt: 1,
-  updatedAt: 1,
-};
-
-    // Build base query using existing builder (this.buildProductQuery)
     let query = this.buildProductQuery(mongoFilter, isAdmin, populateCreatedBy);
 
-    // Apply projection, sort, pagination
     query = query.select(LISTING_PROJECTION).sort(sortOptions);
 
     const skip = (page - 1) * limit;
     query = query.skip(skip).limit(limit);
 
-    // Execute queries in parallel and use lean() for performance
+    // run queries in parallel and lean() for performance
     const [products, total] = await Promise.all([
       query.lean(),
       Product.countDocuments(mongoFilter),
     ]);
 
-    // Trim variants array to only first variant for listing to reduce payload
-    const trimmedProducts = (products || []).map((p: any) => {
-      if (Array.isArray(p.variants) && p.variants.length > 1) {
-        p.variants = [p.variants[0]];
-      }
-      // Normalize category object to { _id, name } if it's populated
-      if (p.category && typeof p.category === "object") {
-        p.category = {
-          _id: p.category._id,
-          name: p.category.name ?? p.category,
-        };
-      }
-      return p;
-    });
+    // map to listing DTO (centralized)
+    const dto = (products || []).map((p: any) => this.mapToListingDTO(p));
 
     return {
-      products: trimmedProducts,
+      products: dto,
       page,
       limit,
       totalPages: Math.max(1, Math.ceil(total / limit)),
@@ -370,19 +409,15 @@ const LISTING_PROJECTION: any = {
     };
   }
 
-  /**
-   * ✅ UNIFIED - Get single product by query
-   */
+  // single product helper (full doc)
   private async getSingleProduct(
     query: FilterQuery<IProductInput>,
     isAdmin: boolean = false
   ) {
     const finalQuery = isAdmin ? query : { ...query, isPublished: true };
-
     const product = await this.buildProductQuery(finalQuery, isAdmin)
       .findOne()
       .lean();
-
     if (!product) throw new AppError("Product not found", 404);
     return product;
   }
@@ -395,18 +430,14 @@ const LISTING_PROJECTION: any = {
     return this.getSingleProduct({ _id: productId }, isAdmin);
   }
 
-  /**
-   * ✅ UNIFIED - Search products
-   */
+  // search - returns full results mapped to listing DTO
   async searchProducts(
     searchQuery: string,
     page = 1,
     limit = 10,
     isAdmin: boolean = false
   ) {
-    const textSearchFilter = {
-      $text: { $search: searchQuery },
-    };
+    const textSearchFilter = { $text: { $search: searchQuery } };
 
     const query = this.buildProductQuery(textSearchFilter, isAdmin)
       .sort({ score: { $meta: "textScore" } })
@@ -417,14 +448,14 @@ const LISTING_PROJECTION: any = {
     const finalFilter = isAdmin
       ? textSearchFilter
       : { ...textSearchFilter, isPublished: true };
-
     const [products, total] = await Promise.all([
       paginated.lean(),
       Product.countDocuments(finalFilter),
     ]);
 
+    const dto = (products || []).map((p: any) => this.mapToListingDTO(p));
     return {
-      products,
+      products: dto,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
@@ -432,9 +463,6 @@ const LISTING_PROJECTION: any = {
     };
   }
 
-  /**
-   * ✅ UNIFIED - Get products by category
-   */
   async getProductsByCategory(
     slug: string,
     page = 1,
@@ -445,24 +473,22 @@ const LISTING_PROJECTION: any = {
     if (!category) throw new AppError("Category not found", 404);
 
     const categoryFilter = { category: category._id };
-
     const query = this.buildProductQuery(categoryFilter, isAdmin).sort({
       createdAt: -1,
     });
-
     const paginated = this.applyPagination(query, page, limit);
 
     const finalFilter = isAdmin
       ? categoryFilter
       : { ...categoryFilter, isPublished: true };
-
     const [products, total] = await Promise.all([
       paginated.lean(),
       Product.countDocuments(finalFilter),
     ]);
 
+    const dto = (products || []).map((p: any) => this.mapToListingDTO(p));
     return {
-      products,
+      products: dto,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
@@ -470,55 +496,56 @@ const LISTING_PROJECTION: any = {
     };
   }
 
-  /**
-   * ✅ Get latest products
-   */
+  // getLatestProducts -> uses rep snapshot if present, fallbacks to firstVariant
   async getLatestProducts(limit: number = 8, isAdmin: boolean = false) {
     const products = await this.buildProductQuery({}, isAdmin)
       .sort({ createdAt: -1 })
       .limit(limit)
-      .select("name slug variants category createdAt")
+      .select(
+        "name slug variants category repImage repThumbSafe repPrice repDiscountedPrice createdAt"
+      )
       .lean();
 
-    // Return optimized data for frontend
-    return products.map((product) => {
-      const firstVariant = product.variants?.[0];
+    return products.map((product: any) => {
+      const firstVariant = Array.isArray(product.variants)
+        ? product.variants[0]
+        : undefined;
 
       return {
         _id: product._id,
         name: product.name,
         slug: product.slug,
         category: product.category,
-        image: firstVariant?.images?.[0]?.url || "",
-        price: firstVariant?.price,
-        discountedPrice: firstVariant?.discountedPrice,
-        hasDiscount: firstVariant?.hasDiscount,
-        createdAt: product.createdAt,
+        image:
+          product.repThumbSafe ||
+          product.repImage ||
+          firstVariant?.images?.[0]?.url ||
+          "",
+        price: product.repPrice ?? firstVariant?.price ?? null,
+        discountedPrice:
+          product.repDiscountedPrice ?? firstVariant?.discountedPrice ?? null,
+        hasDiscount:
+          (product.repDiscountedPrice ?? firstVariant?.discountedPrice) <
+          (product.repPrice ?? firstVariant?.price ?? Infinity),
+        createdAt: (product as any).createdAt || null,
       };
     });
   }
 
-  /**
-   * ✅ Get featured/trending products
-   */
   async getFeaturedProducts(limit: number = 8, isAdmin: boolean = false) {
-    const featuredFilter = {
-      "reviewStats.averageRating": { $gte: 4 },
-    };
-
-    return await this.buildProductQuery(featuredFilter, isAdmin)
-      .sort({
-        "reviewStats.averageRating": -1,
-        "reviewStats.totalReviews": -1,
-      })
+    const featuredFilter = { "reviewStats.averageRating": { $gte: 4 } };
+    const products = await this.buildProductQuery(featuredFilter, isAdmin)
+      .sort({ "reviewStats.averageRating": -1, "reviewStats.totalReviews": -1 })
       .limit(limit)
       .lean();
+
+    const dto = (products || []).map((p: any) => this.mapToListingDTO(p));
+    return dto;
   }
 
-  // ==================== ADMIN SPECIFIC SHORTCUTS ====================
-
+  // -------------------- admin shortcuts --------------------
   async getAllProductsAdmin(filter = {}, page: number = 1, limit: number = 10) {
-    return this.getAllProducts(filter, page, limit, true, true); // Admin + populate creator
+    return this.getAllProducts(filter, page, limit, true, true);
   }
 
   async getProductByIdAdmin(productId: string) {
@@ -526,4 +553,6 @@ const LISTING_PROJECTION: any = {
   }
 }
 
+// export instance
 export const productService = new ProductService();
+export default productService;
