@@ -1,3 +1,4 @@
+// components/helperComponents/ImageUploader.tsx
 "use client";
 
 import { useRef, useState, useEffect } from "react";
@@ -5,14 +6,12 @@ import { FiUpload, FiX } from "react-icons/fi";
 import toast from "react-hot-toast";
 import { uploadImageToCloudinary } from "../../../utils/uploadToCloudinary";
 
-/* normalized image shape - matches backend model expectations */
 export interface UploadedImage {
-  url: string;
+  url: string; // original full-quality URL (secure_url)
   public_id: string;
-  thumbSafe?: string;
-  thumbSmart?: string;
-  blurDataURL?: string;
+  thumbSafe?: string; // low-quality full-image (no crop) for lists
   isPrimary?: boolean;
+  _origFileName?: string; // internal for failed placeholders
 }
 
 interface ImageUploaderProps {
@@ -22,6 +21,11 @@ interface ImageUploaderProps {
   defaultUrls?: UploadedImage[]; // already normalized objects expected
 }
 
+const makeKey = (img: UploadedImage, idx: number) =>
+  img.public_id
+    ? `${img.public_id}-${idx}`
+    : `${img._origFileName || "img"}-${idx}-${Date.now()}`;
+
 export default function ImageUploader({
   folder = "default",
   maxFiles = 1,
@@ -29,26 +33,22 @@ export default function ImageUploader({
   defaultUrls = [],
 }: ImageUploaderProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [previews, setPreviews] = useState<string[]>([]);
+  const [previewsMap, setPreviewsMap] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0); // 0..100 overall
+  const [progress, setProgress] = useState(0);
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>(
     defaultUrls || []
   );
 
-  // initialize previews for defaultUrls (so thumbnails show if page loads with defaults)
   useEffect(() => {
-    if (defaultUrls && defaultUrls.length) {
-      setUploadedImages(defaultUrls);
-    }
+    if (defaultUrls && defaultUrls.length) setUploadedImages(defaultUrls);
   }, [defaultUrls]);
 
-  // cleanup object URLs created for previews
   useEffect(() => {
     return () => {
-      previews.forEach((url) => URL.revokeObjectURL(url));
+      previewsMap.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [previews]);
+  }, [previewsMap]);
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -61,7 +61,6 @@ export default function ImageUploader({
 
     const allowed = ["image/jpeg", "image/png", "image/webp", "image/avif"];
     const sizeLimitMB = 5;
-
     for (const file of Array.from(files)) {
       if (!allowed.includes(file.type)) {
         toast.error("Invalid file type");
@@ -73,24 +72,20 @@ export default function ImageUploader({
       }
     }
 
-    // create previews for UX
-    const previewUrls = Array.from(files).map((file) =>
+    const batchPreviews = Array.from(files).map((file) =>
       URL.createObjectURL(file)
     );
-    setPreviews(previewUrls);
+    setPreviewsMap(batchPreviews);
 
-    await uploadImages(files);
-    // reset input so same file can be selected again
+    await uploadImages(files, batchPreviews);
+
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  /**
-   * uploadImages
-   * - uploads files sequentially (safer for rate limits) but reports overall progress correctly
-   * - expects uploadImageToCloudinary(file, folder, onProgress) to return an object:
-   *   { url, public_id, thumbSafe?, thumbSmart?, blurDataURL? }
-   */
-  const uploadImages = async (files: FileList | File[]) => {
+  const uploadImages = async (
+    files: FileList | File[],
+    batchPreviews: string[]
+  ) => {
     setUploading(true);
     setProgress(0);
 
@@ -101,11 +96,10 @@ export default function ImageUploader({
 
     for (let i = 0; i < total; i++) {
       const file = fileArray[i];
+      const previewForThis = batchPreviews[i];
+
       try {
-        // per-file progress updated into overall progress
         const perFileOnProgress = (p: number) => {
-          // p: 0..100 for current file
-          // overall = (completed / total)*100 + (p/total)
           const overall = (completed / total) * 100 + p / total;
           setProgress(Math.min(100, Math.round(overall)));
         };
@@ -116,53 +110,58 @@ export default function ImageUploader({
           perFileOnProgress
         );
 
-        // normalize response into UploadedImage
         const normalized: UploadedImage = {
-          url: resp.secure_url || resp.url || "",
-          public_id:
-            resp.public_id ||
-            resp.publicId ||
-            extractPublicId(resp.secure_url || resp.url || "") ||
-            "",
+          url: resp.secure_url || resp.secure || resp.url || "",
+          public_id: resp.public_id || resp.publicId || "",
           thumbSafe:
-            resp.eager?.[0]?.secure_url ||
-            resp.thumbSafe ||
-            resp.transformUrls?.thumbSafe,
-          thumbSmart:
-            resp.eager?.[1]?.secure_url ||
-            resp.thumbSmart ||
-            resp.transformUrls?.thumbSmart,
-          blurDataURL: resp.blurDataURL || resp.tinyBase64,
+            resp.thumbSafe || (resp.secure_url ? resp.secure_url : undefined),
           isPrimary: false,
         };
 
-        // minimal validation
         if (!normalized.url || !normalized.public_id) {
+          if (previewForThis) URL.revokeObjectURL(previewForThis);
           throw new Error("Invalid upload response");
         }
 
         newUploaded.push(normalized);
         completed += 1;
-        // update progress to reflect completed file
         setProgress(Math.min(100, Math.round((completed / total) * 100)));
       } catch (err: any) {
         console.error("uploadImages error:", err);
-        toast.error(`Failed to upload ${file.name}`);
+        // push a failed placeholder using preview so user sees it and can remove
+        const failed: UploadedImage = {
+          url: batchPreviews[i] || "",
+          public_id: "",
+          _origFileName: fileArray[i].name,
+        };
+        newUploaded.push(failed);
+        completed += 1;
+        setProgress(Math.min(100, Math.round((completed / total) * 100)));
+        toast.error(`Failed to upload ${fileArray[i].name}`);
       }
     }
 
-    // finalize
     setUploading(false);
     setTimeout(() => setProgress(0), 300);
 
+    // append and trim
     const updated = [...uploadedImages, ...newUploaded].slice(0, maxFiles);
     setUploadedImages(updated);
-    setPreviews([]);
+
+    // revoke previews that are not needed (successful uploads use server URLs)
+    batchPreviews.forEach((url) => {
+      const usedByFailed = updated.some(
+        (u) => u.url === url && (!u.public_id || u.public_id.length === 0)
+      );
+      if (!usedByFailed) URL.revokeObjectURL(url);
+    });
+
+    setPreviewsMap([]);
     onUpload(updated);
 
-    if (newUploaded.length === total) {
+    if (newUploaded.every((n) => n.public_id && n.public_id.length > 0)) {
       toast.success("All images uploaded!");
-    } else if (newUploaded.length > 0) {
+    } else if (newUploaded.some((n) => n.public_id && n.public_id.length > 0)) {
       toast.success("Some images uploaded");
     } else {
       toast.error("No images uploaded");
@@ -171,16 +170,22 @@ export default function ImageUploader({
 
   const removeImage = (index: number) => {
     const updated = [...uploadedImages];
-    updated.splice(index, 1);
+    const removed = updated.splice(index, 1)[0];
+    if (removed && removed.url && removed.url.startsWith("blob:")) {
+      try {
+        URL.revokeObjectURL(removed.url);
+      } catch {}
+    }
     setUploadedImages(updated);
     onUpload(updated);
   };
 
-  // helper: best preview URL (prefer local preview, else stored url)
   const getPreviewSrc = (idx: number, img: UploadedImage) => {
-    // if previews present (fresh upload) show them in order
-    if (previews[idx]) return previews[idx];
-    return img.url || "/placeholder.jpg";
+    // prefer local blob preview if present in previewsMap for current batch
+    if (img.url && img.url.startsWith("blob:")) return img.url;
+    if (previewsMap[idx]) return previewsMap[idx];
+    // prefer thumbSafe for list view
+    return img.thumbSafe || img.url || "/placeholder.jpg";
   };
 
   return (
@@ -220,11 +225,11 @@ export default function ImageUploader({
       {uploadedImages.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {uploadedImages.map((img, i) => (
-            <div key={img.public_id + "-" + i} className="relative group">
+            <div key={makeKey(img, i)} className="relative group">
               <img
                 src={getPreviewSrc(i, img)}
                 className="w-full h-28 object-cover rounded shadow border"
-                alt={`Uploaded ${i}`}
+                alt={img._origFileName || `Uploaded ${i}`}
               />
               <button
                 onClick={() => removeImage(i)}
@@ -239,24 +244,4 @@ export default function ImageUploader({
       )}
     </div>
   );
-}
-
-/* ---------- small helper to extract cloudinary public id from URL if needed ---------- */
-function extractPublicId(url: string) {
-  try {
-    if (!url) return "";
-    // cloudinary urls like: https://res.cloudinary.com/<cloud>/image/upload/v1234/folder/name.ext
-    const parts = url.split("/upload/");
-    if (parts.length < 2) return "";
-    const after = parts[1]; // v1234/folder/name.ext
-    // remove version and extension
-    const segments = after.split("/");
-    // remove version if present (starts with v)
-    if (segments[0].startsWith("v")) segments.shift();
-    const publicWithExt = segments.join("/"); // folder/name.ext
-    const idx = publicWithExt.lastIndexOf(".");
-    return idx > 0 ? publicWithExt.slice(0, idx) : publicWithExt;
-  } catch {
-    return "";
-  }
 }

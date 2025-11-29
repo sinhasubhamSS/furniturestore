@@ -6,7 +6,7 @@ export interface IVariantImage {
   url: string;
   public_id: string;
   thumbSafe?: string;
-  blurDataURL?: string;
+
   isPrimary?: boolean;
 }
 
@@ -134,7 +134,7 @@ const variantImageSchema = new Schema<IVariantImage>(
     url: { type: String, required: true },
     public_id: { type: String, required: true },
     thumbSafe: { type: String },
-    blurDataURL: { type: String },
+  
     isPrimary: { type: Boolean, default: false },
   },
   { _id: false }
