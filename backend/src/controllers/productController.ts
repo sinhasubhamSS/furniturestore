@@ -1,4 +1,3 @@
-// controllers/product.controller.ts
 import { Response } from "express";
 import { productService } from "../services/productService";
 import { AuthRequest } from "../types/app-request";
@@ -252,7 +251,7 @@ export const getProductsByCategory = catchAsync(
       slug,
       page,
       limit,
-      isAdmin 
+      isAdmin
     );
 
     if (!isAdmin) {

@@ -1,4 +1,3 @@
-// src/services/productService.ts
 import { FilterQuery, Types } from "mongoose";
 import cloudinary from "../config/cloudinary";
 import Category from "../models/category.model";
@@ -11,20 +10,28 @@ import { IVariant } from "../types/productservicetype";
 
 /**
  * ProductService
- * - kept same class-style you had
- * - important changes:
- *   - LISTING_PROJECTION uses rep* denormalized fields (fast for listing & SSR)
- *   - buildSortOptions uses rep* fields
- *   - deleteRemovedImages runs deletes in parallel (faster)
- *   - create/edit call Product.recomputeDenorm(...) after saves
- *   - getLatestProducts uses rep snapshot when available
- *   - mapToListingDTO central mapper for listing consistency
+ * - Removed blurDataURL usage
+ * - validateImages helper added
+ * - deletion logic uses public_id set comparison (robust to reorder)
+ * - deleteProduct deletes cloudinary assets for product
  */
 
 class ProductService {
   // -------------------- helpers --------------------
   private buildSlug(name: string) {
     return slugify(name, { lower: true, strict: true });
+  }
+
+  private validateImages(images: any[]) {
+    if (!Array.isArray(images) || images.length === 0) return false;
+    return images.every(
+      (img) =>
+        img &&
+        typeof img.url === "string" &&
+        img.url.length > 0 &&
+        typeof img.public_id === "string" &&
+        img.public_id.length > 0
+    );
   }
 
   // delete removed cloudinary images in parallel (safer + faster)
@@ -46,6 +53,20 @@ class ProductService {
           await cloudinary.uploader.destroy(img.public_id);
         } catch (e) {
           console.error("cloudinary delete error", img.public_id, e);
+        }
+      })
+    );
+  }
+
+  // delete array of public_ids (parallel)
+  private async deletePublicIds(publicIds: string[] = []) {
+    if (!publicIds || publicIds.length === 0) return;
+    await Promise.all(
+      publicIds.map(async (id) => {
+        try {
+          await cloudinary.uploader.destroy(id);
+        } catch (e) {
+          console.error("cloudinary delete error", id, e);
         }
       })
     );
@@ -74,7 +95,6 @@ class ProductService {
   }
 
   // -------------------- sorting --------------------
-  // use rep* fields for listing sorts so UI sort matches listing price shown
   private buildSortOptions(sortBy: string): { [key: string]: 1 | -1 } {
     switch (sortBy) {
       case "price_low":
@@ -92,7 +112,6 @@ class ProductService {
   }
 
   // -------------------- mapping helpers --------------------
-  // central DTO for listing -> keep frontend stable and small
   private mapToListingDTO(p: any) {
     return {
       _id: p._id,
@@ -118,8 +137,11 @@ class ProductService {
 
     // process variants: sku, price, discountedPrice, savings, stock normalize
     const processedVariants = productData.variants.map((variant) => {
-      if (!variant.images || variant.images.length === 0) {
-        throw new AppError("Each variant must have at least one image", 400);
+      if (!this.validateImages(variant.images)) {
+        throw new AppError(
+          "Each variant must have at least one valid image (url + public_id)",
+          400
+        );
       }
 
       const sku = generateSKU(productData.name, variant.color, variant.size);
@@ -213,28 +235,34 @@ class ProductService {
         throw new AppError("At least one variant is required", 400);
       }
 
-      // delete removed images (compare old -> new). safe even if new shorter.
-      // note: this loops per-variant index matching. if your frontend reorders variants, adjust logic to compare by public_id or sku.
-      for (let i = 0; i < product.variants.length; i++) {
-        const oldVariant = product.variants[i];
-        const newVariant = updateData.variants[i];
-        if (newVariant) {
-          await this.deleteRemovedImages(
-            oldVariant.images as any,
-            newVariant.images as any
-          );
-        } else {
-          // whole variant removed -> delete all its images
-          await this.deleteRemovedImages(oldVariant.images as any, []);
-        }
-      }
+      // --- robust deletion: compute old public_ids vs new public_ids (across all variants)
+      const oldPublicIds = new Set<string>();
+      product.variants.forEach((v: any) => {
+        (v.images || []).forEach((img: any) => {
+          if (img?.public_id) oldPublicIds.add(img.public_id);
+        });
+      });
+
+      const newPublicIds = new Set<string>();
+      (updateData.variants || []).forEach((v: any) => {
+        (v.images || []).forEach((img: any) => {
+          if (img?.public_id) newPublicIds.add(img.public_id);
+        });
+      });
+
+      const toDeleteIds = Array.from(oldPublicIds).filter(
+        (id) => !newPublicIds.has(id)
+      );
+
+      // delete in parallel
+      await this.deletePublicIds(toDeleteIds);
 
       // recalc processed variants (same logic as create)
       const processedVariants: IVariant[] = updateData.variants.map(
         (variant) => {
-          if (!variant.images || variant.images.length === 0) {
+          if (!this.validateImages(variant.images)) {
             throw new AppError(
-              "Each variant must have at least one image",
+              "Each variant must have at least one valid image (url + public_id)",
               400
             );
           }
@@ -328,12 +356,26 @@ class ProductService {
   }
 
   async deleteProduct(productId: string, userId: string) {
-    const product = await Product.findOneAndDelete({
+    const product = await Product.findOne({
       _id: productId,
       createdBy: userId,
     });
     if (!product) throw new AppError("Product not found or unauthorized", 404);
-    // optionally: delete all cloudinary images for safety (not implemented here)
+
+    // gather all public_ids for deletion
+    const publicIds: string[] = [];
+    (product.variants || []).forEach((v: any) => {
+      (v.images || []).forEach((img: any) => {
+        if (img?.public_id) publicIds.push(img.public_id);
+      });
+    });
+
+    // delete assets in parallel
+    await this.deletePublicIds(publicIds);
+
+    // remove product doc
+    await product.deleteOne();
+
     return product;
   }
 

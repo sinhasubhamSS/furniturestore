@@ -6,7 +6,6 @@ export interface IVariantImage {
   url: string;
   public_id: string;
   thumbSafe?: string;
-
   isPrimary?: boolean;
 }
 
@@ -72,7 +71,6 @@ export interface IProduct extends Document {
   repImage?: string;
   repImagePublicId?: string;
   repThumbSafe?: string;
-  repBlurDataURL?: string;
 
   repPrice?: number;
   repDiscountedPrice?: number;
@@ -134,7 +132,6 @@ const variantImageSchema = new Schema<IVariantImage>(
     url: { type: String, required: true },
     public_id: { type: String, required: true },
     thumbSafe: { type: String },
-  
     isPrimary: { type: Boolean, default: false },
   },
   { _id: false }
@@ -249,7 +246,6 @@ const productSchema = new Schema<IProduct, IProductModel>(
     repImage: { type: String },
     repImagePublicId: { type: String },
     repThumbSafe: { type: String },
-    repBlurDataURL: { type: String },
 
     repPrice: { type: Number },
     repDiscountedPrice: { type: Number },
@@ -369,7 +365,6 @@ productSchema.pre("save", function (this: IProduct, next) {
         this.repImage = this.repImage || rep.img.url;
         this.repImagePublicId = this.repImagePublicId || rep.img.public_id;
         this.repThumbSafe = this.repThumbSafe || rep.img.thumbSafe;
-        this.repBlurDataURL = this.repBlurDataURL || rep.img.blurDataURL;
         this.ogImage = this.ogImage || rep.img.thumbSafe || rep.img.url;
       }
     }
@@ -527,7 +522,6 @@ productSchema.statics.recomputeDenorm = async function (productDoc: any) {
       update.repImage = rep.img.url || update.repImage;
       update.repImagePublicId = rep.img.public_id || update.repImagePublicId;
       update.repThumbSafe = rep.img.thumbSafe || update.repThumbSafe;
-      update.repBlurDataURL = rep.img.blurDataURL || update.repBlurDataURL;
       update.ogImage = update.ogImage || rep.img.thumbSafe || rep.img.url;
     }
   }

@@ -1,18 +1,18 @@
+// components/admin/product/VariantForm.tsx
 "use client";
 
+import React, { useEffect } from "react";
 import {
   UseFormRegister,
   UseFormSetValue,
   UseFormGetValues,
   UseFormWatch,
-  useFormContext,
 } from "react-hook-form";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import ImageUploader, {
   UploadedImage,
 } from "@/components/helperComponents/ImageUploader";
-import { useEffect } from "react";
 
 interface VariantFormProps {
   index: number;
@@ -31,55 +31,27 @@ const VariantForm: React.FC<VariantFormProps> = ({
   watch,
   remove,
 }) => {
-  // get unregister from form context for cleanup
-  const { unregister } = useFormContext();
-
-  // register images field so RHF validates it if needed
+  // register images for validation
   useEffect(() => {
+    // register manually so RHF validates images presence
     register(`variants.${index}.images`, {
       required: "At least one image is required",
     });
-
-    return () => {
-      // unregister when component unmounts (clean)
-      try {
-        unregister(`variants.${index}.images`);
-      } catch (e) {
-        // swallow — not critical
-      }
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, register, unregister]);
+  }, [index, register]);
 
-  // handler receives normalized UploadedImage[] from ImageUploader
-  // Expected minimal shape from uploader: { url, public_id, thumbSafe?, isPrimary? }
   const handleImageUpload = (images: UploadedImage[]) => {
-    // set images array into form: backend expects objects (url + public_id + optional thumbs)
+    // ensure first image is primary if none selected
+    if (images && images.length && !images.some((i) => i.isPrimary)) {
+      images = images.map((img, i) => ({ ...img, isPrimary: i === 0 }));
+    }
     setValue(`variants.${index}.images`, images, {
       shouldDirty: true,
       shouldValidate: true,
     });
-
-    // If you want first uploaded image to be primary by default:
-    if (images && images.length && !images.some((i) => i.isPrimary)) {
-      const updated = images.map((img, i) => ({ ...img, isPrimary: i === 0 }));
-      setValue(`variants.${index}.images`, updated, {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
-    }
   };
 
-  // show discount inputs when hasDiscount checked
   const hasDiscount = watch(`variants.${index}.hasDiscount`);
-
-  /**
-   * NOTE about image processing:
-   * - Do NOT fetch original url and perform client-side transform at render time.
-   * - At upload time we store both `url` (full-quality) and `thumbSafe` (full-image scaled, no crop).
-   * - For listing/product-card use `thumbSafe || url` (faster). For full-detail view use `url`.
-   * - If you have legacy images without thumbSafe, you can call your server to compute/generate, or fallback to injectTransform(url, 'f_auto,q_auto,w_600').
-   */
 
   return (
     <div className="border border-muted rounded-lg p-4 space-y-4 bg-muted/30">
@@ -94,7 +66,6 @@ const VariantForm: React.FC<VariantFormProps> = ({
         </Button>
       </div>
 
-      {/* Image section: ImageUploader returns normalized UploadedImage[] */}
       <ImageUploader
         folder="variants"
         maxFiles={5}
@@ -104,7 +75,6 @@ const VariantForm: React.FC<VariantFormProps> = ({
         }
       />
 
-      {/* Basic variant info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
           label="Color"
@@ -135,7 +105,6 @@ const VariantForm: React.FC<VariantFormProps> = ({
         />
       </div>
 
-      {/* Discount Section */}
       <div className="border-t pt-4">
         <div className="flex items-center space-x-2 mb-3">
           <input

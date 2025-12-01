@@ -1,4 +1,3 @@
-// components/helperComponents/ImageUploader.tsx
 "use client";
 
 import { useRef, useState, useEffect } from "react";
@@ -19,6 +18,8 @@ interface ImageUploaderProps {
   maxFiles?: number;
   onUpload: (images: UploadedImage[]) => void;
   defaultUrls?: UploadedImage[]; // already normalized objects expected
+  onUploadStart?: () => void; // called when an upload batch starts
+  onUploadEnd?: () => void; // called when an upload batch finishes
 }
 
 const makeKey = (img: UploadedImage, idx: number) =>
@@ -31,6 +32,8 @@ export default function ImageUploader({
   maxFiles = 1,
   onUpload,
   defaultUrls = [],
+  onUploadStart,
+  onUploadEnd,
 }: ImageUploaderProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [previewsMap, setPreviewsMap] = useState<string[]>([]);
@@ -46,7 +49,11 @@ export default function ImageUploader({
 
   useEffect(() => {
     return () => {
-      previewsMap.forEach((url) => URL.revokeObjectURL(url));
+      previewsMap.forEach((url) => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {}
+      });
     };
   }, [previewsMap]);
 
@@ -77,7 +84,9 @@ export default function ImageUploader({
     );
     setPreviewsMap(batchPreviews);
 
+    onUploadStart?.();
     await uploadImages(files, batchPreviews);
+    onUploadEnd?.();
 
     if (inputRef.current) inputRef.current.value = "";
   };
@@ -111,10 +120,9 @@ export default function ImageUploader({
         );
 
         const normalized: UploadedImage = {
-          url: resp.secure_url || resp.secure || resp.url || "",
+          url: resp.url || resp.secure_url || resp.secure || "",
           public_id: resp.public_id || resp.publicId || "",
-          thumbSafe:
-            resp.thumbSafe || (resp.secure_url ? resp.secure_url : undefined),
+          thumbSafe: resp.thumbSafe || resp.eager?.[0]?.secure_url || undefined,
           isPrimary: false,
         };
 
@@ -144,16 +152,19 @@ export default function ImageUploader({
     setUploading(false);
     setTimeout(() => setProgress(0), 300);
 
-    // append and trim
     const updated = [...uploadedImages, ...newUploaded].slice(0, maxFiles);
     setUploadedImages(updated);
 
-    // revoke previews that are not needed (successful uploads use server URLs)
+    // revoke previews not used by failed placeholders
     batchPreviews.forEach((url) => {
       const usedByFailed = updated.some(
         (u) => u.url === url && (!u.public_id || u.public_id.length === 0)
       );
-      if (!usedByFailed) URL.revokeObjectURL(url);
+      if (!usedByFailed) {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {}
+      }
     });
 
     setPreviewsMap([]);
@@ -181,10 +192,8 @@ export default function ImageUploader({
   };
 
   const getPreviewSrc = (idx: number, img: UploadedImage) => {
-    // prefer local blob preview if present in previewsMap for current batch
     if (img.url && img.url.startsWith("blob:")) return img.url;
     if (previewsMap[idx]) return previewsMap[idx];
-    // prefer thumbSafe for list view
     return img.thumbSafe || img.url || "/placeholder.jpg";
   };
 

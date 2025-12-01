@@ -1,7 +1,8 @@
+// components/admin/product/ProductForm.tsx
 "use client";
 
+import React, { useEffect, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
-import { useState, useEffect } from "react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import VisibilityToggle from "./VisibilityToggle";
@@ -76,6 +77,13 @@ const ProductForm: React.FC<ProductFormProps> = ({
   });
 
   const handleFormSubmit = (data: CreateProductInput) => {
+    // normalize empty strings for discountValidUntil -> undefined (backend treats missing as permanent)
+    data.variants = data.variants.map((v) => ({
+      ...v,
+      discountValidUntil: v.discountValidUntil
+        ? v.discountValidUntil
+        : undefined,
+    }));
     data.isPublished = visibility;
     onSubmit(data);
   };
@@ -95,25 +103,32 @@ const ProductForm: React.FC<ProductFormProps> = ({
         {isEdit ? "Edit Product" : "Create Product"}
       </h2>
 
+      {/* Product Name */}
       <Input
-        name="name"
+        id="name"
         label="Product Name"
         placeholder="e.g. Leather Wallet"
         required
-        register={register("name", { required: "Product name is required" })}
-        error={errors.name?.message}
+        {...register("name", { required: "Product name is required" })}
+        error={errors.name?.message as string | undefined}
       />
 
+      {/* Title */}
       <Input
-        name="title"
+        id="title"
         label="Title"
         placeholder="Optional product title"
-        register={register("title")}
+        {...register("title")}
+        error={errors.title?.message as string | undefined}
       />
 
+      {/* Description */}
       <div>
-        <label className="block text-sm font-medium mb-1">Description</label>
+        <label className="block text-sm font-medium mb-1" htmlFor="description">
+          Description
+        </label>
         <textarea
+          id="description"
           {...register("description", { required: "Description is required" })}
           className="w-full p-2 rounded-md border border-gray-300"
           placeholder="Enter product description"
@@ -123,13 +138,16 @@ const ProductForm: React.FC<ProductFormProps> = ({
         )}
       </div>
 
+      {/* Category */}
       <CategoryDropdown
         value={getValues("category") ?? ""}
         onChange={(value: string) => setValue("category", value)}
       />
 
+      {/* Visibility */}
       <VisibilityToggle value={visibility} onChange={setVisibility} />
 
+      {/* Variants */}
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-semibold">Variants</h3>
@@ -147,59 +165,61 @@ const ProductForm: React.FC<ProductFormProps> = ({
             getValues={getValues}
             watch={watch}
             remove={() => removeVariant(index)}
-         
           />
         ))}
       </div>
 
+      {/* Specifications */}
       <SpecificationForm onChange={handleSpecificationChange} />
 
+      {/* Measurements */}
       <div>
         <h3 className="text-lg font-semibold mb-2">Measurements</h3>
         <div className="grid grid-cols-2 gap-4">
           <Input
-            name="measurements.width"
+            id="measurements.width"
             label="Width (cm)"
             type="number"
             step="0.01"
-            register={register("measurements.width", { valueAsNumber: true })}
+            {...register("measurements.width", { valueAsNumber: true })}
           />
           <Input
-            name="measurements.height"
+            id="measurements.height"
             label="Height (cm)"
             type="number"
             step="0.01"
-            register={register("measurements.height", { valueAsNumber: true })}
+            {...register("measurements.height", { valueAsNumber: true })}
           />
           <Input
-            name="measurements.depth"
+            id="measurements.depth"
             label="Depth (cm)"
             type="number"
             step="0.01"
-            register={register("measurements.depth", { valueAsNumber: true })}
+            {...register("measurements.depth", { valueAsNumber: true })}
           />
           <Input
-            name="measurements.weight"
+            id="measurements.weight"
             label="Weight (kg)"
             type="number"
             step="0.01"
-            register={register("measurements.weight", { valueAsNumber: true })}
+            {...register("measurements.weight", { valueAsNumber: true })}
           />
         </div>
       </div>
 
+      {/* Warranty & Disclaimer */}
       <Input
-        name="warranty"
+        id="warranty"
         label="Warranty Info"
         placeholder="e.g. 1-year warranty included"
-        register={register("warranty")}
+        {...register("warranty")}
       />
 
       <Input
-        name="disclaimer"
+        id="disclaimer"
         label="Disclaimer"
         placeholder="Any important disclaimers"
-        register={register("disclaimer")}
+        {...register("disclaimer")}
       />
 
       <Button type="submit" className="w-full mt-6" disabled={loading}>

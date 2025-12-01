@@ -1,7 +1,8 @@
+// components/admin/product/SpecificationForm.tsx
 "use client";
 
 import React, { useState } from "react";
-import { Specification } from "@/types/Product";
+import { Specification } from "@/types/Product"; // adjust if you have different type path
 
 const SpecificationForm = ({
   onChange,
@@ -12,16 +13,13 @@ const SpecificationForm = ({
 
   const updateForm = (updated: Specification[]) => {
     setSpecifications(updated);
-    onChange(updated); // send data to parent (like ProductForm)
+    onChange(updated);
   };
 
   const addSection = () => {
     updateForm([
       ...specifications,
-      {
-        section: "",
-        specs: [{ key: "", value: "" }],
-      },
+      { section: "", specs: [{ key: "", value: "" }] },
     ]);
   };
 
@@ -97,10 +95,7 @@ const SpecificationForm = ({
                 placeholder="Value"
                 className="border p-2 w-1/2 rounded"
               />
-              <button
-                onClick={() => removeSpec(i, j)}
-                className="text-red-500"
-              >
+              <button onClick={() => removeSpec(i, j)} className="text-red-500">
                 X
               </button>
             </div>
