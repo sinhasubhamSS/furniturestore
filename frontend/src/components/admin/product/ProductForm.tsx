@@ -1,7 +1,6 @@
-// components/admin/product/ProductForm.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
@@ -49,8 +48,12 @@ const ProductForm: React.FC<ProductFormProps> = ({
     setValue,
     getValues,
     reset,
-    formState: { errors },
+    formState: { errors, isValid },
+    trigger,
+    setError,
+    clearErrors,
   } = useForm<CreateProductInput>({
+    mode: "onChange",
     defaultValues: {
       variants: [defaultVariant],
       specifications: [],
@@ -59,6 +62,42 @@ const ProductForm: React.FC<ProductFormProps> = ({
       ...defaultValues,
     },
   });
+
+  // register category (since CategoryDropdown is controlled)
+  useEffect(() => {
+    register("category", { required: "Category is required" });
+    // register specifications validator (we set value from SpecificationForm)
+    register("specifications", {
+      validate: (val) => {
+        if (!val || (Array.isArray(val) && val.length === 0)) return true;
+        if (!Array.isArray(val)) return "Invalid specifications format";
+        for (let i = 0; i < val.length; i++) {
+          const sec = val[i];
+          if (
+            !sec ||
+            typeof sec.section !== "string" ||
+            sec.section.trim().length === 0
+          ) {
+            return "Section name is required";
+          }
+          if (!Array.isArray(sec.specs) || sec.specs.length === 0) {
+            return "At least one spec is required in each section";
+          }
+          for (let j = 0; j < sec.specs.length; j++) {
+            const s = sec.specs[j];
+            if (!s || !s.key || String(s.key).trim().length === 0) {
+              return "Spec key is required";
+            }
+            if (!s || !s.value || String(s.value).trim().length === 0) {
+              return "Spec value is required";
+            }
+          }
+        }
+        return true;
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [register]);
 
   useEffect(() => {
     if (defaultValues) {
@@ -76,23 +115,105 @@ const ProductForm: React.FC<ProductFormProps> = ({
     name: "variants",
   });
 
-  const handleFormSubmit = (data: CreateProductInput) => {
-    // normalize empty strings for discountValidUntil -> undefined (backend treats missing as permanent)
-    data.variants = data.variants.map((v) => ({
+  // when SpecificationForm changes, put value into RHF (and validate)
+  const onSpecsChange = (specs: any[]) => {
+    setValue("specifications", specs, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+    // trigger validation for specs immediately
+    trigger("specifications");
+  };
+
+  // normalize & sanitize before submit
+  const handleFormSubmit = (rawData: CreateProductInput) => {
+    const data = JSON.parse(JSON.stringify(rawData)) as CreateProductInput;
+
+    // normalize discountValidUntil
+    data.variants = (data.variants || []).map((v) => ({
       ...v,
       discountValidUntil: v.discountValidUntil
         ? v.discountValidUntil
         : undefined,
     }));
+
+    // clean measurements: remove null/empty and coerce to numbers
+    if (data.measurements && typeof data.measurements === "object") {
+      const m: any = {};
+      ["width", "height", "depth", "weight"].forEach((k) => {
+        const val = (data.measurements as any)[k];
+        if (val === "" || val === null || val === undefined) return;
+        const num = Number(val);
+        if (!Number.isNaN(num)) m[k] = num;
+      });
+      if (Object.keys(m).length > 0) data.measurements = m as any;
+      else delete (data as any).measurements;
+    }
+
     data.isPublished = visibility;
+
     onSubmit(data);
   };
 
-  const handleSpecificationChange = (
-    specs: CreateProductInput["specifications"]
-  ) => {
-    setValue("specifications", specs);
+  // watch variants to ensure each variant has required fields + uploaded image
+  const watchedVariants = watch("variants");
+  const watchedCategory = watch("category");
+  const watchedSpecs = watch("specifications");
+
+  // helper to check variant-level requirements
+  const variantsHaveUploadedImage = (variantsParam: any[] | undefined) => {
+    if (!Array.isArray(variantsParam) || variantsParam.length === 0)
+      return false;
+
+    return variantsParam.every((v) => {
+      const colorOk = v?.color && String(v.color).trim().length > 0;
+      const sizeOk = v?.size && String(v.size).trim().length > 0;
+      const basePriceOk =
+        typeof v?.basePrice === "number" &&
+        !isNaN(v.basePrice) &&
+        v.basePrice > 0;
+      const images = Array.isArray(v?.images) ? v.images : [];
+      const anyUploaded = images.some(
+        (img: any) =>
+          typeof img?.public_id === "string" &&
+          img.public_id &&
+          img.public_id.length > 0
+      );
+      return colorOk && sizeOk && basePriceOk && anyUploaded;
+    });
   };
+
+  // ensure category required error shows if empty after first touch
+  useEffect(() => {
+    if (!watchedCategory || String(watchedCategory).trim() === "") {
+      setError("category", {
+        type: "required",
+        message: "Category is required",
+      });
+    } else {
+      clearErrors("category");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedCategory]);
+
+  // also trigger specs validation live
+  useEffect(() => {
+    // run validation for specs (registered above)
+    trigger("specifications");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedSpecs]);
+
+  const canSubmit =
+    isValid && variantsHaveUploadedImage(watchedVariants) && !!watchedCategory;
+
+  const disabledMessage = useMemo(() => {
+    if (!watchedCategory || String(watchedCategory).trim() === "")
+      return "Category is required";
+    if (!isValid) return "Fill required fields (name/description/etc.)";
+    if (!variantsHaveUploadedImage(watchedVariants))
+      return "Each variant needs color, size, base price (>0) and at least one uploaded image.";
+    return "";
+  }, [isValid, watchedVariants, watchedCategory]);
 
   return (
     <form
@@ -141,8 +262,13 @@ const ProductForm: React.FC<ProductFormProps> = ({
       {/* Category */}
       <CategoryDropdown
         value={getValues("category") ?? ""}
-        onChange={(value: string) => setValue("category", value)}
+        onChange={(v: string) => {
+          setValue("category", v, { shouldValidate: true, shouldDirty: true });
+        }}
       />
+      {errors.category && (
+        <p className="text-red-500 text-sm">{errors.category.message}</p>
+      )}
 
       {/* Visibility */}
       <VisibilityToggle value={visibility} onChange={setVisibility} />
@@ -165,12 +291,19 @@ const ProductForm: React.FC<ProductFormProps> = ({
             getValues={getValues}
             watch={watch}
             remove={() => removeVariant(index)}
+            errors={errors}
           />
         ))}
       </div>
 
       {/* Specifications */}
-      <SpecificationForm onChange={handleSpecificationChange} />
+      <SpecificationForm onChange={onSpecsChange} />
+      {errors.specifications && (
+        <p className="text-red-500 text-sm">
+          {(errors.specifications as any).message ||
+            String(errors.specifications)}
+        </p>
+      )}
 
       {/* Measurements */}
       <div>
@@ -214,7 +347,6 @@ const ProductForm: React.FC<ProductFormProps> = ({
         placeholder="e.g. 1-year warranty included"
         {...register("warranty")}
       />
-
       <Input
         id="disclaimer"
         label="Disclaimer"
@@ -222,9 +354,18 @@ const ProductForm: React.FC<ProductFormProps> = ({
         {...register("disclaimer")}
       />
 
-      <Button type="submit" className="w-full mt-6" disabled={loading}>
-        {isEdit ? "Update Product" : "Create Product"}
-      </Button>
+      {/* Submit */}
+      {canSubmit ? (
+        <Button type="submit" className="w-full mt-6" disabled={loading}>
+          {isEdit ? "Update Product" : "Create Product"}
+        </Button>
+      ) : (
+        <div className="w-full mt-6 text-center text-sm text-gray-500">
+          <div className={disabledMessage ? "text-red-500" : ""}>
+            {disabledMessage || "Fill all required fields to enable Create"}
+          </div>
+        </div>
+      )}
     </form>
   );
 };

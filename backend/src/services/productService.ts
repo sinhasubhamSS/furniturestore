@@ -10,9 +10,9 @@ import { IVariant } from "../types/productservicetype";
 
 /**
  * ProductService
- * - Removed blurDataURL usage
- * - validateImages helper added
- * - deletion logic uses public_id set comparison (robust to reorder)
+ * - Normalizes images (preserve thumbSafe/public_id/isPrimary)
+ * - validateImages requires at least one uploaded image per variant
+ * - Ensures exactly one isPrimary per variant
  * - deleteProduct deletes cloudinary assets for product
  */
 
@@ -22,16 +22,66 @@ class ProductService {
     return slugify(name, { lower: true, strict: true });
   }
 
-  private validateImages(images: any[]) {
+  /**
+   * Validate images array:
+   * - Must be an array with length > 0
+   * - Every image must have a non-empty `url` string
+   * - At least one image must have a valid public_id (successful upload)
+   */
+  private validateImages(images: any[] = []) {
     if (!Array.isArray(images) || images.length === 0) return false;
-    return images.every(
-      (img) =>
-        img &&
-        typeof img.url === "string" &&
-        img.url.length > 0 &&
-        typeof img.public_id === "string" &&
-        img.public_id.length > 0
+
+    // helper to read public id from different possible keys
+    const readPublicId = (img: any) =>
+      img?.public_id || img?.publicId || img?.publicIdStr || null;
+
+    // every image must have a URL
+    const allHaveUrl = images.every(
+      (img) => img && typeof img.url === "string" && img.url.length > 0
     );
+    if (!allHaveUrl) return false;
+
+    // require at least one uploaded image with a public_id
+    const anyWithPublicId = images.some((img) => {
+      const pid = readPublicId(img);
+      return typeof pid === "string" && pid.length > 0;
+    });
+
+    return anyWithPublicId;
+  }
+
+  /**
+   * Normalize images to a consistent internal shape:
+   * { url, public_id?, thumbSafe?, isPrimary: boolean }
+   * Ensures exactly one isPrimary: if multiple flagged, keep first flagged; if none flagged, set first image as primary.
+   */
+  private normalizeImages(images: any[] = []) {
+    const normalized = (images || []).map((img: any) => {
+      const public_id = img?.public_id || img?.publicId || img?.publicIdStr || "";
+      return {
+        url: typeof img?.url === "string" ? img.url : "",
+        public_id: public_id || undefined,
+        thumbSafe: img?.thumbSafe || img?.thumb_safe || img?.thumb || undefined,
+        isPrimary: !!img?.isPrimary,
+      };
+    });
+
+    if (normalized.length === 0) return normalized;
+
+    // If any are marked primary, keep only the first as primary and clear others
+    const firstPrimaryIndex = normalized.findIndex((i) => i.isPrimary);
+    if (firstPrimaryIndex >= 0) {
+      normalized.forEach((n, idx) => {
+        n.isPrimary = idx === firstPrimaryIndex;
+      });
+    } else {
+      // otherwise mark first as primary
+      normalized.forEach((n, idx) => {
+        n.isPrimary = idx === 0;
+      });
+    }
+
+    return normalized;
   }
 
   // delete removed cloudinary images in parallel (safer + faster)
@@ -137,12 +187,16 @@ class ProductService {
 
     // process variants: sku, price, discountedPrice, savings, stock normalize
     const processedVariants = productData.variants.map((variant) => {
+      // ensure variant.images exists and at least one successful upload
       if (!this.validateImages(variant.images)) {
         throw new AppError(
-          "Each variant must have at least one valid image (url + public_id)",
+          "Each variant must have at least one valid uploaded image (url + public_id).",
           400
         );
       }
+
+      // normalize images explicitly so thumbSafe/isPrimary/public_id are preserved
+      const images = this.normalizeImages(variant.images);
 
       const sku = generateSKU(productData.name, variant.color, variant.size);
       const gstDecimal = variant.gstRate / 100;
@@ -167,6 +221,7 @@ class ProductService {
 
       return {
         ...variant,
+        images, // normalized images
         sku,
         price: Math.round(price * 100) / 100,
         discountedPrice: Math.round(discountedPrice * 100) / 100,
@@ -262,10 +317,13 @@ class ProductService {
         (variant) => {
           if (!this.validateImages(variant.images)) {
             throw new AppError(
-              "Each variant must have at least one valid image (url + public_id)",
+              "Each variant must have at least one valid uploaded image (url + public_id).",
               400
             );
           }
+
+          // normalize images (ensure single primary)
+          const images = this.normalizeImages(variant.images);
 
           const sku = generateSKU(
             updateData.name || product.name,
@@ -294,6 +352,7 @@ class ProductService {
 
           return {
             ...variant,
+            images, // normalized images
             sku,
             price: Math.round(price * 100) / 100,
             discountedPrice: Math.round(discountedPrice * 100) / 100,
@@ -586,7 +645,7 @@ class ProductService {
   }
 
   // -------------------- admin shortcuts --------------------
-  async getAllProductsAdmin(filter = {}, page: number = 1, limit: number = 10) {
+  async getAllProductsAdmin(filter = {}, page: number = 1, limit = 10) {
     return this.getAllProducts(filter, page, limit, true, true);
   }
 

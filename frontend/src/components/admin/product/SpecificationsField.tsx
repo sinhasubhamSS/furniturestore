@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Specification } from "@/types/Product"; // adjust if you have different type path
+import { Specification } from "@/types/Product";
 
 const SpecificationForm = ({
   onChange,
@@ -13,15 +13,27 @@ const SpecificationForm = ({
 
   const updateForm = (updated: Specification[]) => {
     setSpecifications(updated);
-    onChange(updated);
+    // sanitize before sending: trim strings
+    const sanitized = updated
+      .map((s) => ({
+        section: (s.section ?? "").toString().trim(),
+        specs: (s.specs ?? []).map((sp) => ({
+          key: (sp.key ?? "").toString().trim(),
+          value: (sp.value ?? "").toString().trim(),
+        })),
+      }))
+      .filter(
+        (s) =>
+          s.section.length > 0 && Array.isArray(s.specs) && s.specs.length > 0
+      );
+    onChange(sanitized);
   };
 
-  const addSection = () => {
+  const addSection = () =>
     updateForm([
       ...specifications,
       { section: "", specs: [{ key: "", value: "" }] },
     ]);
-  };
 
   const removeSection = (index: number) => {
     const updated = [...specifications];
@@ -70,8 +82,14 @@ const SpecificationForm = ({
               onChange={(e) => updateSection(i, e.target.value)}
               placeholder="Section name"
               className="border p-2 w-full rounded"
+              // prevent Enter from accidentally submitting parent form
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.preventDefault();
+              }}
             />
+            {/* explicit type="button" so this does NOT submit the form */}
             <button
+              type="button"
               onClick={() => removeSection(i)}
               className="ml-2 text-red-500"
             >
@@ -87,6 +105,9 @@ const SpecificationForm = ({
                 onChange={(e) => updateSpec(i, j, "key", e.target.value)}
                 placeholder="Key"
                 className="border p-2 w-1/2 rounded"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.preventDefault();
+                }}
               />
               <input
                 type="text"
@@ -94,14 +115,22 @@ const SpecificationForm = ({
                 onChange={(e) => updateSpec(i, j, "value", e.target.value)}
                 placeholder="Value"
                 className="border p-2 w-1/2 rounded"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.preventDefault();
+                }}
               />
-              <button onClick={() => removeSpec(i, j)} className="text-red-500">
+              <button
+                type="button"
+                onClick={() => removeSpec(i, j)}
+                className="text-red-500"
+              >
                 X
               </button>
             </div>
           ))}
 
           <button
+            type="button"
             onClick={() => addSpec(i)}
             className="mt-2 text-blue-500 text-sm"
           >
@@ -111,6 +140,7 @@ const SpecificationForm = ({
       ))}
 
       <button
+        type="button"
         onClick={addSection}
         className="bg-blue-600 text-white px-4 py-2 rounded"
       >

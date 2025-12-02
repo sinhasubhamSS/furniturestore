@@ -12,17 +12,21 @@ import { Types } from "mongoose";
 
 // ==================== ADMIN CONTROLLERS ====================
 
+// controllers/productController.ts
+
 export const createProduct = catchAsync(
   async (req: AuthRequest, res: Response) => {
     if (!req.userId) throw new AppError("Unauthorized", 401);
 
-    // validate input
     const parsedData = createProductSchema.parse(req.body);
 
-    const product = await productService.createProduct(
-      { ...parsedData, createdBy: new Types.ObjectId(req.userId) },
-      req.userId
-    );
+    const payload = {
+      ...parsedData,
+      title: parsedData.title ?? parsedData.name,
+      createdBy: new Types.ObjectId(req.userId),
+    };
+
+    const product = await productService.createProduct(payload, req.userId);
 
     return res
       .status(201)

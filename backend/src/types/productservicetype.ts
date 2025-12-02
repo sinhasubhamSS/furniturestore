@@ -26,6 +26,8 @@ export interface IVariant {
   images: {
     url: string;
     public_id: string;
+    thumbSafe?: string | null;
+    isPrimary?: boolean;
   }[];
 }
 
@@ -33,7 +35,7 @@ export interface IVariant {
 export interface IProductInput {
   name: string;
   slug?: string; // Auto-generated from name
-  title: string;
+  title?: string;
   description: string;
 
   // ✅ Required variants array

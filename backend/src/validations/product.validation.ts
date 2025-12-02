@@ -1,7 +1,8 @@
+// validations/product.validation.ts
 import { Types } from "mongoose";
 import { z } from "zod";
 
-// ✅ ObjectId validator (same)
+// ObjectId preprocess -> Types.ObjectId
 const objectId = z.preprocess(
   (val) => {
     if (typeof val === "string" && Types.ObjectId.isValid(val)) {
@@ -14,42 +15,62 @@ const objectId = z.preprocess(
   })
 );
 
-// ✅ Image schema (same)
+// helper: coerce empty/null/"" to undefined, then to number
+const optionalNumber = z.preprocess((val) => {
+  if (val === "" || val === null || val === undefined) return undefined;
+  const n = Number(val);
+  return Number.isNaN(n) ? val : n;
+}, z.number().optional());
+
+// ✅ Image schema: include thumbSafe & isPrimary
 const imageSchema = z.object({
   url: z.string().url({ message: "Invalid image URL" }),
-  public_id: z.string().min(1, "public_id is required"), // ✅ Fixed underscore
+  public_id: z.string().min(1, "public_id is required"),
+  // newly added
+  thumbSafe: z.string().url().optional(), // optional, expect a url when present
+  isPrimary: z.boolean().optional(),
 });
 
-// ✅ MINIMAL UPDATE: Variant schema + discount (just 3 lines added)
+// Variant schema
 const variantSchema = z
   .object({
     sku: z.string().min(1, "SKU is required").optional(),
     color: z.string().min(1, "Color is required"),
     size: z.string().min(1, "Size is required"),
     basePrice: z.preprocess(
-      (val) => Number(val),
+      (v) => Number(v),
       z.number().positive("Base price must be positive")
     ),
     gstRate: z.preprocess(
-      (val) => Number(val),
+      (v) => Number(v),
       z.number().min(0).max(100, "GST must be 0-100%")
     ),
     stock: z.preprocess(
-      (val) => Number(val),
+      (v) => Number(v),
       z.number().int().nonnegative().default(0)
     ),
 
-    // ✅ JUST THESE 3 LINES ADDED:
-    hasDiscount: z.boolean().default(false),
-    discountPercent: z.coerce.number().min(0).max(70).default(0),
-    discountValidUntil: z.coerce.date().default(new Date(0)),
+    // discount fields (allow missing/false)
+    hasDiscount: z.boolean().optional().default(false),
+    discountPercent: z.preprocess(
+      (v) => (v === "" || v === null || v === undefined ? 0 : Number(v)),
+      z.number().min(0).max(70).optional().default(0)
+    ),
+    // accept string date from frontend, empty -> undefined, coerce to Date when present
+    discountValidUntil: z.preprocess((v) => {
+      if (!v) return undefined;
+      const d = new Date(v as any);
+      return isNaN(d.getTime()) ? v : d;
+    }, z.date().optional()),
 
     images: z.array(imageSchema).min(1, "At least one image per variant"),
   })
   .refine(
     (data) => {
-      // If discount is enabled, percent must be > 0
-      if (data.hasDiscount && data.discountPercent <= 0) {
+      if (
+        data.hasDiscount &&
+        (data.discountPercent === undefined || data.discountPercent <= 0)
+      ) {
         return false;
       }
       return true;
@@ -62,13 +83,8 @@ const variantSchema = z
   )
   .refine(
     (data) => {
-      // If discount is enabled, end date should be in future
-      if (
-        data.hasDiscount &&
-        data.discountValidUntil &&
-        data.discountValidUntil <= new Date()
-      ) {
-        return false;
+      if (data.hasDiscount && data.discountValidUntil) {
+        return data.discountValidUntil > new Date();
       }
       return true;
     },
@@ -78,7 +94,7 @@ const variantSchema = z
     }
   );
 
-// ✅ Specification schema (same)
+// specification schema
 const specificationSchema = z.object({
   section: z.string().min(1, "Section name is required"),
   specs: z
@@ -91,18 +107,19 @@ const specificationSchema = z.object({
     .min(1, "At least one spec is required"),
 });
 
-// ✅ Measurements schema (same)
+// measurements: use optionalNumber for fields
 const measurementsSchema = z.object({
-  width: z.number().optional(),
-  height: z.number().optional(),
-  depth: z.number().optional(),
-  weight: z.number().optional(),
+  width: optionalNumber,
+  height: optionalNumber,
+  depth: optionalNumber,
+  weight: optionalNumber,
 });
 
-// ✅ Create Product Schema (same)
+// Create Product
 export const createProductSchema = z.object({
   name: z.string().min(1, "Product name is required"),
-  title: z.string().min(1, "Product title is required"),
+  // make title optional if frontend sometimes leaves it empty — change to required if you need always present
+  title: z.string().optional(),
   description: z.string().min(1, "Description is required"),
   category: objectId,
   variants: z.array(variantSchema).min(1, "At least one variant is required"),
@@ -110,23 +127,27 @@ export const createProductSchema = z.object({
   measurements: measurementsSchema.optional(),
   warranty: z.string().optional(),
   disclaimer: z.string().optional(),
-  slug: z
-    .string()
-    .optional()
-    .refine((val) => !val, {
-      message: "Slug is auto-generated and should not be provided",
-    }),
+  // slug: allow but don't require — if provided ensure it's a non-empty string; else backend will generate.
+  slug: z.string().optional(),
   isPublished: z.boolean().optional().default(false),
 });
 
-// ✅ Update Schema (same)
-export const updateProductSchema = createProductSchema
-  .partial()
-  .refine((data) => {
-    if (data.variants?.length === 0) return false;
+// Update schema: partial but don't allow removing all variants
+export const updateProductSchema = createProductSchema.partial().refine(
+  (data) => {
+    if (
+      data.variants &&
+      Array.isArray(data.variants) &&
+      data.variants.length === 0
+    )
+      return false;
     return true;
-  }, "Cannot remove all variants");
+  },
+  {
+    message: "Cannot remove all variants",
+  }
+);
 
-// ✅ Export types
+// types
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;

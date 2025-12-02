@@ -1,25 +1,27 @@
+// components/helperComponents/ImageUploader.tsx
 "use client";
 
 import { useRef, useState, useEffect } from "react";
 import { FiUpload, FiX } from "react-icons/fi";
+import { FiStar } from "react-icons/fi";
 import toast from "react-hot-toast";
 import { uploadImageToCloudinary } from "../../../utils/uploadToCloudinary";
 
 export interface UploadedImage {
-  url: string; // original full-quality URL (secure_url)
+  url: string;
   public_id: string;
-  thumbSafe?: string; // low-quality full-image (no crop) for lists
+  thumbSafe?: string;
   isPrimary?: boolean;
-  _origFileName?: string; // internal for failed placeholders
+  _origFileName?: string;
 }
 
 interface ImageUploaderProps {
   folder?: string;
   maxFiles?: number;
   onUpload: (images: UploadedImage[]) => void;
-  defaultUrls?: UploadedImage[]; // already normalized objects expected
-  onUploadStart?: () => void; // called when an upload batch starts
-  onUploadEnd?: () => void; // called when an upload batch finishes
+  defaultUrls?: UploadedImage[];
+  onUploadStart?: () => void;
+  onUploadEnd?: () => void;
 }
 
 const makeKey = (img: UploadedImage, idx: number) =>
@@ -56,6 +58,17 @@ export default function ImageUploader({
       });
     };
   }, [previewsMap]);
+
+  // helper: ensure exactly one primary
+  const ensureSinglePrimary = (arr: UploadedImage[]) => {
+    if (arr.length === 0) return arr;
+    const firstPrimary = arr.findIndex((i) => i.isPrimary);
+    if (firstPrimary >= 0) {
+      return arr.map((a, idx) => ({ ...a, isPrimary: idx === firstPrimary }));
+    } else {
+      return arr.map((a, idx) => ({ ...a, isPrimary: idx === 0 }));
+    }
+  };
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -136,7 +149,6 @@ export default function ImageUploader({
         setProgress(Math.min(100, Math.round((completed / total) * 100)));
       } catch (err: any) {
         console.error("uploadImages error:", err);
-        // push a failed placeholder using preview so user sees it and can remove
         const failed: UploadedImage = {
           url: batchPreviews[i] || "",
           public_id: "",
@@ -152,7 +164,8 @@ export default function ImageUploader({
     setUploading(false);
     setTimeout(() => setProgress(0), 300);
 
-    const updated = [...uploadedImages, ...newUploaded].slice(0, maxFiles);
+    let updated = [...uploadedImages, ...newUploaded].slice(0, maxFiles);
+    updated = ensureSinglePrimary(updated);
     setUploadedImages(updated);
 
     // revoke previews not used by failed placeholders
@@ -187,6 +200,16 @@ export default function ImageUploader({
         URL.revokeObjectURL(removed.url);
       } catch {}
     }
+    const normalized = ensureSinglePrimary(updated);
+    setUploadedImages(normalized);
+    onUpload(normalized);
+  };
+
+  const setPrimary = (index: number) => {
+    const updated = uploadedImages.map((img, idx) => ({
+      ...img,
+      isPrimary: idx === index,
+    }));
     setUploadedImages(updated);
     onUpload(updated);
   };
@@ -240,6 +263,23 @@ export default function ImageUploader({
                 className="w-full h-28 object-cover rounded shadow border"
                 alt={img._origFileName || `Uploaded ${i}`}
               />
+              <div className="absolute top-1 left-1 p-1">
+                <button
+                  onClick={() => setPrimary(i)}
+                  className={`p-1 rounded-full bg-white bg-opacity-80 ${
+                    img.isPrimary ? "ring-2 ring-yellow-400" : ""
+                  }`}
+                  title={img.isPrimary ? "Primary image" : "Set as primary"}
+                  aria-label="Set primary"
+                >
+                  <FiStar
+                    size={16}
+                    className={
+                      img.isPrimary ? "text-yellow-500" : "text-gray-400"
+                    }
+                  />
+                </button>
+              </div>
               <button
                 onClick={() => removeImage(i)}
                 className="absolute top-1 right-1 bg-black bg-opacity-60 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"

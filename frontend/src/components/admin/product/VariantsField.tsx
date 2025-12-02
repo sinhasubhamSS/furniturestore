@@ -1,4 +1,3 @@
-// components/admin/product/VariantForm.tsx
 "use client";
 
 import React, { useEffect } from "react";
@@ -7,6 +6,7 @@ import {
   UseFormSetValue,
   UseFormGetValues,
   UseFormWatch,
+  FieldErrors,
 } from "react-hook-form";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
@@ -21,6 +21,7 @@ interface VariantFormProps {
   getValues: UseFormGetValues<any>;
   watch: UseFormWatch<any>;
   remove: () => void;
+  errors?: FieldErrors;
 }
 
 const VariantForm: React.FC<VariantFormProps> = ({
@@ -30,20 +31,35 @@ const VariantForm: React.FC<VariantFormProps> = ({
   getValues,
   watch,
   remove,
+  errors,
 }) => {
-  // register images for validation
   useEffect(() => {
-    // register manually so RHF validates images presence
     register(`variants.${index}.images`, {
-      required: "At least one image is required",
+      validate: (imgs: any[]) => {
+        if (!Array.isArray(imgs) || imgs.length === 0)
+          return "At least one image is required";
+        const hasUploaded = imgs.some(
+          (im) => typeof im?.public_id === "string" && im.public_id.length > 0
+        );
+        if (!hasUploaded)
+          return "At least one uploaded image (public_id) is required";
+        return true;
+      },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, register]);
 
   const handleImageUpload = (images: UploadedImage[]) => {
-    // ensure first image is primary if none selected
-    if (images && images.length && !images.some((i) => i.isPrimary)) {
-      images = images.map((img, i) => ({ ...img, isPrimary: i === 0 }));
+    if (images && images.length) {
+      const firstPrimaryIdx = images.findIndex((i) => i.isPrimary);
+      if (firstPrimaryIdx === -1) {
+        images = images.map((img, i) => ({ ...img, isPrimary: i === 0 }));
+      } else {
+        images = images.map((img, i) => ({
+          ...img,
+          isPrimary: i === firstPrimaryIdx,
+        }));
+      }
     }
     setValue(`variants.${index}.images`, images, {
       shouldDirty: true,
@@ -52,6 +68,8 @@ const VariantForm: React.FC<VariantFormProps> = ({
   };
 
   const hasDiscount = watch(`variants.${index}.hasDiscount`);
+  const imageError =
+    (errors?.variants && (errors.variants as any)[index]?.images) || undefined;
 
   return (
     <div className="border border-muted rounded-lg p-4 space-y-4 bg-muted/30">
@@ -74,24 +92,54 @@ const VariantForm: React.FC<VariantFormProps> = ({
           (getValues(`variants.${index}.images`) as UploadedImage[]) || []
         }
       />
+      {imageError && (
+        <p className="text-red-500 text-sm mt-1">
+          {(imageError as any).message || imageError}
+        </p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
           label="Color"
           placeholder="e.g. Brown"
-          {...register(`variants.${index}.color`, { required: true })}
+          {...register(`variants.${index}.color`, {
+            required: "Color is required",
+          })}
+          error={
+            (errors?.variants &&
+              (errors.variants as any)[index]?.color?.message) as
+              | string
+              | undefined
+          }
         />
         <Input
           label="Size"
           placeholder="e.g. Medium"
-          {...register(`variants.${index}.size`, { required: true })}
+          {...register(`variants.${index}.size`, {
+            required: "Size is required",
+          })}
+          error={
+            (errors?.variants &&
+              (errors.variants as any)[index]?.size?.message) as
+              | string
+              | undefined
+          }
         />
 
         <Input
           label="Base Price"
           type="number"
           step="0.01"
-          {...register(`variants.${index}.basePrice`, { valueAsNumber: true })}
+          {...register(`variants.${index}.basePrice`, {
+            valueAsNumber: true,
+            required: "Base price is required",
+          })}
+          error={
+            (errors?.variants &&
+              (errors.variants as any)[index]?.basePrice?.message) as
+              | string
+              | undefined
+          }
         />
         <Input
           label="GST Rate (%)"
