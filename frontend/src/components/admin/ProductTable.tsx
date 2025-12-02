@@ -34,18 +34,38 @@ const ProductTable = () => {
             <th className="px-4 py-2 text-center">Actions</th>
           </tr>
         </thead>
+
         <tbody className="divide-y divide-[var(--border)] bg-[var(--secondary-light)]">
           {products.map((product) => {
-            const firstVariant = product.variants?.[0];
+            const v0 = product.variants?.[0]; // first variant fallback
+
+            // --- IMAGE fallback chain ---
             const imageUrl =
-              firstVariant?.images?.[0]?.url ||
+              product.repThumbSafe ||
+              product.repImage ||
+              v0?.images?.[0]?.thumbSafe ||
+              v0?.images?.[0]?.url ||
               "https://via.placeholder.com/60";
+
+            // --- PRICE fallback chain ---
+            const displayPrice =
+              product.repPrice ??
+              product.price ??
+              v0?.price ??
+              null;
+
+            // --- STOCK fallback chain ---
+            const displayStock =
+              typeof product.totalStock === "number"
+                ? product.totalStock
+                : v0?.stock ?? "—";
 
             return (
               <tr
                 key={product._id}
                 className="hover:bg-[var(--secondary-light)]/90 transition"
               >
+                {/* IMAGE */}
                 <td className="px-4 py-2">
                   <img
                     src={imageUrl}
@@ -54,22 +74,30 @@ const ProductTable = () => {
                   />
                 </td>
 
+                {/* NAME */}
                 <td className="px-4 py-2 font-medium">{product.name}</td>
 
-                <td className="px-4 py-2">{firstVariant?.stock ?? "—"}</td>
+                {/* STOCK */}
+                <td className="px-4 py-2">{displayStock}</td>
 
+                {/* CATEGORY */}
                 <td className="px-4 py-2">
                   {typeof product.category === "string"
                     ? product.category
                     : product.category?.name ?? "—"}
                 </td>
 
+                {/* PRICE */}
                 <td className="px-4 py-2">
-                  ₹{firstVariant?.price?.toLocaleString() ?? "—"}
+                  {displayPrice
+                    ? `₹${displayPrice.toLocaleString()}`
+                    : "—"}
                 </td>
 
+                {/* ACTIONS */}
                 <td className="px-4 py-2 text-center">
                   <div className="flex items-center justify-center gap-3">
+                    {/* Edit */}
                     <button
                       title="Edit"
                       className="hover:text-[var(--color-accent)] transition-colors"
@@ -80,6 +108,7 @@ const ProductTable = () => {
                       <Pencil size={16} />
                     </button>
 
+                    {/* Delete */}
                     <button
                       title="Delete"
                       className="hover:text-[var(--text-error)] transition-colors"
@@ -88,6 +117,7 @@ const ProductTable = () => {
                       <Trash2 size={16} />
                     </button>
 
+                    {/* View */}
                     <button
                       title="View"
                       className="hover:text-[var(--color-accent)] transition-colors"

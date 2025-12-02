@@ -57,7 +57,8 @@ class ProductService {
    */
   private normalizeImages(images: any[] = []) {
     const normalized = (images || []).map((img: any) => {
-      const public_id = img?.public_id || img?.publicId || img?.publicIdStr || "";
+      const public_id =
+        img?.public_id || img?.publicId || img?.publicIdStr || "";
       return {
         url: typeof img?.url === "string" ? img.url : "",
         public_id: public_id || undefined,
@@ -645,8 +646,43 @@ class ProductService {
   }
 
   // -------------------- admin shortcuts --------------------
+  // --- admin listing: return full documents (includes variants) ---
   async getAllProductsAdmin(filter = {}, page: number = 1, limit = 10) {
-    return this.getAllProducts(filter, page, limit, true, true);
+    const mongoFilter: any = filter || {};
+
+    // convert category slug -> id if caller passed slug (optional, keep same logic as getAllProducts)
+    if (mongoFilter.category && typeof mongoFilter.category === "string") {
+      const cat = await Category.findOne({ slug: mongoFilter.category });
+      if (cat) mongoFilter.category = cat._id;
+    }
+
+    const skip = (page - 1) * limit;
+
+    // build query: full doc, populate category + createdBy for admin
+    let query = Product.find(mongoFilter)
+      .populate("category", "name slug")
+      .populate("createdBy", "name email")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // run queries in parallel
+    const [products, total] = await Promise.all([
+      query,
+      Product.countDocuments(mongoFilter),
+    ]);
+
+    // Ensure denorm fields exist — if you want to be extra safe you can call recomputeDenorm per product,
+    // but that is heavy. Better to ensure recomputeDenorm runs on create/edit (you already call it).
+    // Here we'll return the full products array directly:
+    return {
+      products,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+      totalItems: total,
+    };
   }
 
   async getProductByIdAdmin(productId: string) {
