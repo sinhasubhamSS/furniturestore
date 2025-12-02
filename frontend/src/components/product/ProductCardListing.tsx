@@ -2,7 +2,7 @@
 
 import React, { memo, useMemo } from "react";
 import { FaHeart, FaRegHeart, FaShoppingCart } from "react-icons/fa";
-import { DisplayProduct } from "@/types/Product";
+import type { DisplayProduct } from "@/types/Product"; // <-- lowercase path
 import { useWishlistManager } from "@/hooks/useWishlistManger";
 import { getCloudinaryThumbnail } from "../../../utils/cloudinary"; // ensure this exists
 
@@ -12,7 +12,9 @@ interface ProductCardListingProps {
 
 const ProductCardListing = memo(
   ({ product }: ProductCardListingProps) => {
-    const variant = product.variants?.[0] ?? ({} as any);
+    // pick first variant (defensive)
+    const variant = (product.variants && product.variants[0]) ?? ({} as any);
+
     const {
       isInWishlist,
       addToWishlist,
@@ -42,9 +44,9 @@ const ProductCardListing = memo(
     };
 
     const discountedPrice = variant?.hasDiscount
-      ? variant.discountedPrice
+      ? variant.discountedPrice ?? null
       : null;
-    const originalPrice = variant?.price;
+    const originalPrice = variant?.price ?? variant?.basePrice ?? 0;
     const discountPercent =
       discountedPrice && originalPrice
         ? Math.round(((originalPrice - discountedPrice) / originalPrice) * 100)
@@ -55,11 +57,15 @@ const ProductCardListing = memo(
       const maybeFirst = variant?.images?.[0];
       const originalUrl =
         typeof maybeFirst === "string" ? maybeFirst : maybeFirst?.url;
-      // getCloudinaryThumbnail will return transformed URL for Cloudinary or original if not cloudinary
       const thumb = getCloudinaryThumbnail(originalUrl);
-      // Use thumbnail if available, else original, else placeholder
       return thumb || originalUrl || "/placeholder.jpg";
     }, [variant]);
+
+    // SAFELY derive category name: product.category can be string OR object
+    const categoryName =
+      typeof product.category === "string"
+        ? product.category
+        : product.category?.name ?? "";
 
     return (
       <div
@@ -77,7 +83,6 @@ const ProductCardListing = memo(
             background: "var(--color-primary)",
           }}
         >
-          {/* keep object-contain and padding so whole image is visible */}
           <img
             src={imgSrc}
             alt={product.name}
@@ -85,7 +90,7 @@ const ProductCardListing = memo(
           />
 
           {/* Discount badge */}
-          {variant?.hasDiscount && (
+          {variant?.hasDiscount && discountPercent > 0 && (
             <div
               className="absolute top-3 left-3 text-xs font-semibold px-2 py-0.5 rounded"
               style={{
@@ -167,12 +172,14 @@ const ProductCardListing = memo(
             >
               {product.name}
             </h3>
-            {product.category?.name && (
+
+            {/* Use derived categoryName (safe) */}
+            {categoryName && (
               <div
                 className="text-xs mb-1"
                 style={{ color: "var(--text-accent)" }}
               >
-                {product.category.name}
+                {categoryName}
               </div>
             )}
           </div>
@@ -185,7 +192,7 @@ const ProductCardListing = memo(
                     className="text-base font-bold"
                     style={{ color: "var(--color-accent)" }}
                   >
-                    ₹{discountedPrice.toFixed(0)}
+                    ₹{discountedPrice!.toFixed(0)}
                   </span>
                   <span
                     className="text-xs line-through"

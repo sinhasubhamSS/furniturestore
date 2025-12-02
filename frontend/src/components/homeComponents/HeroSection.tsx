@@ -1,21 +1,57 @@
 "use client";
 
-import { useGetLatestProductsQuery } from "@/redux/services/user/publicProductApi";
-import { homeProduct } from "@/types/Product";
-import Image from "next/image";
+import Image, { type StaticImageData } from "next/image";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useMemo,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
+import { useGetLatestProductsQuery } from "@/redux/services/user/publicProductApi";
+import type { homeProduct } from "@/types/Product";
 
-const slideDuration = 6000;
+const SLIDE_DURATION = 6000;
 
-const HeroSection = () => {
+type SlideSrc = { id: string; src: string | StaticImageData };
+
+const isStaticImageData = (v: unknown): v is StaticImageData =>
+  typeof v === "object" && v !== null && "src" in (v as any);
+
+/**
+ * Build normalized slides (string URLs or StaticImageData) with stable ids.
+ */
+const buildSlides = (products: homeProduct[] | undefined): SlideSrc[] => {
+  if (!products || products.length === 0) return [];
+
+  const slides: SlideSrc[] = [];
+
+  for (let i = 0; i < products.length; i++) {
+    const p = products[i];
+    const raw = p?.image;
+
+    if (!raw) continue;
+
+    if (typeof raw === "string") {
+      const s = raw.trim();
+      if (s.length === 0) continue;
+      slides.push({ id: p._id ?? `idx-${i}`, src: s });
+    } else if (isStaticImageData(raw)) {
+      slides.push({ id: p._id ?? `idx-${i}`, src: raw });
+    }
+  }
+
+  return slides;
+};
+
+const HeroSection: React.FC = () => {
   const router = useRouter();
   const { data, isLoading } = useGetLatestProductsQuery();
 
-  // ✅ Use image directly from product (not from variants)
-  const products: homeProduct[] = data || [];
+  const products: homeProduct[] = data ?? [];
 
-  const images = products.map((product) => product?.image).filter(Boolean);
+  const slides = useMemo(() => buildSlides(products), [products]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -26,18 +62,31 @@ const HeroSection = () => {
   const pauseTimeRef = useRef<number | null>(null);
   const accumulatedTimeRef = useRef(0);
 
-  const nextSlide = useCallback(() => {
-    setCurrentIndex((prev) => (prev + 1) % images.length);
+  // reset index when slides change so we never go out-of-range
+  useEffect(() => {
+    setCurrentIndex((prev) =>
+      slides.length === 0 ? 0 : Math.min(prev, slides.length - 1)
+    );
     setProgress(0);
     accumulatedTimeRef.current = 0;
-  }, [images.length]);
+    startTimeRef.current = null;
+  }, [slides.length]);
+
+  const nextSlide = useCallback(() => {
+    setCurrentIndex((prev) =>
+      slides.length > 0 ? (prev + 1) % slides.length : 0
+    );
+    setProgress(0);
+    accumulatedTimeRef.current = 0;
+    startTimeRef.current = null;
+  }, [slides.length]);
 
   const animateProgress = useCallback(
     (timestamp: number) => {
       if (!startTimeRef.current) startTimeRef.current = timestamp;
       const elapsed =
         timestamp - startTimeRef.current + accumulatedTimeRef.current;
-      const percent = Math.min(100, (elapsed / slideDuration) * 100);
+      const percent = Math.min(100, (elapsed / SLIDE_DURATION) * 100);
       setProgress(percent);
 
       if (percent >= 100) {
@@ -60,20 +109,21 @@ const HeroSection = () => {
     animationRef.current = requestAnimationFrame(animateProgress);
   }, [animateProgress]);
 
-  const pauseAnimation = () => {
+  const pauseAnimation = useCallback(() => {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     }
     pauseTimeRef.current = performance.now();
-  };
+  }, []);
 
   useEffect(() => {
-    if (!isPaused && images.length > 0) startAnimation();
+    if (slides.length === 0) return;
+    if (!isPaused) startAnimation();
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [isPaused, images.length, startAnimation]);
+  }, [isPaused, slides.length, startAnimation]);
 
   const handlePause = () => {
     setIsPaused(true);
@@ -121,33 +171,42 @@ const HeroSection = () => {
                   Loading latest products...
                 </span>
               </div>
-            ) : images.length === 0 ? (
+            ) : slides.length === 0 ? (
               <div className="flex items-center justify-center h-full px-4 text-center">
                 <span className="text-[var(--color-foreground)]">
                   No product images available.
                 </span>
               </div>
             ) : (
-              images.map((src, index) => (
-                <Image
-                  key={index}
-                  src={src}
-                  alt={`Slide ${index + 1}`}
-                  fill
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                  priority={index === 0} // ✅ first image fast load
-                  className={`absolute inset-0 object-contain transition-opacity duration-700 ease-in-out p-2  ${
-                    index === currentIndex ? "opacity-100" : "opacity-0"
-                  }`}
-                />
-              ))
+              slides.map((slide, index) => {
+                const active = index === currentIndex;
+                return (
+                  <div
+                    key={slide.id}
+                    className={`absolute inset-0 transition-opacity duration-700 ease-in-out p-2 ${
+                      active ? "opacity-100 z-10" : "opacity-0 z-0"
+                    }`}
+                    aria-hidden={!active}
+                  >
+                    <Image
+                      src={slide.src}
+                      alt={`Slide ${index + 1}`}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      priority={index === 0}
+                      loading={index === 0 ? "eager" : "lazy"}
+                      style={{ objectFit: "contain" }}
+                    />
+                  </div>
+                );
+              })
             )}
           </div>
 
           {/* Progress Bars */}
-          {images.length > 0 && (
+          {slides.length > 0 && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 w-full justify-center px-4">
-              {images.map((_, index) => (
+              {slides.map((_, index) => (
                 <div
                   key={index}
                   className="h-1.5 flex-1 max-w-[80px] bg-[var(--color-secondary)] rounded-full overflow-hidden"

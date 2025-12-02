@@ -8,6 +8,7 @@ import {
   useEditProductMutation,
   useGetAdminProductsQuery,
 } from "@/redux/services/admin/adminProductapi";
+import type { Variant, VariantImage } from "@/types/Product";
 
 const EditProductPage = () => {
   const { id } = useParams();
@@ -32,26 +33,47 @@ const EditProductPage = () => {
   // Use type assertion since slug exists in product but not in CreateProductInput
   const { category, slug, ...restProduct } = product as {
     slug: string;
-    category: { _id: string };
+    category: { _id: string } | string;
     [key: string]: any;
+  };
+
+  // Helper to normalize discountValidUntil to string | undefined
+  const normalizeDiscountValidUntil = (d?: string | Date): string | undefined => {
+    if (!d) return undefined;
+    if (typeof d === "string") {
+      if (d.trim() === "") return undefined;
+      return d;
+    }
+    if (d instanceof Date) return d.toISOString();
+    // fallback
+    try {
+      const s = String(d);
+      return s.trim() === "" ? undefined : s;
+    } catch {
+      return undefined;
+    }
   };
 
   // Build default values without slug for the form
   const transformedProduct: Partial<CreateProductInput> = {
     ...restProduct,
-    category: category._id,
-    variants: product.variants.map((v) => ({
+    category: typeof category === "string" ? category : category._id,
+    variants: (product.variants ?? []).map((v: Variant) => ({
       color: v.color,
       size: v.size,
-      basePrice: (v as unknown as { basePrice?: number }).basePrice ?? 0,
-      gstRate: v.gstRate,
-      stock: v.stock,
-      hasDiscount: v.hasDiscount,
-      discountPercent: v.discountPercent,
-      discountValidUntil: v.discountValidUntil ?? "",
-      discountedPrice:
-        (v as unknown as { discountedPrice?: number }).discountedPrice ?? 0,
-      images: v.images,
+      basePrice: v.basePrice ?? 0,
+      gstRate: v.gstRate ?? 0,
+      stock: v.stock ?? 0,
+      hasDiscount: !!v.hasDiscount,
+      discountPercent: v.discountPercent ?? 0,
+      discountValidUntil: normalizeDiscountValidUntil(v.discountValidUntil),
+      discountedPrice: v.discountedPrice ?? 0,
+      images: (v.images ?? []).map((img: VariantImage) => ({
+        url: img.url,
+        public_id: img.public_id,
+        thumbSafe: img.thumbSafe,
+        isPrimary: img.isPrimary,
+      })),
     })),
   };
 

@@ -21,6 +21,7 @@ import {
   setAdvanceEligibility,
 } from "@/redux/slices/checkoutSlice";
 import { CheckoutPricingResponse } from "@/types/order";
+import type { Variant } from "@/types/Product"; // adjust path if needed
 
 /**
  * CheckoutPage
@@ -205,7 +206,7 @@ export default function CheckoutPage() {
     const item = checkoutItems[index];
     if (!item) return;
     const variant = item.product.variants?.find(
-      (v) => v._id === item.variantId
+      (v:Variant) => v._id === item.variantId
     );
     if (!variant) return;
 

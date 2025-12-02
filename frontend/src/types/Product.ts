@@ -109,12 +109,14 @@ export type ProductInput = Partial<BaseProduct> & {
 
 // product shape returned from API with category populated
 export type DisplayProduct = BaseProduct & {
-  category?: {
-    _id: string;
-    name: string;
-  } | string; // some endpoints may return id string instead of object
+  category?:
+    | {
+        _id: string;
+        name: string;
+      }
+    | string; // some endpoints may return id string instead of object
 };
-
+export type Product = BaseProduct;
 // Admin listing response
 export type AdminProductResponse = {
   products: DisplayProduct[];
