@@ -75,6 +75,7 @@ export type BaseProduct = {
   inStock?: boolean;
 
   // representative (denormalized) snapshot fields for fast listing
+  image?: string; // top-level canonical representative image (frontend-authoritative)
   repImage?: string; // full image url (may be repThumbSafe or repImage)
   repImagePublicId?: string;
   repThumbSafe?: string; // low-quality safe thumb for list

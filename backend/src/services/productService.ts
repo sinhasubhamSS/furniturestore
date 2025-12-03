@@ -484,9 +484,17 @@ class ProductService {
       visibleOnHomepage: 1,
       createdAt: 1,
       updatedAt: 1,
+      // include category name if populated (optional)
+      category: 1,
     };
 
-    let query = this.buildProductQuery(mongoFilter, isAdmin, populateCreatedBy);
+    // Build the same final filter we use in the query (so countDocuments matches)
+    const finalFilter = isAdmin
+      ? mongoFilter
+      : { ...mongoFilter, isPublished: true };
+
+    // Build query (populate will be applied inside buildProductQuery)
+    let query = this.buildProductQuery(finalFilter, isAdmin, populateCreatedBy);
 
     query = query.select(LISTING_PROJECTION).sort(sortOptions);
 
@@ -496,11 +504,35 @@ class ProductService {
     // run queries in parallel and lean() for performance
     const [products, total] = await Promise.all([
       query.lean(),
-      Product.countDocuments(mongoFilter),
+      Product.countDocuments(finalFilter),
     ]);
 
-    // map to listing DTO (centralized)
-    const dto = (products || []).map((p: any) => this.mapToListingDTO(p));
+    // map to listing DTO: return both rep* fields AND backward-compatible keys
+    const dto = (products || []).map((p: any) => {
+      // keep original mapToListingDTO behaviour but also expose rep* explicitly
+      const base = this.mapToListingDTO(p);
+
+      return {
+        // existing DTO keys
+        ...base,
+        // expose rep* named fields so frontend expecting them will receive them
+        repThumbSafe: p.repThumbSafe ?? null,
+        repImage: p.repImage ?? null,
+        repPrice:
+          typeof p.repPrice !== "undefined" ? p.repPrice : p.price ?? null,
+        repDiscountedPrice:
+          typeof p.repDiscountedPrice !== "undefined"
+            ? p.repDiscountedPrice
+            : p.lowestDiscountedPrice ?? null,
+        repSavings: p.repSavings ?? 0,
+        repInStock:
+          typeof p.repInStock !== "undefined" ? p.repInStock : !!p.inStock,
+        // also include category populated name if available (keeps frontend safe)
+        category: p.category?.name
+          ? { name: p.category.name, _id: p.category._id }
+          : p.category,
+      };
+    });
 
     return {
       products: dto,

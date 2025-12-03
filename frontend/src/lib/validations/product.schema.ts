@@ -59,6 +59,17 @@ export const createProductSchema = z.object({
   description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
   isPublished: z.boolean().optional(),
+
+  // optional top-level image (frontend expects it)
+  image: z.string().url("Invalid image URL").optional(),
+
+  // optional rep overrides (admin can supply; backend will recompute/override if needed)
+  repImage: z.string().optional(),
+  repThumbSafe: z.string().optional(),
+  repPrice: z.number().optional(),
+  repDiscountedPrice: z.number().optional(),
+  repInStock: z.boolean().optional(),
+
   variants: z
     .array(variantSchema)
     .min(1, "At least one variant is required")
