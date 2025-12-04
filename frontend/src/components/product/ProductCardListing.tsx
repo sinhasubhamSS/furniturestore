@@ -1,18 +1,20 @@
 "use client";
 
 import React, { memo, useMemo } from "react";
+import Image from "next/image";
 import { FaHeart, FaRegHeart, FaShoppingCart } from "react-icons/fa";
-import type { DisplayProduct } from "@/types/Product"; // <-- lowercase path
+import type { DisplayProduct } from "@/types/Product";
 import { useWishlistManager } from "@/hooks/useWishlistManger";
-import { getCloudinaryThumbnail } from "../../../utils/cloudinary"; // ensure this exists
 
 interface ProductCardListingProps {
   product: DisplayProduct;
 }
 
+const PLACEHOLDER = "/placeholder.jpg"; // ensure this exists in /public
+
 const ProductCardListing = memo(
   ({ product }: ProductCardListingProps) => {
-    // pick first variant (defensive)
+    // defensive first-variant
     const variant = (product.variants && product.variants[0]) ?? ({} as any);
 
     const {
@@ -43,28 +45,64 @@ const ProductCardListing = memo(
       }
     };
 
-    const discountedPrice = variant?.hasDiscount
-      ? variant.discountedPrice ?? null
-      : null;
-    const originalPrice = variant?.price ?? variant?.basePrice ?? 0;
+    // ---------- Image selection (priority):
+    // 1) product.image (authoritative)
+    // 2) product.repThumbSafe (LQIP) -> used as blurDataURL if present
+    // 3) product.repImage
+    // 4) first variant image (support string or { url })
+    // 5) placeholder
+    const { imgSrc, blurDataURL } = useMemo(() => {
+      const imgFromProduct =
+        typeof (product as any).image === "string" && (product as any).image
+          ? (product as any).image
+          : null;
+
+      const repThumb = typeof (product as any).repThumbSafe === "string" && (product as any).repThumbSafe
+        ? (product as any).repThumbSafe
+        : null;
+
+      const repImage = typeof (product as any).repImage === "string" && (product as any).repImage
+        ? (product as any).repImage
+        : null;
+
+      const maybeFirst = variant?.images?.[0];
+      const firstUrl = typeof maybeFirst === "string" ? maybeFirst : maybeFirst?.url;
+      const variantImage = typeof firstUrl === "string" && firstUrl ? firstUrl : null;
+
+      // choose src (prefer explicit product.image or repImage; keep repThumb for blur)
+      const src = imgFromProduct || repImage || variantImage || PLACEHOLDER;
+      const blur = repThumb || (imgFromProduct === null && repImage === null ? variantImage : null);
+
+      return { imgSrc: src, blurDataURL: blur || undefined };
+    }, [product, variant]);
+
+    // ---------- Price selection (prefer denormalized rep fields then variant/top-level)
+    const price =
+      (product as any).repDiscountedPrice ??
+      (product as any).discountedPrice ??
+      variant?.discountedPrice ??
+      (product as any).repPrice ??
+      variant?.price ??
+      (product as any).price ??
+      null;
+
+    const originalPrice =
+      (product as any).repPrice ??
+      variant?.price ??
+      (product as any).price ??
+      null;
+
+    const hasDiscount =
+      price != null && originalPrice != null && Number(price) < Number(originalPrice);
+
     const discountPercent =
-      discountedPrice && originalPrice
-        ? Math.round(((originalPrice - discountedPrice) / originalPrice) * 100)
+      hasDiscount && originalPrice && price
+        ? Math.round(((Number(originalPrice) - Number(price)) / Number(originalPrice)) * 100)
         : 0;
 
-    // compute image URL (prefer thumbnail if possible)
-    const imgSrc = useMemo(() => {
-      const maybeFirst = variant?.images?.[0];
-      const originalUrl =
-        typeof maybeFirst === "string" ? maybeFirst : maybeFirst?.url;
-      const thumb = getCloudinaryThumbnail(originalUrl);
-      return thumb || originalUrl || "/placeholder.jpg";
-    }, [variant]);
-
-    // SAFELY derive category name: product.category can be string OR object
     const categoryName =
       typeof product.category === "string"
-        ? product.category
+        ? ""
         : product.category?.name ?? "";
 
     return (
@@ -83,14 +121,20 @@ const ProductCardListing = memo(
             background: "var(--color-primary)",
           }}
         >
-          <img
+          <Image
             src={imgSrc}
             alt={product.name}
-            className="max-h-full max-w-full object-contain p-4 transition-transform duration-200 group-hover:scale-105"
+            width={400}
+            height={320}
+            style={{ objectFit: "contain", padding: "1rem" }}
+            priority={false}
+            placeholder={blurDataURL ? "blur" : "empty"}
+            blurDataURL={blurDataURL}
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px"
           />
 
           {/* Discount badge */}
-          {variant?.hasDiscount && discountPercent > 0 && (
+          {hasDiscount && discountPercent > 0 && (
             <div
               className="absolute top-3 left-3 text-xs font-semibold px-2 py-0.5 rounded"
               style={{
@@ -186,27 +230,30 @@ const ProductCardListing = memo(
 
           <div className="flex items-center gap-2">
             <div className="flex items-baseline gap-2">
-              {discountedPrice !== null ? (
+              {price != null ? (
                 <>
                   <span
                     className="text-base font-bold"
                     style={{ color: "var(--color-accent)" }}
                   >
-                    ₹{discountedPrice!.toFixed(0)}
+                    ₹{Number(price).toFixed(0)}
                   </span>
-                  <span
-                    className="text-xs line-through"
-                    style={{ color: "var(--text-accent)" }}
-                  >
-                    ₹{originalPrice?.toFixed(0)}
-                  </span>
+                  {hasDiscount && originalPrice != null && (
+                    <span
+                      className="text-xs line-through"
+                      style={{ color: "var(--text-accent)" }}
+                    >
+                      ₹{Number(originalPrice).toFixed(0)}
+                    </span>
+                  )}
                 </>
               ) : (
                 <span
                   className="text-base font-bold"
                   style={{ color: "var(--color-accent)" }}
                 >
-                  ₹{originalPrice?.toFixed(0)}
+                  ₹
+                  {originalPrice != null ? Number(originalPrice).toFixed(0) : "—"}
                 </span>
               )}
             </div>
@@ -214,7 +261,7 @@ const ProductCardListing = memo(
               className="ml-auto text-xs font-semibold"
               style={{ color: "var(--text-accent)" }}
             >
-              Free delivery
+              {product.repInStock ? "In stock" : "Free delivery"}
             </div>
           </div>
         </div>
@@ -229,7 +276,14 @@ const ProductCardListing = memo(
       </div>
     );
   },
-  (prev, next) => prev.product._id === next.product._id
+  (prev, next) =>
+    prev.product._id === next.product._id &&
+    // visible fields: images, prices, inStock
+    ((prev.product as any).image ?? (prev.product as any).repImage ?? (prev.product as any).repThumbSafe) ===
+      ((next.product as any).image ?? (next.product as any).repImage ?? (next.product as any).repThumbSafe) &&
+    (prev.product as any).repPrice === (next.product as any).repPrice &&
+    (prev.product as any).repDiscountedPrice === (next.product as any).repDiscountedPrice &&
+    prev.product.repInStock === next.product.repInStock
 );
 
 ProductCardListing.displayName = "ProductCardListing";
