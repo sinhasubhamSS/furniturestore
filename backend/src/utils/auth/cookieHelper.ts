@@ -1,24 +1,37 @@
 import { Response } from "express";
-type SameSiteType = "none" | "lax" | "strict";
 
 /**
- * NOTE:
- * Using NODE_ENV to decide secure flag so local dev (http) can still set cookies.
- * Refresh cookie path unified to "/api/user/refresh-token" to match your clearAuthCookies.
- * If your actual refresh endpoint path is different, make them identical.
+ * Better paths:
+ * - accessToken available everywhere → "/"
+ * - refreshToken SHOULD also be accessible to refresh route → "/" (not restricted path)
  */
-
-const COOKIE_REFRESH_PATH = "/api/user/refresh-token";
 const COOKIE_ACCESS_PATH = "/";
+const COOKIE_REFRESH_PATH = "/";
 
 const ACCESS_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 const isProd = process.env.NODE_ENV === "production";
+
+/**
+ * FINAL COOKIE LOGIC:
+ *
+ * 🔥 DEV (localhost):
+ *   secure: false
+ *   sameSite: "lax"
+ *   → Browser WILL store cookies even on cross-origin localhost
+ *
+ * 🔥 PROD (https domains):
+ *   secure: true
+ *   sameSite: "none"
+ *   → Required for cross-site cookies
+ */
 const cookieOptions = {
-  httpOnly: true, // JS से read न हो, safe
-  secure: isProd, // prod => true, localhost => false
-  sameSite: isProd ? "none" : "lax", // prod cross-site needs none, dev use lax
+  httpOnly: true,
+  secure: isProd ? true : false,
+  sameSite: isProd ? "none" : "lax", // dev-friendly, prod-secure
 } as const;
+
 export const setAuthCookies = (
   res: Response,
   accessToken: string,
@@ -35,6 +48,14 @@ export const setAuthCookies = (
     path: COOKIE_REFRESH_PATH,
     maxAge: REFRESH_TTL_MS,
   });
+
+  console.log("→ Cookies set:", {
+    env: process.env.NODE_ENV,
+    access: COOKIE_ACCESS_PATH,
+    refresh: COOKIE_REFRESH_PATH,
+    sameSite: cookieOptions.sameSite,
+    secure: cookieOptions.secure,
+  });
 };
 
 export const clearAuthCookies = (res: Response): void => {
@@ -48,7 +69,6 @@ export const clearAuthCookies = (res: Response): void => {
   });
 };
 
-// export constants in case other files need them
 export {
   ACCESS_TTL_MS as ACCESS_TTL,
   REFRESH_TTL_MS as REFRESH_TTL,
