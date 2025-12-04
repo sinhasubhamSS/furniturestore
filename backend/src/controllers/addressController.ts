@@ -32,6 +32,8 @@ export const updateAddress = catchAsync(
   }
 );
 
+
+
 export const deleteAddress = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
