@@ -1,7 +1,8 @@
+// utils/axios.ts
 import axios, { AxiosRequestConfig } from "axios";
 
 const axiosClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,
+  baseURL: "/api", // IMPORTANT: use Next.js rewrite proxy so requests are same-origin
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
@@ -51,19 +52,20 @@ axiosClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // hit refresh-token endpoint
-        const refreshResponse = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/user/refresh-token`,
+        // Use axiosClient so refresh also goes through the proxy (/api)
+        const refreshResponse = await axiosClient.post(
+          "/user/refresh-token",
           {},
           { withCredentials: true }
         );
 
-        // 👇 agar backend body me new accessToken bhejta hai to headers update karo
         const newAccessToken = refreshResponse.data?.accessToken;
         if (newAccessToken) {
-          axiosClient.defaults.headers[
-            "Authorization"
-          ] = `Bearer ${newAccessToken}`;
+          // set on common headers properly
+          (axiosClient.defaults.headers as any).common = {
+            ...(axiosClient.defaults.headers as any).common,
+            Authorization: `Bearer ${newAccessToken}`,
+          };
           originalRequest.headers = {
             ...originalRequest.headers,
             Authorization: `Bearer ${newAccessToken}`,
@@ -76,8 +78,10 @@ axiosClient.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         if (typeof window !== "undefined") {
-  window.location.href = `/auth/login?from=${encodeURIComponent(window.location.pathname)}`;
-}
+          window.location.href = `/auth/login?from=${encodeURIComponent(
+            window.location.pathname
+          )}`;
+        }
 
         return Promise.reject(refreshError);
       } finally {

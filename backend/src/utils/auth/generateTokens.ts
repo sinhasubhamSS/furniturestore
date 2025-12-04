@@ -1,8 +1,8 @@
 // utils/auth/generateTokens.ts
 import jwt from "jsonwebtoken";
 
-const ACCESS_TTL = process.env.ACCESS_TOKEN_TTL || "15m";
-const REFRESH_TTL = process.env.REFRESH_TOKEN_TTL || "7d";
+const ACCESS_TTL =  "15m";
+const REFRESH_TTL =  "7d";
 
 // Ensure secrets exist at runtime
 if (!process.env.ACCESS_TOKEN_SECRET) {
