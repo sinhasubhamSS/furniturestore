@@ -26,6 +26,7 @@ const SignupPage = () => {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<SignupFormValues>({ mode: "onChange" });
 
@@ -33,22 +34,34 @@ const SignupPage = () => {
   const { signup, loading, error } = useSignup();
   const router = useRouter();
 
+  const passwordValue = watch("password");
+
   const onSubmit = async (data: SignupFormValues) => {
     try {
+      // frontend double-check (extra safety/UX)
+      if (data.password !== data.confirmPassword) {
+        toast.error("Passwords do not match");
+        return;
+      }
+
       let avatarUrl = "";
       if (avatarFile) {
-        const uploadResult = await uploadImageToCloudinary(avatarFile, "avatars");
+        const uploadResult = await uploadImageToCloudinary(
+          avatarFile,
+          "avatars"
+        );
         avatarUrl = uploadResult.url;
       }
 
-      const signupData = {
-        ...data,
+      const signupPayload = {
+        name: data.name,
+        email: data.email,
+        password: data.password,
         avatar: avatarUrl,
+        confirmPassword: data.confirmPassword,
       };
 
-      const { confirmPassword, ...payload } = signupData;
-
-      const res = await signup(payload);
+      const res = await signup(signupPayload);
 
       if (res?.user?._id) {
         toast.success("Signup successful! 🎉");
@@ -117,6 +130,8 @@ const SignupPage = () => {
           placeholder="Confirm your password"
           register={register("confirmPassword", {
             required: "Please confirm your password",
+            validate: (value) =>
+              value === passwordValue || "Passwords do not match",
           })}
           error={errors.confirmPassword?.message}
         />
@@ -145,11 +160,15 @@ const SignupPage = () => {
         </button>
 
         {error && (
-          <p className="text-[var(--text-error)] mt-3 text-sm text-center">{error}</p>
+          <p className="text-[var(--text-error)] mt-3 text-sm text-center">
+            {error}
+          </p>
         )}
 
         <div className="mt-4 text-sm text-center">
-          <span className="text-[var(--foreground)]">Already have an account? </span>
+          <span className="text-[var(--foreground)]">
+            Already have an account?{" "}
+          </span>
           <Link
             href="/auth/login"
             className="text-[var(--text-accent)] font-medium hover:underline"

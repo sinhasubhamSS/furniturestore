@@ -20,18 +20,36 @@ import {
  * Register
  */
 export const registerUser = catchAsync(async (req: Request, res: Response) => {
-  const { name, email, password, avatar } = req.body;
-  if (!name || !email || !password)
-    throw new AppError("All fields are required", 400);
+  // accept confirmPassword from client
+  const { name, email, password, confirmPassword, avatar } = req.body;
 
-  const userExists = await User.findOne({ email });
+  // basic required fields check
+  if (!name || !email || !password || !confirmPassword) {
+    throw new AppError(
+      "Name, email, password & confirm password are required",
+      400
+    );
+  }
+
+  // normalize email
+  const normalizedEmail = String(email).trim().toLowerCase();
+
+  // simple password policy (example)
+  if (String(password).length < 6)
+    throw new AppError("Password must be at least 6 characters", 400);
+
+  // confirm password check (server-side must have this)
+  if (password !== confirmPassword)
+    throw new AppError("Passwords do not match", 400);
+
+  const userExists = await User.findOne({ email: normalizedEmail });
   if (userExists) throw new AppError("Email already exists", 409);
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
   const newUser = await User.create({
-    name,
-    email,
+    name: String(name).trim(),
+    email: normalizedEmail,
     password: hashedPassword,
     avatar: avatar || "",
     role: "buyer",
@@ -57,7 +75,6 @@ export const registerUser = catchAsync(async (req: Request, res: Response) => {
     }
   );
 });
-
 /**
  * Login
  */
