@@ -1,5 +1,11 @@
+// product.model.ts
 import { Schema, model, Model, models, Document, Types } from "mongoose";
 import slugify from "slugify";
+import {
+  computeVariantFromBase,
+  computeVariantFromSellingPrice,
+  PricingResult,
+} from "../utils/pricing";
 
 /* ---------- Variant image + variant interfaces ---------- */
 export interface IVariantImage {
@@ -12,22 +18,41 @@ export interface IVariantImage {
 export interface IVariant extends Document {
   sku: string;
   color: string;
-  size: string;
+  size?: string;
 
-  basePrice: number;
-  gstRate: number;
+  // SOURCE-OF-TRUTH (admin enters basePrice) OR derived from finalSellingPrice
+  basePrice: number; // taxable value (admin must provide OR derived)
+  gstRate: number; // percent e.g. 18 (0-100)
 
-  price: number;
-  discountedPrice: number;
+  // Optional marketing/display MRP
+  listingPrice?: number;
+
+  // Computed (persisted)
+  gstAmount: number;
+  sellingPrice: number; // base + gst (inclusive) OR provided as finalSellingPrice and derived
+
+  // For merchant-friendly input: optional field that can be sent from frontend.
+  // We'll delete it after computation so it doesn't stay stored.
+  finalSellingPrice?: number;
+
+  // Compatibility / snapshots (deprecated names kept)
+  price?: number; // mirrors listingPrice (DEPRECATED)
+  discountedPrice?: number; // mirrors sellingPrice (DEPRECATED)
   savings: number;
 
-  hasDiscount: boolean;
-  discountPercent: number;
+  discountPercent?: number; // computed from listingPrice vs sellingPrice (integer percent)
+
+  hasDiscount?: boolean;
   discountValidUntil?: Date;
 
   stock: number;
   reservedStock: number;
   images: IVariantImage[];
+
+  // audit
+  priceMode?: "base" | "selling";
+  priceUpdatedAt?: Date;
+  priceUpdatedBy?: Types.ObjectId;
 }
 
 /* ---------- Product interface ---------- */
@@ -52,43 +77,36 @@ export interface IProduct extends Document {
 
   variants: Types.DocumentArray<IVariant>;
 
-  colors: string[];
-  sizes: string[];
-
   warranty?: string;
   disclaimer?: string;
 
   category: Types.ObjectId;
 
-  price: number; // Lowest variant price
-  lowestDiscountedPrice?: number; // Lowest discounted price among variants
+  // Denormalized product-level aggregates
+  price?: number; // lowest variant listingPrice (marketing)
+  lowestDiscountedPrice?: number; // lowest variant sellingPrice (actual payable)
   maxSavings: number;
 
-  // denorm + SEO
   primaryVariantId?: Types.ObjectId;
   primaryLocked?: boolean;
 
   repImage?: string;
-  repImagePublicId?: string;
   repThumbSafe?: string;
 
   repPrice?: number;
   repDiscountedPrice?: number;
-  repSavings?: number;
   repInStock?: boolean;
 
   totalStock?: number;
   inStock?: boolean;
 
+  displayMRP?: number;
+
   metaTitle?: string;
   metaDescription?: string;
-  canonicalUrl?: string;
-  ogImage?: string;
   searchTags?: string[];
   visibleOnHomepage?: boolean;
-  lastUpdatedForListing?: Date;
 
-  // timestamps
   createdAt?: Date;
   updatedAt?: Date;
 
@@ -141,56 +159,146 @@ const variantSchema = new Schema<IVariant>(
   {
     sku: { type: String, required: true },
     color: { type: String, required: true },
-    size: { type: String, required: true },
+    size: { type: String },
 
+    // Source-of-truth: basePrice (taxable)
     basePrice: { type: Number, required: true },
-    gstRate: { type: Number, required: true },
+    gstRate: { type: Number, required: true, min: 0, max: 100 },
 
-    price: { type: Number, default: 0 },
-    discountedPrice: { type: Number, default: 0 },
+    // Optional marketing/display MRP (no default so absence is explicit)
+    listingPrice: { type: Number },
+
+    // Computed (persisted for audit & invoices)
+    gstAmount: { type: Number, default: 0 },
+    sellingPrice: { type: Number, default: 0 },
+
+    // Accept merchant input of final selling price (input-only). We'll clear it after compute.
+    finalSellingPrice: { type: Number },
+
+    // legacy compatibility fields (kept updated)
+    price: { type: Number }, // will mirror listingPrice
+    discountedPrice: { type: Number }, // will mirror sellingPrice
     savings: { type: Number, default: 0 },
 
+    // computed percent discount shown to users (derived from listing vs selling)
+    discountPercent: { type: Number, default: 0, min: 0, max: 100 },
+
     hasDiscount: { type: Boolean, default: false },
-    discountPercent: { type: Number, default: 0, min: 0, max: 70 },
     discountValidUntil: { type: Date },
 
     stock: { type: Number, required: true, default: 0 },
     reservedStock: { type: Number, default: 0 },
 
     images: { type: [variantImageSchema], default: [] },
+
+    // audit
+    priceMode: { type: String, enum: ["base", "selling"], default: "base" },
+    priceUpdatedAt: { type: Date },
+    priceUpdatedBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
   { _id: true }
 );
 
 /* ---------- variant pre-save ---------- */
-variantSchema.pre("save", function (this: IVariant, next) {
-  this.price = this.basePrice + (this.basePrice * this.gstRate) / 100;
+variantSchema.pre("save", function (this: any, next) {
+  try {
+    // Priority: if finalSellingPrice provided by frontend (merchant), derive base from it.
+    // Otherwise use canonical basePrice as provided.
+    let pricing: PricingResult | null = null;
 
-  const isDiscountValid =
-    this.hasDiscount &&
-    this.discountPercent > 0 &&
-    (!this.discountValidUntil || this.discountValidUntil > new Date());
+    const gstRate = this.gstRate || 0;
+    const listingInput =
+      typeof this.listingPrice === "number" && this.listingPrice > 0
+        ? this.listingPrice
+        : undefined;
 
-  if (isDiscountValid) {
-    const discountAmount = (this.basePrice * this.discountPercent) / 100;
-    const discountedBasePrice = this.basePrice - discountAmount;
-    this.discountedPrice =
-      discountedBasePrice + (discountedBasePrice * this.gstRate) / 100;
-    this.savings = this.price - this.discountedPrice;
-  } else {
-    this.discountedPrice = this.price;
-    this.savings = 0;
-    this.hasDiscount = false;
+    if (
+      typeof this.finalSellingPrice === "number" &&
+      this.finalSellingPrice > 0
+    ) {
+      // merchant provided final inclusive price
+      pricing = computeVariantFromSellingPrice(
+        this.finalSellingPrice,
+        gstRate,
+        listingInput
+      );
+      // persist derived base
+      this.basePrice = pricing.base;
+      // remove the input-only field so it doesn't stay stored (optional)
+      this.finalSellingPrice = undefined;
+      // indicate priceMode "selling" since merchant input final price
+      this.priceMode = "selling";
+    } else {
+      // canonical flow: admin provided basePrice
+      const baseInput = typeof this.basePrice === "number" ? this.basePrice : 0;
+      pricing = computeVariantFromBase(baseInput, gstRate, listingInput);
+      this.priceMode = "base";
+    }
+
+    if (!pricing) throw new Error("Pricing computation failed");
+
+    // persist canonical computed values
+    this.basePrice = pricing.base;
+    this.gstAmount = pricing.gstAmount;
+    this.sellingPrice = pricing.sellingPrice;
+    this.listingPrice = pricing.listingPrice;
+
+    // derived fields
+    this.savings = pricing.savings;
+    this.discountPercent = pricing.discountPercent;
+    this.hasDiscount = (this.savings || 0) > 0;
+
+    // legacy compatibility mirrors
+    this.price = this.listingPrice;
+    this.discountedPrice = this.sellingPrice;
+
+    // audit
+    this.priceUpdatedAt = new Date();
+
+    // rounding safety (pricing already rounded but double-check)
+    this.basePrice = Math.round((this.basePrice || 0) * 100) / 100;
+    this.gstAmount = Math.round((this.gstAmount || 0) * 100) / 100;
+    this.sellingPrice = Math.round((this.sellingPrice || 0) * 100) / 100;
+    if (this.listingPrice)
+      this.listingPrice = Math.round(this.listingPrice * 100) / 100;
+    if (this.price) this.price = Math.round(this.price * 100) / 100;
+    if (this.discountedPrice)
+      this.discountedPrice = Math.round(this.discountedPrice * 100) / 100;
+    this.savings = Math.round((this.savings || 0) * 100) / 100;
+    this.discountPercent = Math.round(this.discountPercent || 0);
+  } catch (err) {
+    // fallback: attempt to compute from existing fields
+    try {
+      const gstDecimal = (this.gstRate || 0) / 100;
+      const baseFallback = this.basePrice || 0;
+      const gstAmountFallback =
+        Math.round(baseFallback * gstDecimal * 100) / 100;
+      const sellingFallback =
+        Math.round((baseFallback + gstAmountFallback) * 100) / 100;
+      this.basePrice = baseFallback;
+      this.gstAmount = gstAmountFallback;
+      this.sellingPrice = sellingFallback;
+      this.price = this.price || sellingFallback;
+      this.discountedPrice = this.discountedPrice || sellingFallback;
+      this.savings =
+        Math.round((this.price - this.discountedPrice) * 100) / 100;
+      this.discountPercent = Math.round(
+        (this.listingPrice || 0) > 0
+          ? ((this.listingPrice - this.sellingPrice) /
+              (this.listingPrice || 1)) *
+              100
+          : 0
+      );
+      this.priceMode = this.priceMode || "base";
+      this.priceUpdatedAt = new Date();
+    } catch (e) {
+      // allow save to continue but values may be inconsistent
+    }
   }
-
-  this.price = Math.round(this.price * 100) / 100;
-  this.discountedPrice = Math.round(this.discountedPrice * 100) / 100;
-  this.savings = Math.round(this.savings * 100) / 100;
-
   next();
 });
 
-/* ---------- Product schema ---------- */
+/* ---------- Product schema (same as refactor) ---------- */
 const productSchema = new Schema<IProduct, IProductModel>(
   {
     name: { type: String, required: true, trim: true },
@@ -227,29 +335,23 @@ const productSchema = new Schema<IProduct, IProductModel>(
       weight: { type: Number },
     },
 
-    colors: { type: [String], default: [] },
-    sizes: { type: [String], default: [] },
-
     warranty: { type: String, default: "" },
     disclaimer: { type: String, default: "" },
 
     category: { type: Schema.Types.ObjectId, ref: "Category", required: true },
 
-    price: { type: Number, required: true },
-    lowestDiscountedPrice: { type: Number, required: false },
+    price: { type: Number }, // lowest listingPrice (marketing)
+    lowestDiscountedPrice: { type: Number },
     maxSavings: { type: Number, default: 0 },
 
-    // denorm + seo
     primaryVariantId: { type: Schema.Types.ObjectId },
     primaryLocked: { type: Boolean, default: false },
 
     repImage: { type: String },
-    repImagePublicId: { type: String },
     repThumbSafe: { type: String },
 
     repPrice: { type: Number },
     repDiscountedPrice: { type: Number },
-    repSavings: { type: Number, default: 0 },
     repInStock: { type: Boolean, default: false },
 
     totalStock: { type: Number, default: 0 },
@@ -257,13 +359,11 @@ const productSchema = new Schema<IProduct, IProductModel>(
 
     metaTitle: { type: String },
     metaDescription: { type: String },
-    canonicalUrl: { type: String },
-    ogImage: { type: String },
 
     searchTags: { type: [String], default: [] },
     visibleOnHomepage: { type: Boolean, default: false },
 
-    lastUpdatedForListing: { type: Date, default: Date.now },
+    displayMRP: { type: Number },
 
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
 
@@ -298,7 +398,7 @@ const productSchema = new Schema<IProduct, IProductModel>(
 );
 
 /* ---------- pre-save: slug, aggregates and sync rep from representative variant ---------- */
-productSchema.pre("save", function (this: IProduct, next) {
+productSchema.pre("save", function (this: any, next) {
   // slugify if name changed
   if (this.isModified("name")) {
     this.slug = slugify(this.name, {
@@ -308,42 +408,57 @@ productSchema.pre("save", function (this: IProduct, next) {
     });
   }
 
-  // aggregates
+  // aggregates from variants
   if (this.variants && this.variants.length) {
-    this.price =
-      Math.min(...this.variants.map((v: any) => v.price ?? Infinity)) ||
-      this.price;
-    this.lowestDiscountedPrice =
-      Math.min(
-        ...this.variants.map((v: any) => v.discountedPrice ?? Infinity)
-      ) || this.lowestDiscountedPrice;
+    const listingPrices = this.variants.map((v: any) =>
+      typeof v.listingPrice === "number" && v.listingPrice > 0
+        ? v.listingPrice
+        : Infinity
+    );
+    const minListing = Math.min(...listingPrices);
+    this.price = isFinite(minListing)
+      ? Math.round(minListing * 100) / 100
+      : this.price;
+
+    const sellingPrices = this.variants.map((v: any) =>
+      typeof v.sellingPrice === "number" && v.sellingPrice > 0
+        ? v.sellingPrice
+        : Infinity
+    );
+    const minSelling = Math.min(...sellingPrices);
+    this.lowestDiscountedPrice = isFinite(minSelling)
+      ? Math.round(minSelling * 100) / 100
+      : this.lowestDiscountedPrice;
+
     this.maxSavings = Math.max(
       ...this.variants.map((v: any) => v.savings ?? 0),
-      this.maxSavings
+      this.maxSavings || 0
     );
-
-    this.colors = [...new Set(this.variants.map((v: any) => v.color))];
-    this.sizes = [...new Set(this.variants.map((v: any) => v.size))];
   }
 
-  // sync representative variant snapshot so listing price/image match chosen variant
+  // sync representative variant snapshot
   try {
-    const Model: any = (this.constructor as any);
-    const pickFn = typeof Model.pickRepresentative === "function" ? Model.pickRepresentative : null;
+    const Model: any = this.constructor as any;
+    const pickFn =
+      typeof Model.pickRepresentative === "function"
+        ? Model.pickRepresentative
+        : null;
     let rep: any = null;
 
     if (pickFn) {
       rep = pickFn(this);
     } else {
-      // fallback to first variant
       const v0 = this.variants?.[0];
       if (v0) {
-        const img = (v0.images && v0.images.find((i: any) => i.isPrimary)) || v0.images?.[0] || {};
+        const img =
+          (v0.images && v0.images.find((i: any) => i.isPrimary)) ||
+          v0.images?.[0] ||
+          {};
         rep = {
           vid: v0._id,
           img,
-          price: v0.price,
-          discountedPrice: v0.discountedPrice,
+          price: v0.listingPrice,
+          discountedPrice: v0.sellingPrice,
           savings: v0.savings,
           inStock: (v0.stock || 0) > 0,
         };
@@ -357,19 +472,15 @@ productSchema.pre("save", function (this: IProduct, next) {
 
       this.repPrice = rep.price;
       this.repDiscountedPrice = rep.discountedPrice;
-      this.repSavings = rep.savings || 0;
       this.repInStock = !!rep.inStock;
 
       if (rep.img) {
-        // prefer existing top-level values if already set (admin override)
         this.repImage = this.repImage || rep.img.url;
-        this.repImagePublicId = this.repImagePublicId || rep.img.public_id;
         this.repThumbSafe = this.repThumbSafe || rep.img.thumbSafe;
-        this.ogImage = this.ogImage || rep.img.thumbSafe || rep.img.url;
       }
     }
   } catch (e) {
-    // ignore errors and continue save
+    // ignore
   }
 
   next();
@@ -393,8 +504,7 @@ productSchema.index({
   title: "text",
 });
 
-/* ---------- statics ---------- */
-
+/* ---------- statics (same as earlier refactor) ---------- */
 productSchema.statics.updateReviewStats = async function (
   productId: string,
   stats: any
@@ -439,11 +549,10 @@ productSchema.statics.getTopRated = function (limit: number = 10) {
     .limit(limit);
 };
 
-// pickRepresentative: admin override respected; otherwise choose best in-stock then lowest discounted price
+// pickRepresentative: admin override respected; otherwise prefer in-stock then lowest sellingPrice
 productSchema.statics.pickRepresentative = function (doc: any) {
   if (!doc) return null;
 
-  // if admin locked primaryVariant, prefer that exact variant (even if OOS)
   if (doc.primaryVariantId) {
     const v = doc.variants.id(doc.primaryVariantId);
     if (v) {
@@ -454,24 +563,36 @@ productSchema.statics.pickRepresentative = function (doc: any) {
       return {
         vid: v._id,
         img,
-        price: v.price,
-        discountedPrice: v.discountedPrice,
+        price: v.listingPrice,
+        discountedPrice: v.sellingPrice,
         savings: v.savings,
         inStock: (v.stock || 0) > 0,
       };
     }
   }
 
-  // otherwise choose automatically preferring inStock variants then lowest discountedPrice + savings
-  const arr = (doc.variants || []).map((v: any) => ({
-    v,
-    score:
-      ((v.stock || 0) > 0 ? 10000 : 0) -
-      (v.discountedPrice || v.price || 0) +
-      (v.savings || 0),
-  }));
-  arr.sort((a: any, b: any) => b.score - a.score);
-  const best = arr[0]?.v;
+  const candidates = (doc.variants || []).slice();
+  candidates.sort((a: any, b: any) => {
+    const aIn = (a.stock || 0) > 0 ? 0 : 1;
+    const bIn = (b.stock || 0) > 0 ? 0 : 1;
+    if (aIn !== bIn) return aIn - bIn;
+
+    const aPrice =
+      typeof a.sellingPrice === "number"
+        ? a.sellingPrice
+        : Number.POSITIVE_INFINITY;
+    const bPrice =
+      typeof b.sellingPrice === "number"
+        ? b.sellingPrice
+        : Number.POSITIVE_INFINITY;
+    if (aPrice !== bPrice) return aPrice - bPrice;
+
+    const aSavings = a.savings || 0;
+    const bSavings = b.savings || 0;
+    return bSavings - aSavings;
+  });
+
+  const best = candidates[0];
   if (!best) return null;
   const firstImg =
     (best.images && best.images.find((i: any) => i.isPrimary)) ||
@@ -480,21 +601,19 @@ productSchema.statics.pickRepresentative = function (doc: any) {
   return {
     vid: best._id,
     img: firstImg,
-    price: best.price,
-    discountedPrice: best.discountedPrice,
+    price: best.listingPrice,
+    discountedPrice: best.sellingPrice,
     savings: best.savings,
     inStock: (best.stock || 0) > 0,
   };
 };
 
-// recomputeDenorm: update denorm fields, respects primaryLocked
 productSchema.statics.recomputeDenorm = async function (productDoc: any) {
   const Product = this;
   let doc = productDoc;
   if (!productDoc.toObject) doc = await Product.findById(productDoc);
   if (!doc) return null;
 
-  // compute totalStock accounting reservedStock
   const totalStock = (doc.variants || []).reduce(
     (s: number, v: any) =>
       s + Math.max(0, (v.stock || 0) - (v.reservedStock || 0)),
@@ -506,23 +625,17 @@ productSchema.statics.recomputeDenorm = async function (productDoc: any) {
   const update: any = {
     totalStock,
     inStock: anyInStock,
-    lastUpdatedForListing: new Date(),
   };
 
   if (rep) {
-    // if admin locked primaryVariant, we should not overwrite primaryVariantId
     if (!doc.primaryLocked) update.primaryVariantId = rep.vid;
-    // always update representative snapshot fields
     update.repPrice = rep.price;
     update.repDiscountedPrice = rep.discountedPrice;
-    update.repSavings = rep.savings || 0;
     update.repInStock = rep.inStock;
 
     if (rep.img) {
       update.repImage = rep.img.url || update.repImage;
-      update.repImagePublicId = rep.img.public_id || update.repImagePublicId;
       update.repThumbSafe = rep.img.thumbSafe || update.repThumbSafe;
-      update.ogImage = update.ogImage || rep.img.thumbSafe || rep.img.url;
     }
   }
 

@@ -28,6 +28,7 @@ const defaultVariant: CreateProductInput["variants"][number] = {
   discountPercent: 0,
   discountValidUntil: "",
   discountedPrice: 0,
+  listingPrice: undefined,
 };
 
 const ProductForm: React.FC<ProductFormProps> = ({
@@ -125,17 +126,35 @@ const ProductForm: React.FC<ProductFormProps> = ({
     trigger("specifications");
   };
 
+  // helper: round to 2 decimals
+  const round2 = (n: number) => Math.round(Number(n || 0) * 100) / 100;
+
   // normalize & sanitize before submit
   const handleFormSubmit = (rawData: CreateProductInput) => {
     const data = JSON.parse(JSON.stringify(rawData)) as CreateProductInput;
 
-    // normalize discountValidUntil
-    data.variants = (data.variants || []).map((v) => ({
-      ...v,
-      discountValidUntil: v.discountValidUntil
-        ? v.discountValidUntil
-        : undefined,
-    }));
+    // normalize discountValidUntil & coerce numbers per variant
+    data.variants = (data.variants || []).map((v) => {
+      const basePrice = round2(Number(v.basePrice || 0));
+      const listingPrice =
+        typeof v.listingPrice !== "undefined" && v.listingPrice !== null
+          ? round2(Number(v.listingPrice))
+          : undefined;
+      const gstRate = Number(v.gstRate || 0);
+      const stock = Number(v.stock || 0);
+
+      return {
+        ...v,
+        basePrice,
+        listingPrice,
+        gstRate,
+        stock,
+        // keep discountValidUntil undefined if empty
+        discountValidUntil: v.discountValidUntil
+          ? v.discountValidUntil
+          : undefined,
+      };
+    });
 
     // clean measurements: remove null/empty and coerce to numbers
     if (data.measurements && typeof data.measurements === "object") {
@@ -144,7 +163,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
         const val = (data.measurements as any)[k];
         if (val === "" || val === null || val === undefined) return;
         const num = Number(val);
-        if (!Number.isNaN(num)) m[k] = num;
+        if (!Number.isNaN(num)) m[k] = round2(num);
       });
       if (Object.keys(m).length > 0) data.measurements = m as any;
       else delete (data as any).measurements;
@@ -160,14 +179,14 @@ const ProductForm: React.FC<ProductFormProps> = ({
   const watchedCategory = watch("category");
   const watchedSpecs = watch("specifications");
 
-  // helper to check variant-level requirements
+  // helper to check variant-level requirements (size optional)
   const variantsHaveUploadedImage = (variantsParam: any[] | undefined) => {
     if (!Array.isArray(variantsParam) || variantsParam.length === 0)
       return false;
 
     return variantsParam.every((v) => {
       const colorOk = v?.color && String(v.color).trim().length > 0;
-      const sizeOk = v?.size && String(v.size).trim().length > 0;
+      // size optional now
       const basePriceOk =
         typeof v?.basePrice === "number" &&
         !isNaN(v.basePrice) &&
@@ -179,7 +198,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
           img.public_id &&
           img.public_id.length > 0
       );
-      return colorOk && sizeOk && basePriceOk && anyUploaded;
+      return colorOk && basePriceOk && anyUploaded;
     });
   };
 
@@ -211,7 +230,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
       return "Category is required";
     if (!isValid) return "Fill required fields (name/description/etc.)";
     if (!variantsHaveUploadedImage(watchedVariants))
-      return "Each variant needs color, size, base price (>0) and at least one uploaded image.";
+      return "Each variant needs color, base price (>0) and at least one uploaded image.";
     return "";
   }, [isValid, watchedVariants, watchedCategory]);
 

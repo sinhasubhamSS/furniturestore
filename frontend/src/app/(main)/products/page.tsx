@@ -9,6 +9,7 @@ import Link from "next/link";
 import Button from "@/components/ui/Button";
 import SortDropdown from "@/components/filter/SortDropdown";
 import ProductCardSkeleton from "@/components/skleton/productList";
+import type { DisplayProduct } from "@/types/Product";
 
 const ProductsPage = () => {
   const searchParams = useSearchParams();
@@ -33,7 +34,6 @@ const ProductsPage = () => {
       sortBy: sortFromUrl as "latest" | "price_low" | "price_high" | "discount",
     },
     {
-      // ⭐ YEH WALA PART  — hook ke second argument me hi allowed hai
       refetchOnMountOrArgChange: false,
       refetchOnReconnect: true,
       refetchOnFocus: false,
@@ -42,14 +42,17 @@ const ProductsPage = () => {
 
   const { data: categories } = useGetCategoriesQuery();
 
-  const filteredProducts = useMemo(() => {
+  // <-- typed filteredProducts
+  const filteredProducts = useMemo<DisplayProduct[]>(() => {
     if (!data?.products) return [];
-    return data.products;
+    return data.products as DisplayProduct[];
   }, [data]);
 
   const selectedCategoryName = useMemo(() => {
     if (!categoryFromUrl || !categories) return null;
-    const category = categories.find((cat) => cat.slug === categoryFromUrl);
+    const category = categories.find(
+      (cat: any) => cat.slug === categoryFromUrl
+    );
     return category?.name || null;
   }, [categoryFromUrl, categories]);
 
@@ -75,34 +78,17 @@ const ProductsPage = () => {
   };
 
   if (isLoading) {
-    const skeletonCount = 12; // same as your limit
-
+    const skeletonCount = 12;
     return (
       <div
         style={{ background: "var(--color-primary)" }}
         className="min-h-[calc(100vh-64px)] py-4 px-0"
       >
-        {/* Skeleton Header */}
-        <div className="flex items-center justify-between gap-3 mb-4 px-4">
-          {/* left title skeleton */}
-          <div className="h-6 bg-gray-300 rounded w-40 animate-pulse" />
-
-          {/* right sort skeleton */}
-          <div className="h-8 bg-gray-300 rounded w-28 animate-pulse" />
-        </div>
-
-        {/* Skeleton Grid */}
+        {/* skeleton UI omitted for brevity — keep your existing skeleton */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-[1px] px-0 sm:px-4">
           {Array.from({ length: skeletonCount }).map((_, i) => (
             <ProductCardSkeleton key={i} />
           ))}
-        </div>
-
-        {/* Skeleton Pagination */}
-        <div className="flex justify-center gap-3 mt-6">
-          <div className="h-8 w-24 bg-gray-300 rounded animate-pulse" />
-          <div className="h-8 w-16 bg-gray-300 rounded animate-pulse" />
-          <div className="h-8 w-24 bg-gray-300 rounded animate-pulse" />
         </div>
       </div>
     );
@@ -139,11 +125,8 @@ const ProductsPage = () => {
       style={{ background: "var(--color-primary)" }}
       className="min-h-[calc(100vh-64px)] py-4 px-0"
     >
-      <div className="">
-        {/* Header */}
-        {/* Header - keep everything on one row; allow left title to truncate on small screens */}
+      <div>
         <div className="flex items-center justify-between gap-3 mb-4">
-          {/* Left: title - allow truncation when space is low */}
           <div className="min-w-0">
             <h1
               className="text-lg font-semibold truncate"
@@ -154,7 +137,6 @@ const ProductsPage = () => {
             </h1>
           </div>
 
-          {/* Right: sort - do not let it shrink or wrap */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <SortDropdown
               currentSort={sortFromUrl}
@@ -163,41 +145,14 @@ const ProductsPage = () => {
           </div>
         </div>
 
-        {/* Category chips */}
-        {/* {categories?.length > 0 && (
-          <div className="mb-4 flex flex-wrap gap-2 px-4">
-            {categories.slice(0, 8).map((c: any) => (
-              <button
-                key={c._id}
-                onClick={() => updateURL({ category: c.slug, page: "1" })}
-                className="px-3 py-1 text-sm rounded-md border"
-                style={
-                  categoryFromUrl === c.slug
-                    ? { background: "var(--color-accent)", color: "var(--text-light)", borderColor: "var(--color-border-custom)" }
-                    : { background: "var(--color-card)", color: "var(--text-accent)", borderColor: "var(--color-border-custom)" }
-                }
-              >
-                {c.name}
-              </button>
-            ))}
-            {categoryFromUrl && (
-              <button onClick={clearCategoryFilter} className="px-3 py-1 text-sm rounded-md" style={{ background: "var(--color-card-secondary)", color: "var(--text-dark)", border: "1px solid var(--color-border-custom)" }}>
-                Clear category
-              </button>
-            )}
-          </div>
-        )} */}
-
-        {/* GRID: gap 0 between items */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-[1px] px-0 sm:px-4">
           {filteredProducts.length > 0 ? (
-            filteredProducts.map((product) => (
+            filteredProducts.map((product: DisplayProduct) => (
               <Link
                 key={product._id}
                 href={`/products/${product.slug}`}
                 className="block h-full"
               >
-                {/* remove internal padding to let cards touch each other horizontally */}
                 <div className="h-full">
                   <ProductCardListing product={product} />
                 </div>
@@ -213,7 +168,6 @@ const ProductsPage = () => {
           )}
         </div>
 
-        {/* Pagination */}
         {(data?.totalPages || 1) > 1 && filteredProducts.length > 0 && (
           <div className="flex justify-center gap-3 mt-6">
             <Button

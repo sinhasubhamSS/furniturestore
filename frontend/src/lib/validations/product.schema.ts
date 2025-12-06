@@ -4,19 +4,49 @@ import { z } from "zod";
 export const variantSchema = z
   .object({
     color: z.string().min(1, "Color is required"),
-    size: z.string().min(1, "Size is required"),
-    basePrice: z.number().min(0, "Base price must be 0 or more"),
-    gstRate: z.number().min(0, "GST rate must be 0 or more"),
+    // size is optional now (many products don't have size)
+    size: z.string().optional(),
+
+    // Source-of-truth: basePrice must be > 0 for correct tax calculation
+    basePrice: z
+      .number({
+        required_error: "Base price is required",
+        invalid_type_error: "Base price must be a number",
+      })
+      .min(0.01, "Base price must be greater than 0"),
+
+    // gstRate required (0 is allowed)
+    gstRate: z
+      .number({
+        required_error: "GST rate is required",
+        invalid_type_error: "GST rate must be a number",
+      })
+      .min(0, "GST rate must be 0 or more"),
+
+    // Optional marketing/fallback fields (frontend/admin can provide)
+    listingPrice: z.number().min(0).optional(), // MRP (optional)
+    finalSellingPrice: z.number().min(0).optional(), // input-only: merchant may provide final price
+
+    // stock/reserved
     stock: z.number().int().min(0, "Stock must be 0 or more"),
+    reservedStock: z.number().int().min(0).optional(),
+
+    // Computed (optional on input)
+    gstAmount: z.number().optional(),
+    sellingPrice: z.number().optional(),
+
+    // legacy / UI helpers
     hasDiscount: z.boolean().default(false),
     discountPercent: z
       .number()
       .min(0)
-      .max(70, "Discount must be 0-70%")
+      .max(99, "Discount must be between 0-99%")
       .default(0),
     // Keep discountValidUntil optional so empty => treated as permanent by backend
     discountValidUntil: z.string().optional(),
     discountedPrice: z.number().optional().default(0),
+
+    // images (uploader ensures public_id present)
     images: z
       .array(
         z.object({
@@ -30,7 +60,11 @@ export const variantSchema = z
   })
   .refine(
     (data) => {
-      if (data.hasDiscount && data.discountPercent <= 0) return false;
+      if (
+        data.hasDiscount &&
+        (!data.discountPercent || data.discountPercent <= 0)
+      )
+        return false;
       return true;
     },
     {
@@ -55,7 +89,8 @@ export const variantSchema = z
 
 export const createProductSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  title: z.string().min(1, "Title is required"),
+  // title optional to match ProductForm
+  title: z.string().optional(),
   description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
   isPublished: z.boolean().optional(),
@@ -75,7 +110,7 @@ export const createProductSchema = z.object({
     .min(1, "At least one variant is required")
     .refine(
       (variants) => {
-        const combos = variants.map((v) => `${v.color}-${v.size}`);
+        const combos = variants.map((v) => `${v.color}-${v.size ?? ""}`);
         return combos.length === new Set(combos).size;
       },
       { message: "Each color-size combination must be unique" }

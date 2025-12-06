@@ -1,53 +1,65 @@
 import { Types } from "mongoose";
 
-// ✅ Enhanced IVariant Interface
+/* ---------- Variant ---------- */
 export interface IVariant {
   sku?: string;
   color: string;
-  size: string;
-  basePrice: number;
-  gstRate: number;
+  size?: string;
 
-  // ✅ Calculated pricing fields - OPTIONAL (auto-calculated)
-  price?: number;
-  discountedPrice?: number;
+  // SOURCE-OF-TRUTH (admin must provide)
+  basePrice: number; // taxable value (before GST) - required
+  gstRate: number; // percent, e.g. 18
+
+  // Optional marketing/display
+  listingPrice?: number; // optional MRP shown to users
+
+  // Computed / persisted (may be absent on input but stored on DB)
+  gstAmount?: number; // computed = basePrice * gstRate/100
+  sellingPrice?: number; // computed = basePrice + gstAmount
+
+  // legacy compatibility (optional)
+  price?: number; // legacy listingPrice
+  discountedPrice?: number; // legacy sellingPrice
   savings?: number;
 
-  // ✅ Discount fields with proper types
-  hasDiscount: boolean;
-  discountPercent: number;
+  // discounts (for display/UX only)
+  hasDiscount?: boolean;
+  discountPercent?: number; // 0-100
   discountValidUntil?: Date | null;
 
-  // ✅ Stock management
+  // stock
   stock: number;
   reservedStock?: number;
 
-  // ✅ Images array with proper structure
+  // images
   images: {
     url: string;
     public_id: string;
     thumbSafe?: string | null;
     isPrimary?: boolean;
   }[];
+
+  // audit (optional)
+  priceMode?: "base" | "selling"; // we set "base" by default
+  priceUpdatedAt?: Date;
+  priceUpdatedBy?: Types.ObjectId | null;
 }
 
-// ✅ Enhanced IProductInput Interface
+/* ---------- Product input ---------- */
 export interface IProductInput {
   name: string;
-  slug?: string; // Auto-generated from name
+  slug?: string; // auto-generated if absent
   title?: string;
   description: string;
 
-  // ✅ Required variants array
+  // variants required
   variants: IVariant[];
 
-  // ✅ Optional product specifications
   specifications?: {
     section: string;
     specs: { key: string; value: string }[];
   }[];
 
-  // ✅ Optional measurements
   measurements?: {
     width?: number;
     height?: number;
@@ -55,28 +67,25 @@ export interface IProductInput {
     weight?: number;
   };
 
-  // ✅ Optional fields
   warranty?: string;
   disclaimer?: string;
 
-  // ✅ Required category reference
   category: Types.ObjectId;
 
-  // ✅ Auto-calculated pricing fields (computed from variants)
-  price?: number; // Lowest variant price
-  lowestDiscountedPrice?: number; // Lowest discounted price
-  maxSavings?: number; // Maximum savings across variants
+  // denorm/derived (optional on input, maintained by service)
+  price?: number; // lowest listingPrice (for product listing)
+  lowestDiscountedPrice?: number; // lowest sellingPrice across variants
+  maxSavings?: number;
 
-  // ✅ Auto-computed arrays (from variants)
-  colors?: string[]; // Unique colors from variants
-  sizes?: string[]; // Unique sizes from variants
+  // helpful arrays (computed)
+  colors?: string[];
+  sizes?: string[];
 
-  // ✅ Metadata fields
   createdBy: Types.ObjectId;
   createdAt?: Date;
   isPublished?: boolean;
 
-  // ✅ Review stats (optional, with defaults in schema)
+  // review fields (optional)
   reviewStats?: {
     averageRating?: number;
     totalReviews?: number;
@@ -92,7 +101,6 @@ export interface IProductInput {
     lastUpdated?: Date;
   };
 
-  // ✅ Review settings (optional, with defaults in schema)
   reviewSettings?: {
     allowReviews?: boolean;
     requireVerification?: boolean;
@@ -100,12 +108,11 @@ export interface IProductInput {
   };
 }
 
-// ✅ Sort Options Type for Service
+/* ---------- Other helpers ---------- */
 export type SortByOptions = "latest" | "price_low" | "price_high" | "discount";
 
-// ✅ Filter Options Type for API queries
 export interface IProductFilter {
-  category?: string; // Category slug
+  category?: string; // slug
   minPrice?: number;
   maxPrice?: number;
   inStock?: boolean;
@@ -113,7 +120,6 @@ export interface IProductFilter {
   isPublished?: boolean;
 }
 
-// ✅ API Response Type for getAllProducts
 export interface IProductResponse {
   products: IProductInput[];
   page: number;

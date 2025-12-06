@@ -57,7 +57,7 @@ const VariantForm: React.FC<VariantFormProps> = ({
       } else {
         images = images.map((img, i) => ({
           ...img,
-          isPrimary: i === firstPrimaryIdx,
+          isPrimary: i === i ? i === firstPrimaryIdx : img.isPrimary,
         }));
       }
     }
@@ -113,11 +113,9 @@ const VariantForm: React.FC<VariantFormProps> = ({
           }
         />
         <Input
-          label="Size"
+          label="Size (optional)"
           placeholder="e.g. Medium"
-          {...register(`variants.${index}.size`, {
-            required: "Size is required",
-          })}
+          {...register(`variants.${index}.size`)}
           error={
             (errors?.variants &&
               (errors.variants as any)[index]?.size?.message) as
@@ -127,12 +125,16 @@ const VariantForm: React.FC<VariantFormProps> = ({
         />
 
         <Input
-          label="Base Price"
+          label="Base Price (₹)"
           type="number"
           step="0.01"
           {...register(`variants.${index}.basePrice`, {
             valueAsNumber: true,
             required: "Base price is required",
+            validate: (v) =>
+              typeof v === "number" && !isNaN(v) && v > 0
+                ? true
+                : "Base price must be > 0",
           })}
           error={
             (errors?.variants &&
@@ -144,8 +146,22 @@ const VariantForm: React.FC<VariantFormProps> = ({
         <Input
           label="GST Rate (%)"
           type="number"
-          {...register(`variants.${index}.gstRate`, { valueAsNumber: true })}
+          step="0.01"
+          {...register(`variants.${index}.gstRate`, {
+            valueAsNumber: true,
+            required: "GST rate is required",
+          })}
         />
+
+        <Input
+          label="Listing Price (MRP) — optional"
+          type="number"
+          step="0.01"
+          {...register(`variants.${index}.listingPrice`, {
+            valueAsNumber: true,
+          })}
+        />
+
         <Input
           label="Stock"
           type="number"
@@ -165,17 +181,17 @@ const VariantForm: React.FC<VariantFormProps> = ({
             htmlFor={`hasDiscount-${index}`}
             className="text-sm font-medium"
           >
-            Enable Discount
+            Enable Discount (informational)
           </label>
         </div>
 
         {hasDiscount && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50 p-3 rounded">
             <Input
-              label="Discount %"
+              label="Discount % (informational only)"
               type="number"
               min="0"
-              max="70"
+              max="99"
               placeholder="e.g. 20"
               {...register(`variants.${index}.discountPercent`, {
                 valueAsNumber: true,

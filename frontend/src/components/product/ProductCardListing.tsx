@@ -1,3 +1,4 @@
+// components/product/ProductCardListing.tsx
 "use client";
 
 import React, { memo, useMemo } from "react";
@@ -10,11 +11,10 @@ interface ProductCardListingProps {
   product: DisplayProduct;
 }
 
-const PLACEHOLDER = "/placeholder.jpg"; // ensure this exists in /public
+const PLACEHOLDER = "/placeholder.jpg";
 
 const ProductCardListing = memo(
   ({ product }: ProductCardListingProps) => {
-    // defensive first-variant
     const variant = (product.variants && product.variants[0]) ?? ({} as any);
 
     const {
@@ -45,65 +45,131 @@ const ProductCardListing = memo(
       }
     };
 
-    // ---------- Image selection (priority):
-    // 1) product.image (authoritative)
-    // 2) product.repThumbSafe (LQIP) -> used as blurDataURL if present
-    // 3) product.repImage
-    // 4) first variant image (support string or { url })
-    // 5) placeholder
-    const { imgSrc, blurDataURL } = useMemo(() => {
-      const imgFromProduct =
-        typeof (product as any).image === "string" && (product as any).image
-          ? (product as any).image
-          : null;
+    const { imgSrc, blurDataURL, listingVal, sellingVal, priceLabel } =
+      useMemo(() => {
+        const imgFromProduct =
+          typeof (product as any).image === "string" && (product as any).image
+            ? (product as any).image
+            : null;
 
-      const repThumb = typeof (product as any).repThumbSafe === "string" && (product as any).repThumbSafe
-        ? (product as any).repThumbSafe
-        : null;
+        const repThumb =
+          typeof (product as any).repThumbSafe === "string" &&
+          (product as any).repThumbSafe
+            ? (product as any).repThumbSafe
+            : null;
 
-      const repImage = typeof (product as any).repImage === "string" && (product as any).repImage
-        ? (product as any).repImage
-        : null;
+        const repImage =
+          typeof (product as any).repImage === "string" &&
+          (product as any).repImage
+            ? (product as any).repImage
+            : null;
 
-      const maybeFirst = variant?.images?.[0];
-      const firstUrl = typeof maybeFirst === "string" ? maybeFirst : maybeFirst?.url;
-      const variantImage = typeof firstUrl === "string" && firstUrl ? firstUrl : null;
+        const maybeFirst = variant?.images?.[0];
+        const firstUrl =
+          typeof maybeFirst === "string" ? maybeFirst : maybeFirst?.url;
+        const variantImage =
+          typeof firstUrl === "string" && firstUrl ? firstUrl : null;
 
-      // choose src (prefer explicit product.image or repImage; keep repThumb for blur)
-      const src = imgFromProduct || repImage || variantImage || PLACEHOLDER;
-      const blur = repThumb || (imgFromProduct === null && repImage === null ? variantImage : null);
+        const src = imgFromProduct || repImage || variantImage || PLACEHOLDER;
+        const blur =
+          repThumb ||
+          (imgFromProduct === null && repImage === null ? variantImage : null);
 
-      return { imgSrc: src, blurDataURL: blur || undefined };
-    }, [product, variant]);
+        // PRICING: prefer denorm rep fields (repPrice = listingPrice, repDiscountedPrice = sellingPrice)
+        const repPriceField = (product as any).repPrice;
+        const repDiscountedField = (product as any).repDiscountedPrice;
 
-    // ---------- Price selection (prefer denormalized rep fields then variant/top-level)
-    const price =
-      (product as any).repDiscountedPrice ??
-      (product as any).discountedPrice ??
-      variant?.discountedPrice ??
-      (product as any).repPrice ??
-      variant?.price ??
-      (product as any).price ??
-      null;
+        // If rep fields absent calculate from variants
+        let variantListingPrices: number[] = [];
+        let variantSellingPrices: number[] = [];
 
-    const originalPrice =
-      (product as any).repPrice ??
-      variant?.price ??
-      (product as any).price ??
-      null;
+        if (Array.isArray(product.variants) && product.variants.length) {
+          product.variants.forEach((v: any) => {
+            const lp =
+              typeof v.listingPrice === "number"
+                ? v.listingPrice
+                : typeof v.price === "number"
+                ? v.price
+                : null;
+            const sp =
+              typeof v.sellingPrice === "number"
+                ? v.sellingPrice
+                : typeof v.discountedPrice === "number"
+                ? v.discountedPrice
+                : null;
 
+            if (lp != null && Number.isFinite(lp))
+              variantListingPrices.push(lp);
+            if (sp != null && Number.isFinite(sp))
+              variantSellingPrices.push(sp);
+          });
+        }
+
+        const variantMinListing =
+          variantListingPrices.length > 0
+            ? Math.min(...variantListingPrices)
+            : null;
+        const variantMaxListing =
+          variantListingPrices.length > 0
+            ? Math.max(...variantListingPrices)
+            : null;
+
+        const listingVal =
+          typeof repPriceField !== "undefined"
+            ? Number(repPriceField)
+            : variantMinListing ?? (product as any).price ?? null;
+
+        const sellingVal =
+          typeof repDiscountedField !== "undefined"
+            ? Number(repDiscountedField)
+            : (product as any).lowestDiscountedPrice ??
+              (variantSellingPrices.length > 0
+                ? Math.min(...variantSellingPrices)
+                : null);
+
+        // label logic
+        let priceLabel = "";
+        if (
+          variantMinListing != null &&
+          variantMaxListing != null &&
+          variantMaxListing > variantMinListing &&
+          typeof repPriceField === "undefined"
+        ) {
+          priceLabel = `From ₹${variantMinListing.toFixed(0)}`;
+        } else if (sellingVal != null) {
+          priceLabel = `₹${Number(sellingVal).toFixed(0)}`;
+        } else if (listingVal != null) {
+          priceLabel = `₹${Number(listingVal).toFixed(0)}`;
+        } else {
+          priceLabel = "—";
+        }
+
+        return {
+          imgSrc: src,
+          blurDataURL: blur || undefined,
+          listingVal,
+          sellingVal,
+          priceLabel,
+        };
+      }, [product, variant]);
+
+    // discount detection for badge/strike-through
+    const originalPrice = listingVal ?? null;
+    const finalPrice = sellingVal ?? listingVal ?? null;
     const hasDiscount =
-      price != null && originalPrice != null && Number(price) < Number(originalPrice);
-
-    const discountPercent =
-      hasDiscount && originalPrice && price
-        ? Math.round(((Number(originalPrice) - Number(price)) / Number(originalPrice)) * 100)
-        : 0;
+      originalPrice != null &&
+      finalPrice != null &&
+      Number(finalPrice) < Number(originalPrice);
+    const discountPercent = hasDiscount
+      ? Math.round(
+          ((Number(originalPrice) - Number(finalPrice)) /
+            Number(originalPrice)) *
+            100
+        )
+      : 0;
 
     const categoryName =
-      typeof product.category === "string"
-        ? ""
-        : product.category?.name ?? "";
+      typeof product.category === "string" ? "" : product.category?.name ?? "";
 
     return (
       <div
@@ -113,7 +179,6 @@ const ProductCardListing = memo(
           boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
         }}
       >
-        {/* IMAGE SECTION */}
         <div
           className="relative flex items-center justify-center overflow-hidden"
           style={{
@@ -133,7 +198,6 @@ const ProductCardListing = memo(
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px"
           />
 
-          {/* Discount badge */}
           {hasDiscount && discountPercent > 0 && (
             <div
               className="absolute top-3 left-3 text-xs font-semibold px-2 py-0.5 rounded"
@@ -146,7 +210,6 @@ const ProductCardListing = memo(
             </div>
           )}
 
-          {/* Wishlist */}
           <button
             onClick={handleWishlist}
             disabled={isLoading}
@@ -171,7 +234,6 @@ const ProductCardListing = memo(
             )}
           </button>
 
-          {/* Hover overlay */}
           <div
             className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
             style={{
@@ -204,7 +266,6 @@ const ProductCardListing = memo(
           </div>
         </div>
 
-        {/* TEXT SECTION */}
         <div
           className="flex-1 flex flex-col justify-between px-3 py-2"
           style={{ background: "var(--color-card-secondary)" }}
@@ -216,8 +277,6 @@ const ProductCardListing = memo(
             >
               {product.name}
             </h3>
-
-            {/* Use derived categoryName (safe) */}
             {categoryName && (
               <div
                 className="text-xs mb-1"
@@ -230,14 +289,15 @@ const ProductCardListing = memo(
 
           <div className="flex items-center gap-2">
             <div className="flex items-baseline gap-2">
-              {price != null ? (
+              {priceLabel !== "—" ? (
                 <>
                   <span
                     className="text-base font-bold"
                     style={{ color: "var(--color-accent)" }}
                   >
-                    ₹{Number(price).toFixed(0)}
+                    {priceLabel}
                   </span>
+
                   {hasDiscount && originalPrice != null && (
                     <span
                       className="text-xs line-through"
@@ -253,10 +313,13 @@ const ProductCardListing = memo(
                   style={{ color: "var(--color-accent)" }}
                 >
                   ₹
-                  {originalPrice != null ? Number(originalPrice).toFixed(0) : "—"}
+                  {originalPrice != null
+                    ? Number(originalPrice).toFixed(0)
+                    : "—"}
                 </span>
               )}
             </div>
+
             <div
               className="ml-auto text-xs font-semibold"
               style={{ color: "var(--text-accent)" }}
@@ -266,7 +329,6 @@ const ProductCardListing = memo(
           </div>
         </div>
 
-        {/* Hover animation: subtle shadow lift */}
         <style jsx>{`
           .group:hover {
             box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
@@ -278,11 +340,15 @@ const ProductCardListing = memo(
   },
   (prev, next) =>
     prev.product._id === next.product._id &&
-    // visible fields: images, prices, inStock
-    ((prev.product as any).image ?? (prev.product as any).repImage ?? (prev.product as any).repThumbSafe) ===
-      ((next.product as any).image ?? (next.product as any).repImage ?? (next.product as any).repThumbSafe) &&
+    ((prev.product as any).image ??
+      (prev.product as any).repImage ??
+      (prev.product as any).repThumbSafe) ===
+      ((next.product as any).image ??
+        (next.product as any).repImage ??
+        (next.product as any).repThumbSafe) &&
     (prev.product as any).repPrice === (next.product as any).repPrice &&
-    (prev.product as any).repDiscountedPrice === (next.product as any).repDiscountedPrice &&
+    (prev.product as any).repDiscountedPrice ===
+      (next.product as any).repDiscountedPrice &&
     prev.product.repInStock === next.product.repInStock
 );
 
