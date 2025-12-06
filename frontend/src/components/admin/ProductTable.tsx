@@ -7,14 +7,16 @@ import {
   useGetAdminProductsQuery,
   useDeleteProductMutation,
 } from "@/redux/services/admin/adminProductapi";
+import type { DisplayProduct } from "@/types/Product";
 
-const ProductTable = () => {
+const ProductTable: React.FC = () => {
   const { data, isLoading, error } = useGetAdminProductsQuery({
     page: 1,
     limit: 10,
   });
 
-  const products = data?.products || [];
+  // cast to typed array for TS safety
+  const products = (data?.products as DisplayProduct[]) || [];
   const router = useRouter();
   const [deleteProduct] = useDeleteProductMutation();
 
@@ -36,7 +38,7 @@ const ProductTable = () => {
         </thead>
 
         <tbody className="divide-y divide-[var(--border)] bg-[var(--secondary-light)]">
-          {products.map((product) => {
+          {products.map((product: DisplayProduct) => {
             const v0 = product.variants?.[0]; // first variant fallback
 
             // --- IMAGE fallback chain ---
@@ -49,10 +51,7 @@ const ProductTable = () => {
 
             // --- PRICE fallback chain ---
             const displayPrice =
-              product.repPrice ??
-              product.price ??
-              v0?.price ??
-              null;
+              product.repPrice ?? product.price ?? v0?.price ?? null;
 
             // --- STOCK fallback chain ---
             const displayStock =
@@ -90,7 +89,7 @@ const ProductTable = () => {
                 {/* PRICE */}
                 <td className="px-4 py-2">
                   {displayPrice
-                    ? `₹${displayPrice.toLocaleString()}`
+                    ? `₹${Number(displayPrice).toLocaleString()}`
                     : "—"}
                 </td>
 

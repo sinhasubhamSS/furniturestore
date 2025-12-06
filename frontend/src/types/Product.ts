@@ -113,6 +113,10 @@ export type BaseProduct = {
   repSavings?: number;
   repInStock?: boolean;
 
+  // stock / availability denorms (add these so frontend can safely read them)
+  totalStock?: number;
+  inStock?: boolean;
+
   // optional admin/meta fields
   primaryVariantId?: string;
   primaryLocked?: boolean;
@@ -138,5 +142,32 @@ export type DisplayProduct = BaseProduct & {
       }
     | string;
 };
-
+export type AdminProductResponse = {
+  products: DisplayProduct[]; // product list
+  page: number;
+  limit: number;
+  totalPages: number;
+  totalItems: number;
+};
+export interface ProductQueryParams {
+  page?: number;
+  limit?: number;
+  filter?: {
+    category?: string; // slug or id
+    search?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    inStock?: boolean;
+    hasDiscount?: boolean;
+  };
+  sortBy?: "latest" | "price_low" | "price_high" | "discount";
+  fields?: string | string[];
+}
+export type UserProductResponse = {
+  products: DisplayProduct[];
+  page: number;
+  limit: number;
+  totalPages: number;
+  totalItems: number;
+};
 export type Product = BaseProduct;

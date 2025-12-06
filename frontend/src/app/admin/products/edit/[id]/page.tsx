@@ -9,6 +9,7 @@ import {
   useGetAdminProductsQuery,
 } from "@/redux/services/admin/adminProductapi";
 import type { Variant, VariantImage } from "@/types/Product";
+import type { DisplayProduct } from "@/types/Product";
 
 const EditProductPage = () => {
   const { id } = useParams();
@@ -24,7 +25,8 @@ const EditProductPage = () => {
 
   const [editProduct, { isLoading: isUpdating }] = useEditProductMutation();
 
-  const product = productList?.products?.find((p) => p._id === id);
+  // annotate the callback param so TS doesn't infer `any`
+  const product = productList?.products?.find((p: DisplayProduct) => p._id === id);
 
   if (isLoading) return <p className="p-4">Loading...</p>;
   if (!product) return <p className="p-4 text-red-500">Product not found</p>;
@@ -74,6 +76,10 @@ const EditProductPage = () => {
         thumbSafe: img.thumbSafe,
         isPrimary: img.isPrimary,
       })),
+      // populate listingPrice if present on variant
+      ...(typeof (v as any).listingPrice !== "undefined"
+        ? { listingPrice: (v as any).listingPrice }
+        : {}),
     })),
   };
 
