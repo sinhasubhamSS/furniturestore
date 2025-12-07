@@ -4,10 +4,8 @@ import { z } from "zod";
 export const variantSchema = z
   .object({
     color: z.string().min(1, "Color is required"),
-    // size is optional now (many products don't have size)
     size: z.string().optional(),
 
-    // Source-of-truth: basePrice must be > 0 for correct tax calculation
     basePrice: z
       .number({
         required_error: "Base price is required",
@@ -15,7 +13,6 @@ export const variantSchema = z
       })
       .min(0.01, "Base price must be greater than 0"),
 
-    // gstRate required (0 is allowed)
     gstRate: z
       .number({
         required_error: "GST rate is required",
@@ -23,30 +20,26 @@ export const variantSchema = z
       })
       .min(0, "GST rate must be 0 or more"),
 
-    // Optional marketing/fallback fields (frontend/admin can provide)
-    listingPrice: z.number().min(0).optional(), // MRP (optional)
-    finalSellingPrice: z.number().min(0).optional(), // input-only: merchant may provide final price
+    listingPrice: z.number().min(0).optional(),
+    finalSellingPrice: z.number().min(0).optional(),
 
-    // stock/reserved
     stock: z.number().int().min(0, "Stock must be 0 or more"),
     reservedStock: z.number().int().min(0).optional(),
 
-    // Computed (optional on input)
     gstAmount: z.number().optional(),
     sellingPrice: z.number().optional(),
 
-    // legacy / UI helpers
     hasDiscount: z.boolean().default(false),
     discountPercent: z
       .number()
       .min(0)
       .max(99, "Discount must be between 0-99%")
       .default(0),
-    // Keep discountValidUntil optional so empty => treated as permanent by backend
+
+    // keep optional: frontend will pass empty string or undefined
     discountValidUntil: z.string().optional(),
     discountedPrice: z.number().optional().default(0),
 
-    // images (uploader ensures public_id present)
     images: z
       .array(
         z.object({
@@ -72,33 +65,17 @@ export const variantSchema = z
         "Discount percentage must be greater than 0 when discount is enabled",
       path: ["discountPercent"],
     }
-  )
-  .refine(
-    (data) => {
-      if (data.hasDiscount && data.discountValidUntil) {
-        const endDate = new Date(data.discountValidUntil);
-        return endDate > new Date();
-      }
-      return true;
-    },
-    {
-      message: "Discount end date must be in the future when provided",
-      path: ["discountValidUntil"],
-    }
   );
 
 export const createProductSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  // title optional to match ProductForm
   title: z.string().optional(),
   description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
   isPublished: z.boolean().optional(),
 
-  // optional top-level image (frontend expects it)
   image: z.string().url("Invalid image URL").optional(),
 
-  // optional rep overrides (admin can supply; backend will recompute/override if needed)
   repImage: z.string().optional(),
   repThumbSafe: z.string().optional(),
   repPrice: z.number().optional(),
@@ -115,6 +92,7 @@ export const createProductSchema = z.object({
       },
       { message: "Each color-size combination must be unique" }
     ),
+
   specifications: z
     .array(
       z.object({
@@ -130,6 +108,7 @@ export const createProductSchema = z.object({
       })
     )
     .optional(),
+
   measurements: z
     .object({
       width: z.number().optional(),
@@ -138,6 +117,7 @@ export const createProductSchema = z.object({
       weight: z.number().optional(),
     })
     .optional(),
+
   warranty: z.string().optional(),
   disclaimer: z.string().optional(),
 });

@@ -20,6 +20,7 @@ const AddProductPage = () => {
       // check mutation signature: if your RTK expects raw data, pass `data`
       // if it expects wrapper { data }, change to: await createProduct({ data }).unwrap();
       await createProduct(data).unwrap();
+ 
 
       toast.success("Product created");
       router.push("/admin/products");

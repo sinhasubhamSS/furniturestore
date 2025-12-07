@@ -1,3 +1,4 @@
+// components/admin/product/VariantsField.tsx  (or wherever VariantForm lives)
 "use client";
 
 import React, { useEffect } from "react";
@@ -33,6 +34,7 @@ const VariantForm: React.FC<VariantFormProps> = ({
   remove,
   errors,
 }) => {
+  // register image validation (same as before)
   useEffect(() => {
     register(`variants.${index}.images`, {
       validate: (imgs: any[]) => {
@@ -57,7 +59,7 @@ const VariantForm: React.FC<VariantFormProps> = ({
       } else {
         images = images.map((img, i) => ({
           ...img,
-          isPrimary: i === i ? i === firstPrimaryIdx : img.isPrimary,
+          isPrimary: i === firstPrimaryIdx,
         }));
       }
     }
@@ -70,6 +72,74 @@ const VariantForm: React.FC<VariantFormProps> = ({
   const hasDiscount = watch(`variants.${index}.hasDiscount`);
   const imageError =
     (errors?.variants && (errors.variants as any)[index]?.images) || undefined;
+
+  // Watch relevant variant fields for computing listingPrice
+  const watchedBasePrice = watch(`variants.${index}.basePrice`);
+  const watchedGstRate = watch(`variants.${index}.gstRate`);
+  const watchedDiscountPercent = watch(`variants.${index}.discountPercent`);
+  const watchedListingPrice = watch(`variants.${index}.listingPrice`);
+  const watchedFinalSellingPrice = watch(`variants.${index}.finalSellingPrice`);
+
+  // Auto compute listingPrice when admin sets discountPercent and listingPrice is empty.
+  useEffect(() => {
+    // Only auto-fill if:
+    // - discount enabled (hasDiscount may be true), and
+    // - discountPercent is a positive number (0 < d < 100)
+    // - listingPrice is empty/undefined/null/0
+    // - basePrice and gstRate are present to compute sellingPrice (base + gst)
+    const d = Number(watchedDiscountPercent || 0);
+    const base = Number(watchedBasePrice || 0);
+    const gst = Number(watchedGstRate || 0);
+
+    const listingValue = watchedListingPrice;
+    const finalSelling = watchedFinalSellingPrice;
+
+    // prefer computed sellingPrice from base+gst if finalSellingPrice not provided
+    const gstAmount =
+      Math.round((base * (gst / 100) + Number.EPSILON) * 100) / 100;
+    const sellingFromBase =
+      Math.round((base + gstAmount + Number.EPSILON) * 100) / 100;
+
+    // If merchant provided finalSellingPrice input, prefer using it to derive listing
+    const sellingToUse =
+      typeof finalSelling === "number" && finalSelling > 0
+        ? Number(finalSelling)
+        : sellingFromBase;
+
+    // conditions to auto-calc
+    const shouldAutoCalc =
+      !!hasDiscount &&
+      d > 0 &&
+      d < 100 &&
+      (listingValue === undefined ||
+        listingValue === null ||
+        listingValue === "" ||
+        Number(listingValue) === 0) &&
+      sellingToUse > 0;
+
+    if (shouldAutoCalc) {
+      // listing = selling / (1 - d/100)
+      const denom = 1 - d / 100;
+      if (denom > 0) {
+        const computedListing =
+          Math.round((sellingToUse / denom + Number.EPSILON) * 100) / 100;
+        // only set if significantly different to avoid stomping manual edits
+        setValue(`variants.${index}.listingPrice`, computedListing, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      }
+    }
+    // if discountPercent cleared to 0, do not auto-clear listingPrice (preserve manual entry)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    hasDiscount,
+    watchedDiscountPercent,
+    watchedBasePrice,
+    watchedGstRate,
+    watchedFinalSellingPrice,
+    // do not include watchedListingPrice in deps intentionally to avoid loop when we set it
+  ]);
 
   return (
     <div className="border border-muted rounded-lg p-4 space-y-4 bg-muted/30">
@@ -198,9 +268,9 @@ const VariantForm: React.FC<VariantFormProps> = ({
               })}
             />
             <Input
-              label="Valid Until"
+              label="Valid Until (optional)"
               type="date"
-              min={new Date().toISOString().split("T")[0]}
+              // DO NOT set min attribute so empty string is accepted and handled by zod
               {...register(`variants.${index}.discountValidUntil`)}
             />
           </div>

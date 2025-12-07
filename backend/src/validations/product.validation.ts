@@ -26,8 +26,7 @@ const optionalNumber = z.preprocess((val) => {
 const imageSchema = z.object({
   url: z.string().url({ message: "Invalid image URL" }),
   public_id: z.string().min(1, "public_id is required"),
-  // newly added
-  thumbSafe: z.string().url().optional(), // optional, expect a url when present
+  thumbSafe: z.string().url().optional(),
   isPrimary: z.boolean().optional(),
 });
 
@@ -56,7 +55,9 @@ const variantSchema = z
       (v) => (v === "" || v === null || v === undefined ? 0 : Number(v)),
       z.number().min(0).max(70).optional().default(0)
     ),
-    // accept string date from frontend, empty -> undefined, coerce to Date when present
+
+    // NOTE: discountValidUntil is OPTIONAL now and we DO NOT enforce future-date here.
+    // Backend business logic can still enforce/inspect it if you want later.
     discountValidUntil: z.preprocess((v) => {
       if (!v) return undefined;
       const d = new Date(v as any);
@@ -64,6 +65,8 @@ const variantSchema = z
     }, z.date().optional()),
 
     images: z.array(imageSchema).min(1, "At least one image per variant"),
+    listingPrice: z.number().optional(),
+    finalSellingPrice: z.number().optional(),
   })
   .refine(
     (data) => {
@@ -79,18 +82,6 @@ const variantSchema = z
       message:
         "Discount percent must be greater than 0 when discount is enabled",
       path: ["discountPercent"],
-    }
-  )
-  .refine(
-    (data) => {
-      if (data.hasDiscount && data.discountValidUntil) {
-        return data.discountValidUntil > new Date();
-      }
-      return true;
-    },
-    {
-      message: "Discount end date must be in the future",
-      path: ["discountValidUntil"],
     }
   );
 
@@ -118,7 +109,6 @@ const measurementsSchema = z.object({
 // Create Product
 export const createProductSchema = z.object({
   name: z.string().min(1, "Product name is required"),
-  // make title optional if frontend sometimes leaves it empty — change to required if you need always present
   title: z.string().optional(),
   description: z.string().min(1, "Description is required"),
   category: objectId,
@@ -127,12 +117,10 @@ export const createProductSchema = z.object({
   measurements: measurementsSchema.optional(),
   warranty: z.string().optional(),
   disclaimer: z.string().optional(),
-  // slug: allow but don't require — if provided ensure it's a non-empty string; else backend will generate.
   slug: z.string().optional(),
   isPublished: z.boolean().optional().default(false),
 });
 
-// Update schema: partial but don't allow removing all variants
 export const updateProductSchema = createProductSchema.partial().refine(
   (data) => {
     if (
