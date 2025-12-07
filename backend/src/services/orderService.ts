@@ -1,3 +1,4 @@
+// services/OrderService.ts
 import Product, { IVariant } from "../models/product.models";
 import { Order, OrderStatus } from "../models/order.models";
 import { Return } from "../models/return.models";
@@ -8,19 +9,30 @@ import {
 import { Cart } from "../models/cart.model";
 import { paymentService } from "./paymentService";
 import { AppError } from "../utils/AppError";
-import mongoose, { Types } from "mongoose";
+import mongoose from "mongoose";
 import { HybridDeliveryService } from "./hybrid-deliveryService";
 import { DeliveryCalculator } from "../utils/DeliveryCalculator/DeliveryCalculator";
 
-// ✅ Import new utilities
+// utilities / constants
 import { ValidationUtils } from "../utils/validators";
 import { IDGenerator } from "../utils/IDGenerator";
 import { StatusManager } from "../utils/statusManger";
 import { PaginationService } from "./PaginationService";
 import { BUSINESS_RULES } from "../constants/Bussiness";
 
+/**
+ * OrderService - updated to use new product model fields:
+ * - listingPrice (marketing MRP)
+ * - sellingPrice (final inclusive price)
+ * - finalSellingPrice (input-only, derived then cleared)
+ * - reservedStock handling
+ *
+ * Key price decision:
+ * - finalPrice used for order = variant.sellingPrice (if present)
+ * - If sellingPrice missing, fallback to discountedPrice (legacy) or price/listingPrice
+ * - We compute and snapshot basePrice/gstAmount/listingPrice/sellingPrice/discountPercent
+ */
 class OrderService {
-  // Order status transition rules
   private allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
     [OrderStatus.Pending]: [
       OrderStatus.Confirmed,
@@ -38,14 +50,9 @@ class OrderService {
       OrderStatus.Failed,
     ],
     [OrderStatus.OutForDelivery]: [OrderStatus.Delivered, OrderStatus.Failed],
-
-    // ✅ ENHANCED: Delivered के बाद Refunded allow करें
-    [OrderStatus.Delivered]: [
-      OrderStatus.Refunded, // ✅ Return process complete होने पर
-    ],
-
+    [OrderStatus.Delivered]: [OrderStatus.Refunded],
     [OrderStatus.Cancelled]: [],
-    [OrderStatus.Refunded]: [], // ✅ Final state - no further transitions
+    [OrderStatus.Refunded]: [],
     [OrderStatus.Failed]: [],
   };
 
@@ -56,10 +63,9 @@ class OrderService {
     items: { productId: string; quantity: number; variantId?: string }[],
     session: mongoose.ClientSession
   ) {
-    // ✅ Use ValidationUtils
     ValidationUtils.validateOrderItems(items);
 
-    const orderItemsSnapshot = [];
+    const orderItemsSnapshot: any[] = [];
     let totalAmount = 0;
     let totalWeight = 0;
 
@@ -69,13 +75,14 @@ class OrderService {
         throw new AppError(`Product not found: ${item.productId}`, 404);
       }
 
-      let selectedVariant;
+      // pick variant (by id if provided, else first)
+      let selectedVariant: IVariant | undefined;
       if (item.variantId) {
         selectedVariant = product.variants.find(
-          (v: IVariant) => v._id?.toString() === item.variantId
+          (v: any) => v._id?.toString() === item.variantId
         );
       } else {
-        selectedVariant = product.variants[0];
+        selectedVariant = product.variants[0] as any;
       }
 
       if (!selectedVariant) {
@@ -85,8 +92,9 @@ class OrderService {
         );
       }
 
+      // available stock takes reservedStock into account
       const availableStock =
-        selectedVariant.stock - (selectedVariant.reservedStock || 0);
+        (selectedVariant.stock || 0) - (selectedVariant.reservedStock || 0);
 
       if (availableStock < item.quantity) {
         throw new AppError(
@@ -95,15 +103,45 @@ class OrderService {
         );
       }
 
+      // Determine final price customer will pay for this variant:
+      // Prefer sellingPrice (new canonical), then legacy discountedPrice, then listingPrice/price.
       const finalPrice =
-        selectedVariant.hasDiscount && selectedVariant.discountedPrice > 0
+        typeof selectedVariant.sellingPrice === "number" &&
+        selectedVariant.sellingPrice > 0
+          ? selectedVariant.sellingPrice
+          : typeof selectedVariant.discountedPrice === "number" &&
+            selectedVariant.discountedPrice > 0
           ? selectedVariant.discountedPrice
-          : selectedVariant.price;
+          : typeof selectedVariant.price === "number" && selectedVariant.price > 0
+          ? selectedVariant.price
+          : typeof selectedVariant.listingPrice === "number" &&
+            selectedVariant.listingPrice > 0
+          ? selectedVariant.listingPrice
+          : 0;
+
+      // Choose listing/marketing MRP for UI
+      const listingPrice =
+        typeof selectedVariant.listingPrice === "number" &&
+        selectedVariant.listingPrice > 0
+          ? selectedVariant.listingPrice
+          : typeof selectedVariant.price === "number"
+          ? selectedVariant.price
+          : finalPrice;
+
+      const gstAmount = typeof selectedVariant.gstAmount === "number"
+        ? selectedVariant.gstAmount
+        : 0;
+
+      const discountPercent =
+        typeof selectedVariant.discountPercent === "number"
+          ? selectedVariant.discountPercent
+          : selectedVariant.hasDiscount && listingPrice > 0
+          ? Math.round(((listingPrice - finalPrice) / listingPrice) * 100)
+          : 0;
 
       const itemTotal = finalPrice * item.quantity;
       totalAmount += itemTotal;
 
-      // ✅ Use BUSINESS_RULES constant
       const productWeight =
         product.measurements?.weight ?? BUSINESS_RULES.DEFAULT_PRODUCT_WEIGHT;
       totalWeight += productWeight * item.quantity;
@@ -115,24 +153,29 @@ class OrderService {
         image: selectedVariant.images?.[0]?.url || "",
         quantity: item.quantity,
         price: finalPrice,
-        hasDiscount: selectedVariant.hasDiscount,
-        discountPercent: selectedVariant.discountPercent || 0,
+        listingPrice,
+        sellingPrice: finalPrice,
+        basePrice: selectedVariant.basePrice ?? 0,
+        gstAmount,
+        hasDiscount: !!selectedVariant.hasDiscount,
+        discountPercent,
         color: selectedVariant.color,
         size: selectedVariant.size,
         sku: selectedVariant.sku,
         weight: productWeight,
       });
 
-      // Reserve stock
-      if (!selectedVariant.reservedStock) {
-        selectedVariant.reservedStock = 0;
-      }
+      // Reserve stock (increment reservedStock, don't touch stock yet)
+      if (!selectedVariant.reservedStock) selectedVariant.reservedStock = 0;
       selectedVariant.reservedStock += item.quantity;
+
+      // Persist product (with session) so reservation is stored atomically
       await product.save({ session });
     }
 
     return { orderItemsSnapshot, totalAmount, totalWeight };
   }
+
   private async fetchOrdersWithReturns(
     filter: any,
     page: number = 1,
@@ -153,7 +196,6 @@ class OrderService {
       }
     );
 
-    // ✅ Common return checking logic
     const orderIds = result.data.map((order: any) => order.orderId);
     const activeReturns = await Return.find({
       orderId: { $in: orderIds },
@@ -181,6 +223,7 @@ class OrderService {
       pagination: result.pagination,
     };
   }
+
   /**
    * Calculate delivery charges based on pincode, weight, and order value
    */
@@ -222,6 +265,7 @@ class OrderService {
     orderId: string,
     session?: mongoose.ClientSession
   ) {
+    // fetch order by DB _id (not orderId string)
     const order = await Order.findById(orderId).session(session || null);
     if (!order) return;
 
@@ -231,11 +275,12 @@ class OrderService {
       );
       if (product && item.variantId) {
         const variant = product.variants.find(
-          (v: IVariant) => v._id?.toString() === item.variantId?.toString()
+          (v: any) => v._id?.toString() === item.variantId?.toString()
         );
 
         if (variant) {
-          variant.stock -= item.quantity;
+          // Deduct actual stock and reduce reservedStock accordingly
+          variant.stock = Math.max(0, (variant.stock || 0) - item.quantity);
           variant.reservedStock = Math.max(
             0,
             (variant.reservedStock || 0) - item.quantity
@@ -251,6 +296,7 @@ class OrderService {
     orderId: string,
     session?: mongoose.ClientSession
   ) {
+    // fetch order by DB _id
     const order = await Order.findById(orderId).session(session || null);
     if (!order) return;
 
@@ -260,7 +306,7 @@ class OrderService {
       );
       if (product && item.variantId) {
         const variant = product.variants.find(
-          (v: IVariant) => v._id?.toString() === item.variantId?.toString()
+          (v: any) => v._id?.toString() === item.variantId?.toString()
         );
 
         if (variant) {
@@ -280,7 +326,6 @@ class OrderService {
     deliveryCharges: any,
     payment: PlaceOrderPayment
   ) {
-    // ✅ Use BUSINESS_RULES constants
     const packagingFee = BUSINESS_RULES.PACKAGING_FEE;
     const isEligibleForAdvance =
       orderValue >= BUSINESS_RULES.ADVANCE_PAYMENT_THRESHOLD;
@@ -329,7 +374,6 @@ class OrderService {
     orderData: PlaceOrderRequest,
     idempotencyKey?: string
   ) {
-    // ✅ Check for existing order with same idempotencyKey
     if (idempotencyKey) {
       const existingOrder = await Order.findOne({
         user: userId,
@@ -348,18 +392,16 @@ class OrderService {
       await session.withTransaction(async () => {
         let { items, shippingAddress, payment, fromCart } = orderData;
 
-        // ✅ Use ValidationUtils for pincode
         ValidationUtils.validatePincode(shippingAddress.pincode);
 
-        // If ordering from cart, fetch cart items
         if ((!items || items.length === 0) && fromCart) {
           const cart = await Cart.findOne({ user: userId }).session(session);
           if (!cart || cart.items.length === 0)
             throw new AppError("Cart is empty", 400);
 
-          items = cart.items.map((item) => ({
+          items = cart.items.map((item: any) => ({
             productId: item.product.toString(),
-            variantId: item.variantId.toString(),
+            variantId: item.variantId?.toString(),
             quantity: item.quantity,
           }));
         }
@@ -367,7 +409,7 @@ class OrderService {
         if (!items || items.length === 0)
           throw new AppError("No order items provided.", 400);
 
-        // ✅ STEP 1: Validate delivery availability
+        // STEP 1: Validate delivery availability
         const deliveryCheck = await HybridDeliveryService.checkDeliverability(
           shippingAddress.pincode
         );
@@ -379,32 +421,31 @@ class OrderService {
           );
         }
 
-        // ✅ STEP 2: Build order items and calculate weight
+        // STEP 2: Build order items and calculate weight (reserves stock)
         const { orderItemsSnapshot, totalAmount, totalWeight } =
           await this.buildOrderItems(items, session);
 
-        // ✅ STEP 3: Calculate delivery charges
+        // STEP 3: Calculate delivery charges
         const deliveryCharges = await this.calculateDeliveryCharges(
           shippingAddress.pincode,
           totalWeight,
           totalAmount
         );
 
-        // ✅ STEP 4: Calculate fees with advance payment logic
+        // STEP 4: Calculate fees with advance payment logic
         const feeBreakdown = this.calculateSecureOrderFees(
           totalAmount,
           deliveryCharges,
           payment
         );
 
-        // ✅ STEP 5: Enhanced payment processing
+        // STEP 5: Enhanced payment processing
         let paymentStatus: "pending" | "paid" | "partial" = "pending";
         let paymentMethod: "COD" | "RAZORPAY" = payment.method as
           | "COD"
           | "RAZORPAY";
         let provider = payment.method === "COD" ? "CASH" : "RAZORPAY";
 
-        // Check COD availability
         if (payment.method === "COD" && !deliveryCharges.codAvailable) {
           throw new AppError(
             "COD is not available for this delivery location. Please use online payment.",
@@ -412,7 +453,6 @@ class OrderService {
           );
         }
 
-        // ✅ Validate advance payment constraints
         if (feeBreakdown.isAdvancePayment && payment.method === "COD") {
           throw new AppError(
             "Advance payment cannot be COD. Please use online payment.",
@@ -420,7 +460,6 @@ class OrderService {
           );
         }
 
-        // Verify Razorpay payment
         if (payment.method === "RAZORPAY") {
           if (
             !payment.razorpayOrderId ||
@@ -443,10 +482,9 @@ class OrderService {
           paymentStatus = feeBreakdown.isAdvancePayment ? "partial" : "paid";
         }
 
-        // ✅ Use IDGenerator instead of generateStandardOrderId
         const generatedOrderId = await IDGenerator.generateOrderId(Order);
 
-        // ✅ STEP 6: Create order with enhanced fee tracking
+        // STEP 6: Create order document (store detailed snapshots)
         const [newOrder] = await Order.create(
           [
             {
@@ -503,7 +541,7 @@ class OrderService {
 
         createdOrder = newOrder;
 
-        // ✅ STEP 7: Handle stock confirmation based on payment
+        // STEP 7: Confirm reservation when payment conditions are met
         if (
           paymentMethod === "COD" ||
           paymentStatus === "paid" ||
@@ -516,12 +554,10 @@ class OrderService {
           newOrder.status = OrderStatus.Confirmed;
           await newOrder.save({ session });
         } else {
-          console.log(
-            `✅ Order ${newOrder.orderId} created with reserved stock`
-          );
+          // leave as Pending with reservedStock until payment completes
         }
 
-        // ✅ STEP 8: Clear cart if order placed from cart
+        // STEP 8: Clear cart if order placed from cart
         if (fromCart) {
           await Cart.findOneAndUpdate(
             { user: userId },
@@ -566,12 +602,10 @@ class OrderService {
     }
   }
 
-  // ✅ Updated getMyOrders with PaginationService
   async getMyOrders(userId: string, page: number = 1, limit: number = 10) {
     const filter = { user: userId };
     const result = await this.fetchOrdersWithReturns(filter, page, limit);
 
-    // ✅ User-specific formatting (keep your existing detailed formatting)
     const userFormattedOrders = result.orders.map((order: any) => ({
       orderId: order.orderId,
       placedAt: order.placedAt,
@@ -615,6 +649,7 @@ class OrderService {
       pagination: result.pagination,
     };
   }
+
   async getAllOrdersAdmin(
     page: number = 1,
     limit: number = 20,
@@ -623,7 +658,6 @@ class OrderService {
     endDate?: string,
     search?: string
   ) {
-    // ✅ Build admin-specific filter
     const filter: any = {};
 
     if (status && status !== "all") {
@@ -647,14 +681,13 @@ class OrderService {
       ];
     }
 
-    // ✅ Use helper with admin-specific population
     return await this.fetchOrdersWithReturns(filter, page, limit, "user");
   }
+
   async cancelOrder(userId: string, orderId: string) {
-    // ✅ CORRECT: orderId field use करें
     const order = await Order.findOne({
       user: userId,
-      orderId: orderId, // Custom orderId field
+      orderId: orderId,
     });
 
     if (!order) throw new AppError("Order not found", 404);
@@ -681,7 +714,7 @@ class OrderService {
         order.status = OrderStatus.Cancelled;
         await order.save({ session });
 
-        // ✅ FIX: MongoDB _id pass करें, orderId नहीं
+        // release using DB _id
         await this.releaseReservation((order as any)._id.toString(), session);
       });
     } finally {
@@ -691,7 +724,7 @@ class OrderService {
     return {
       success: true,
       message: "Order cancelled successfully",
-      orderId: order.orderId, // ✅ Custom orderId return करें
+      orderId: order.orderId,
     };
   }
 
@@ -709,7 +742,6 @@ class OrderService {
 
     const currentStatus = order.status as OrderStatus;
 
-    // ✅ Use StatusManager for validation
     StatusManager.validateTransition(
       currentStatus,
       newStatus,
@@ -722,7 +754,6 @@ class OrderService {
       await session.withTransaction(async () => {
         order.status = newStatus;
 
-        // ✅ Add delivery tracking info when shipped
         if (newStatus === OrderStatus.Shipped && trackingInfo) {
           if (order.deliverySnapshot) {
             order.deliverySnapshot.trackingId = trackingInfo.trackingId;
@@ -739,7 +770,6 @@ class OrderService {
 
         await order.save({ session });
 
-        // Handle stock based on status change
         if (
           newStatus === OrderStatus.Confirmed &&
           order.paymentSnapshot.status === "paid"
@@ -759,14 +789,10 @@ class OrderService {
     return order;
   }
 
-  /**
-   * ✅ Updated calculateDisplayPricing with ValidationUtils
-   */
   async calculateDisplayPricing(
     items: { productId: string; quantity: number; variantId?: string }[],
     pincode: string
   ) {
-    // ✅ Use ValidationUtils
     ValidationUtils.validatePincode(pincode);
     ValidationUtils.validateOrderItems(items);
 
@@ -781,7 +807,7 @@ class OrderService {
       let selectedVariant;
       if (item.variantId) {
         selectedVariant = product.variants.find(
-          (v: IVariant) => v._id?.toString() === item.variantId
+          (v: any) => v._id?.toString() === item.variantId
         );
       } else {
         selectedVariant = product.variants[0];
@@ -795,14 +821,22 @@ class OrderService {
       }
 
       const finalPrice =
-        selectedVariant.hasDiscount && selectedVariant.discountedPrice > 0
+        typeof selectedVariant.sellingPrice === "number" &&
+        selectedVariant.sellingPrice > 0
+          ? selectedVariant.sellingPrice
+          : typeof selectedVariant.discountedPrice === "number" &&
+            selectedVariant.discountedPrice > 0
           ? selectedVariant.discountedPrice
-          : selectedVariant.price;
+          : typeof selectedVariant.price === "number" && selectedVariant.price > 0
+          ? selectedVariant.price
+          : typeof selectedVariant.listingPrice === "number" &&
+            selectedVariant.listingPrice > 0
+          ? selectedVariant.listingPrice
+          : 0;
 
       subtotal += finalPrice * item.quantity;
     }
 
-    // ✅ Use BUSINESS_RULES constants
     const fixedWeight = BUSINESS_RULES.DEFAULT_PRODUCT_WEIGHT;
     let deliveryCharges;
     let isServiceable = true;
@@ -815,8 +849,6 @@ class OrderService {
         subtotal
       );
     } catch (error) {
-      console.log(`⚠️ Delivery unavailable for pincode ${pincode}:`);
-
       isServiceable = false;
       deliveryCharges = {
         finalCharge: 0,
