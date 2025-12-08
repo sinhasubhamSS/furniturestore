@@ -2,90 +2,169 @@
 
 import { Review, IReview } from "../models/review.models";
 import Product from "../models/product.models";
+import { Order, OrderStatus } from "../models/order.models";
 import { Types } from "mongoose";
 
-// ✅ FIXED: Input types with optional content (Myntra-style)
-type CreateReviewInput = {
+/* ---------- Reusable media types to avoid duplication ---------- */
+type MediaImage = { url: string; publicId: string; caption?: string };
+type MediaVideo = {
+  url: string;
+  publicId: string;
+  thumbnail?: string;
+  duration?: number;
+  caption?: string;
+};
+
+/* ---------- DTO (uses above media types) ---------- */
+export type CreateReviewInput = {
   productId: string;
   userId: string;
   rating: number;
-  content?: string; // ✅ Made optional for rating-only reviews
-  images?: Array<{
-    url: string;
-    publicId: string;
-    caption?: string;
-  }>;
-  videos?: Array<{
-    url: string;
-    publicId: string;
-    thumbnail?: string;
-    duration?: number;
-    caption?: string;
-  }>;
-  isVerifiedPurchase?: boolean;
+  content?: string;
+  images?: MediaImage[];
+  videos?: MediaVideo[];
+  // Do NOT trust client-sent isOfflineBuyer — server will determine based on orderId
+  orderId?: string; // optional order reference (server-verified)
 };
 
 type UpdateReviewInput = Partial<CreateReviewInput>;
 
+/* ---------- Allowed sort fields (security) ---------- */
+const ALLOWED_SORT_FIELDS = ["createdAt", "rating", "helpfulVotes"];
+
 export class ReviewService {
-  // ✅ FIXED: Create Review with optional content and upsert logic
+  // ---------------------------------------
+  // CREATE REVIEW (server-driven verification)
+  // ---------------------------------------
   static async createReview(reviewData: CreateReviewInput): Promise<IReview> {
     try {
-      // Validate product exists
-      const product = await Product.findById(reviewData.productId);
+      const { productId, userId, rating, content, images, videos, orderId } =
+        reviewData;
+
+      // basic sanitization
+      const trimmedContent = (content || "").trim().slice(0, 1000);
+
+      // Check product exists
+      const product = await Product.findById(productId).lean();
       if (!product) throw new Error("Product not found");
 
+      // Check if reviews allowed for product
       if (!product.reviewSettings?.allowReviews) {
         throw new Error("Reviews not allowed for this product");
       }
 
-      // ✅ UPDATED: Use findOneAndUpdate for Myntra-style upsert
-      // This allows user to first rate, then later add review content
+      // -------------------------
+      // Server-driven buyer type
+      // -------------------------
+      // We DO NOT trust client-provided isOfflineBuyer flag.
+      // If orderId provided -> validate it belongs to user, contains product, and is delivered.
+      // Otherwise treat as offline buyer: require at least one image or video and mark pending.
+      let finalIsOfflineBuyer = true;
+      let isVerifiedPurchase = false;
+      let status: "pending" | "approved" = "pending";
+
+      if (orderId) {
+        // validate order (using your Order model fields)
+        const order = await Order.findById(orderId).lean();
+        if (!order) throw new Error("Order not found");
+
+        // ensure order belongs to user
+        // your Order schema uses `user` (ObjectId) not `userId`
+        if (!order.user || order.user.toString() !== userId.toString()) {
+          throw new Error("Order does not belong to user");
+        }
+
+        // check delivered status — adapt to your actual schema fields:
+        // prefer Order.status === OrderStatus.Delivered, fallback to trackingInfo.actualDelivery or deliverySnapshot.estimatedDelivery
+        const isDelivered =
+          order.status === OrderStatus.Delivered ||
+          !!order.trackingInfo?.actualDelivery ||
+          !!order.deliverySnapshot?.estimatedDelivery;
+
+        // check that the order contains the product using your `orderItemsSnapshot`
+        const containsProduct =
+          Array.isArray(order.orderItemsSnapshot) &&
+          order.orderItemsSnapshot.some((it: any) => {
+            // productId may be ObjectId -> convert to string
+            const pid = it.productId?.toString?.();
+            return pid === productId.toString();
+          });
+
+        if (!isDelivered || !containsProduct) {
+          throw new Error(
+            "Order must be delivered and must contain the product to post a verified online review"
+          );
+        }
+
+        // If validations pass, mark as online verified
+        finalIsOfflineBuyer = false;
+        isVerifiedPurchase = true;
+        status = "approved";
+      } else {
+        // offline path - require media
+        const hasMedia = (images?.length || 0) > 0 || (videos?.length || 0) > 0;
+        if (!hasMedia) {
+          throw new Error(
+            "Offline buyer must upload at least 1 image or video."
+          );
+        }
+        finalIsOfflineBuyer = true;
+        isVerifiedPurchase = false;
+        status = "pending"; // admin approval required
+      }
+
+      // -------------------------
+      // Build update payload & upsert
+      // -------------------------
+      const updatePayload: any = {
+        rating,
+        content: trimmedContent,
+        isOfflineBuyer: finalIsOfflineBuyer,
+        isVerifiedPurchase,
+        status,
+        helpfulVotes: 0,
+      };
+
+      if (images !== undefined) updatePayload.images = images;
+      if (videos !== undefined) updatePayload.videos = videos;
+      if (orderId) updatePayload.orderId = new Types.ObjectId(orderId);
+
+      // Use ObjectId for match keys and upsert (one review per user-product)
       const review = await Review.findOneAndUpdate(
         {
-          productId: new Types.ObjectId(reviewData.productId),
-          userId: new Types.ObjectId(reviewData.userId),
+          productId: new Types.ObjectId(productId),
+          userId: new Types.ObjectId(userId),
         },
+        { $set: updatePayload },
         {
-          $set: {
-            rating: reviewData.rating,
-            content: reviewData.content || "", // ✅ Default empty string
-            images: reviewData.images || [],
-            videos: reviewData.videos || [],
-            isVerifiedPurchase: reviewData.isVerifiedPurchase || false,
-            helpfulVotes: 0,
-          },
-        },
-        {
-          upsert: true, // ✅ Create if doesn't exist, update if exists
-          new: true, // ✅ Return updated document
+          upsert: true,
+          new: true,
           runValidators: true,
         }
       );
 
-      // Update product stats
-      await this.updateProductStats(reviewData.productId);
+      // Update product stats (model getProductStats only counts approved)
+      await this.updateProductStats(productId);
 
       return review;
     } catch (error) {
+      // bubble error up (controllers should handle and return proper HTTP codes)
       throw error;
     }
   }
 
-  // 2. Get Review by ID
+  // ---------------------------------------
+  // GET REVIEW BY ID
+  // ---------------------------------------
   static async getReviewById(reviewId: string): Promise<IReview | null> {
-    try {
-      const review = await Review.findById(reviewId)
-        .populate("userId", "name email avatar")
-        .populate("productId", "name slug title");
-
-      return review;
-    } catch (error) {
-      throw error;
-    }
+    return await Review.findById(reviewId)
+      .populate("userId", "name email avatar")
+      .populate("productId", "name slug title");
   }
 
-  // ✅ FIXED: Update Review with optional content
+  // ---------------------------------------
+  // UPDATE REVIEW (user edits)
+  // ---------------------------------------
   static async updateReview(
     reviewId: string,
     userId: string,
@@ -95,26 +174,30 @@ export class ReviewService {
       const review = await Review.findById(reviewId);
       if (!review) throw new Error("Review not found");
 
-      // Check if user owns this review
       if (review.userId.toString() !== userId) {
         throw new Error("You can only edit your own reviews");
       }
 
-      // Validate at least one field is being updated
       const hasUpdates = Object.keys(updateData).length > 0;
-      if (!hasUpdates) {
-        throw new Error("At least one field must be provided for update");
-      }
+      if (!hasUpdates) throw new Error("Nothing to update");
 
-      // Update fields
+      // allow edits only to rating/content/images/videos
       if (updateData.rating !== undefined) review.rating = updateData.rating;
-      if (updateData.content !== undefined) review.content = updateData.content;
+      if (updateData.content !== undefined)
+        review.content = (updateData.content || "").trim().slice(0, 1000);
       if (updateData.images !== undefined) review.images = updateData.images;
       if (updateData.videos !== undefined) review.videos = updateData.videos;
 
+      // keep offline reviews in pending state after edit (admin must re-approve)
+      if (review.isOfflineBuyer) {
+        review.status = "pending";
+      } else {
+        review.status = "approved";
+      }
+
       await review.save();
 
-      // Update product stats
+      // Update product stats (approved-only)
       await this.updateProductStats(review.productId.toString());
 
       return review;
@@ -123,35 +206,30 @@ export class ReviewService {
     }
   }
 
-  // 4. Delete Review
+  // ---------------------------------------
+  // DELETE REVIEW (user)
+  // ---------------------------------------
   static async deleteReview(
     reviewId: string,
     userId: string
   ): Promise<boolean> {
-    try {
-      const review = await Review.findById(reviewId);
-      if (!review) throw new Error("Review not found");
+    const review = await Review.findById(reviewId);
+    if (!review) throw new Error("Review not found");
 
-      // Check ownership
-      if (review.userId.toString() !== userId) {
-        throw new Error("You can only delete your own reviews");
-      }
-
-      const productId = review.productId.toString();
-
-      await Review.findByIdAndDelete(reviewId);
-
-      // Update product stats
-      await this.updateProductStats(productId);
-
-      return true;
-    } catch (error) {
-      throw error;
+    if (review.userId.toString() !== userId) {
+      throw new Error("You can only delete your own reviews");
     }
+
+    const productId = review.productId.toString();
+    await Review.findByIdAndDelete(reviewId);
+
+    await this.updateProductStats(productId);
+    return true;
   }
 
-  // 5. Get Product Reviews
-  // src/services/reviewService.ts में getProductReviews method को update करें:
+  // ---------------------------------------
+  // GET PRODUCT REVIEWS — PUBLIC (approved only)
+  // ---------------------------------------
   static async getProductReviews(
     productId: string,
     page: number = 1,
@@ -160,89 +238,117 @@ export class ReviewService {
     sortOrder: string = "desc",
     rating?: number
   ) {
-    try {
-      const skip = (page - 1) * limit;
+    const skip = (page - 1) * limit;
 
-      // ✅ Build match conditions
-      const matchConditions: any = { productId };
-      if (rating) {
-        matchConditions.rating = rating;
-      }
+    // Security: only allow safe fields
+    if (!ALLOWED_SORT_FIELDS.includes(sortBy)) sortBy = "createdAt";
 
-      // ✅ Build sort conditions
-      const sortConditions: any = {};
-      sortConditions[sortBy] = sortOrder === "asc" ? 1 : -1;
+    const sortConditions: any = {
+      [sortBy]: sortOrder === "asc" ? 1 : -1,
+    };
 
-      const [reviews, total] = await Promise.all([
-        Review.find(matchConditions)
-          .populate("userId", "name avatar")
-          .populate("productId", "name slug title")
-          .sort(sortConditions)
-          .skip(skip)
-          .limit(limit),
+    // Only show approved reviews to public
+    const match: any = {
+      productId: new Types.ObjectId(productId),
+      status: "approved",
+    };
+    if (rating) match.rating = rating;
 
-        Review.countDocuments(matchConditions),
-      ]);
+    const [reviews, total] = await Promise.all([
+      Review.find(match)
+        .populate("userId", "name avatar")
+        .sort(sortConditions)
+        .skip(skip)
+        .limit(limit),
 
-      return {
-        success: true,
-        reviews,
-        pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(total / limit),
-          totalReviews: total,
-          hasNext: page < Math.ceil(total / limit),
-          hasPrev: page > 1,
-        },
-      };
-    } catch (error) {
-      throw error;
-    }
+      Review.countDocuments(match),
+    ]);
+
+    return {
+      success: true,
+      reviews,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalReviews: total,
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1,
+      },
+    };
   }
 
-  // 6. Get User Reviews
-  static async getUserReviews(
-    userId: string,
-    page: number = 1,
-    limit: number = 10
-  ) {
-    try {
-      const skip = (page - 1) * limit; // ✅ Fixed multiplication
+  // ---------------------------------------
+  // GET USER REVIEWS (all statuses)
+  // ---------------------------------------
+  static async getUserReviews(userId: string, page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
 
-      const [reviews, total] = await Promise.all([
-        Review.find({ userId })
-          .populate("productId", "name slug title")
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit),
+    const [reviews, total] = await Promise.all([
+      Review.find({ userId: new Types.ObjectId(userId) })
+        .populate("productId", "name slug title")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
 
-        Review.countDocuments({ userId }),
-      ]);
+      Review.countDocuments({ userId: new Types.ObjectId(userId) }),
+    ]);
 
-      return {
-        success: true,
-        reviews,
-        pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(total / limit),
-          totalReviews: total,
-          hasNext: page < Math.ceil(total / limit),
-          hasPrev: page > 1,
-        },
-      };
-    } catch (error) {
-      throw error;
-    }
+    return {
+      success: true,
+      reviews,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalReviews: total,
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1,
+      },
+    };
   }
 
-  // Helper: Update Product Review Stats
+  // ---------------------------------------
+  // ADMIN: Approve a pending review
+  // Note: ensure admin auth/authorization in controller/middleware
+  // ---------------------------------------
+  static async adminApproveReview(reviewId: string): Promise<IReview | null> {
+    const review = await Review.findById(reviewId);
+    if (!review) throw new Error("Review not found");
+
+    review.status = "approved";
+    await review.save();
+
+    // update stats for product
+    await this.updateProductStats(review.productId.toString());
+
+    return review;
+  }
+
+  // ---------------------------------------
+  // ADMIN: Reject a pending review
+  // ---------------------------------------
+  static async adminRejectReview(reviewId: string, reason?: string) {
+    const review = await Review.findById(reviewId);
+    if (!review) throw new Error("Review not found");
+
+    review.status = "rejected";
+    // optionally: store rejection reason somewhere or emit audit log (not implemented here)
+    await review.save();
+
+    // update stats (rejected reviews shouldn't be counted)
+    await this.updateProductStats(review.productId.toString());
+
+    return review;
+  }
+
+  // ---------------------------------------
+  // UPDATE PRODUCT STATS (only counts approved via model statics)
+  // ---------------------------------------
   private static async updateProductStats(productId: string) {
     try {
-      const stats = await Review.getProductStats(productId);
+      const stats = await (Review as any).getProductStats(productId);
       await Product.updateReviewStats(productId, stats);
     } catch (error) {
-      console.error("Error updating product stats:", error);
-      // Don't throw - stats update failure shouldn't break main operation
+      console.error("Stats update failed:", error);
     }
   }
 }

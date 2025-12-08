@@ -2,30 +2,22 @@
 "use client";
 import { useState } from "react";
 import { useGetProductReviewsQuery } from "@/redux/services/user/reviewApi";
-import StarRating from "../ui/StarRating";
-import QuickRating from "./QuickRating";
- // ✅ Fixed import path
-import ReviewCard from "./ReviewCard"; // ✅ Add this import
+import ReviewCard from "./ReviewCard";
 import { ReviewDisplayType } from "@/types/review";
 import PostReviewModal from "./PostReviewModel";
 
 interface ReviewsSectionProps {
   productId: string;
-  currentUserId?: string; // ✅ Add currentUserId prop
+  currentUserId?: string | null;
 }
 
 const ReviewsSection = ({ productId, currentUserId }: ReviewsSectionProps) => {
-  // ✅ All state declarations inside component
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState<"createdAt" | "rating" | "helpfulVotes">(
-    "createdAt"
-  );
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [editingReview, setEditingReview] = useState<ReviewDisplayType | null>(
     null
-  ); // ✅ Add editing state
+  );
 
   const {
     data: reviewsData,
@@ -35,91 +27,81 @@ const ReviewsSection = ({ productId, currentUserId }: ReviewsSectionProps) => {
     productId,
     page: currentPage,
     limit: showAllReviews ? 10 : 3,
-    sortBy,
-    sortOrder,
+    sortBy: "createdAt",
+    sortOrder: "desc",
   });
 
   const hasReviews = reviewsData?.reviews && reviewsData.reviews.length > 0;
   const totalReviews = reviewsData?.pagination?.totalReviews || 0;
 
+  // helper to create a stable key per review
+  const makeReviewKey = (review: any, index: number) => {
+    // prefer official _id
+    if (
+      review &&
+      (typeof review._id === "string" || typeof review._id === "number")
+    ) {
+      return String(review._id);
+    }
+    // fallback to combination of user id + createdAt (likely unique)
+    if (review && review.userId && (review.userId._id || review.userId)) {
+      const uid = review.userId._id || review.userId;
+      if (review.createdAt) return `${String(uid)}-${String(review.createdAt)}`;
+      return `${String(uid)}-${index}`;
+    }
+    // last resort: index based key (keeps React warning gone but not ideal for reordering)
+    return `review-fallback-${index}`;
+  };
+
+  // Optional: debug missing _id items in dev environment
+  if (process.env.NODE_ENV !== "production" && hasReviews) {
+    const missing = (reviewsData!.reviews || []).filter(
+      (r: any) => !r || (!r._id && !(r.userId && (r.userId._id || r.userId)))
+    );
+    if (missing.length) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "ReviewsSection: some reviews missing _id (fallback keys used):",
+        missing
+      );
+    }
+  }
+
   return (
     <section className="mt-8">
-      <div className="bg-white  shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white shadow-sm border border-gray-100 overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">
-                Customer Reviews
-              </h2>
-              {totalReviews > 0 && (
-                <p className="text-sm text-gray-600 mt-1">
-                  {totalReviews} {totalReviews === 1 ? "review" : "reviews"}
-                </p>
-              )}
-            </div>
-
-            {/* Sort Options */}
-            {hasReviews && showAllReviews && (
-              <select
-                value={`${sortBy}-${sortOrder}`}
-                onChange={(e) => {
-                  const [field, order] = e.target.value.split("-");
-                  setSortBy(field as "createdAt" | "rating" | "helpfulVotes");
-                  setSortOrder(order as "asc" | "desc");
-                  setCurrentPage(1);
-                }}
-                className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="createdAt-desc">Newest First</option>
-                <option value="createdAt-asc">Oldest First</option>
-                <option value="rating-desc">Highest Rating</option>
-                <option value="rating-asc">Lowest Rating</option>
-                <option value="helpfulVotes-desc">Most Helpful</option>
-              </select>
+        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Customer Reviews
+            </h2>
+            {totalReviews > 0 && (
+              <p className="text-sm text-gray-600 mt-1">
+                {totalReviews} {totalReviews === 1 ? "review" : "reviews"}
+              </p>
             )}
           </div>
-        </div>
 
-        {/* Create Review Section */}
-        <div className="px-6 py-5 border-b border-gray-100">
-          <div className="flex items-start gap-4">
-            <div className="flex-1">
-              <QuickRating
-                productId={productId}
-                onSuccess={() => {
-                  console.log("Rating submitted!");
-                }}
-              />
-            </div>
-            <div className="flex-shrink-0">
-              <button
-                onClick={() => setShowReviewModal(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-              >
-                Write Review
-              </button>
-            </div>
+          {/* Only the Add Offline Review button on product page */}
+          <div>
+            <button
+              onClick={() => {
+                setEditingReview(null);
+                setShowReviewModal(true);
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+              title="Add an offline review (photo/video required)"
+            >
+              Add Offline Review
+            </button>
           </div>
         </div>
 
         {/* Reviews Display */}
         <div className="px-6 py-5">
           {isLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
-                    <div className="flex-1">
-                      <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/3"></div>
-                    </div>
-                  </div>
-                  <div className="h-16 bg-gray-200 rounded"></div>
-                </div>
-              ))}
-            </div>
+            <div className="space-y-4">Loading reviews...</div>
           ) : error ? (
             <div className="text-center py-8">
               <p className="text-red-500">Error loading reviews</p>
@@ -150,20 +132,20 @@ const ReviewsSection = ({ productId, currentUserId }: ReviewsSectionProps) => {
             </div>
           ) : (
             <>
-              {/* ✅ Reviews List with Edit Support */}
               <div className="space-y-4">
-                {reviewsData.reviews.map((review: ReviewDisplayType) => (
-                  <ReviewCard
-                    key={review._id}
-                    review={review}
-                    currentUserId={currentUserId || "guest"} // ✅ Pass user ID
-                    onEdit={(review) => {
-                      // ✅ Edit handler
-                      setEditingReview(review);
-                      setShowReviewModal(true);
-                    }}
-                  />
-                ))}
+                {reviewsData!.reviews.map(
+                  (review: ReviewDisplayType, idx: number) => (
+                    <ReviewCard
+                      key={makeReviewKey(review as any, idx)}
+                      review={review}
+                      currentUserId={currentUserId || undefined}
+                      onEdit={(r) => {
+                        setEditingReview(r);
+                        setShowReviewModal(true);
+                      }}
+                    />
+                  )
+                )}
               </div>
 
               {/* View More/Less Toggle */}
@@ -172,11 +154,9 @@ const ReviewsSection = ({ productId, currentUserId }: ReviewsSectionProps) => {
                   <button
                     onClick={() => {
                       setShowAllReviews(!showAllReviews);
-                      if (showAllReviews) {
-                        setCurrentPage(1);
-                      }
+                      setCurrentPage(1);
                     }}
-                    className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                    className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm font-medium"
                   >
                     {showAllReviews
                       ? "Show Less Reviews"
@@ -186,24 +166,22 @@ const ReviewsSection = ({ productId, currentUserId }: ReviewsSectionProps) => {
               )}
 
               {/* Pagination */}
-              {showAllReviews && reviewsData.pagination.totalPages > 1 && (
+              {showAllReviews && reviewsData!.pagination.totalPages > 1 && (
                 <div className="flex justify-center items-center gap-4 mt-6 pt-4 border-t border-gray-100">
                   <button
                     onClick={() => setCurrentPage((prev) => prev - 1)}
-                    disabled={!reviewsData.pagination.hasPrev}
+                    disabled={!reviewsData!.pagination.hasPrev}
                     className="px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                   >
                     Previous
                   </button>
-
                   <span className="text-sm text-gray-600">
-                    Page {reviewsData.pagination.currentPage} of{" "}
-                    {reviewsData.pagination.totalPages}
+                    Page {reviewsData!.pagination.currentPage} of{" "}
+                    {reviewsData!.pagination.totalPages}
                   </span>
-
                   <button
                     onClick={() => setCurrentPage((prev) => prev + 1)}
-                    disabled={!reviewsData.pagination.hasNext}
+                    disabled={!reviewsData!.pagination.hasNext}
                     className="px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                   >
                     Next
@@ -215,19 +193,20 @@ const ReviewsSection = ({ productId, currentUserId }: ReviewsSectionProps) => {
         </div>
       </div>
 
-      {/* ✅ Review Modal with Edit Support */}
+      {/* Review Modal (product-page offline-only) */}
       <PostReviewModal
         productId={productId}
         isOpen={showReviewModal}
         onClose={() => {
           setShowReviewModal(false);
-          setEditingReview(null); // ✅ Clear editing state
+          setEditingReview(null);
         }}
         onSuccess={() => {
           setShowReviewModal(false);
           setEditingReview(null);
         }}
-        existingReview={editingReview} // ✅ Pass editing review
+        existingReview={editingReview}
+        // Note: product page does NOT pass orderId => offline flow enforced
       />
     </section>
   );

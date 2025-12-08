@@ -7,6 +7,6 @@ interface PageProps {
 }
 
 export default function ProductSlugPage({ params }: PageProps) {
-  const { slug } = use(params); // 👈 required in future Next.js versions
+  const { slug } = use(params); 
   return <ProductDetail slug={slug} />;
 }
