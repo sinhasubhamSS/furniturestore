@@ -1,10 +1,20 @@
 import { Address } from "./address";
 
-// ✅ BASE REUSABLE TYPES
+// ---------- BASE REUSABLE TYPES ----------
 export interface OrderItem {
   productId: string;
   variantId?: string;
   quantity: number;
+}
+
+export interface OrderItemSnapshot {
+  productId: string;
+  name?: string;
+  // backend sometimes stores single string or array -> allow both
+  images?: string[] | string | null;
+  quantity?: number;
+  price?: number;
+  _reviewedByUser?: boolean; // optional flag if you store it
 }
 
 export interface DeliveryInfo {
@@ -46,9 +56,9 @@ export interface FeeBreakdown {
   isEligibleForAdvance: boolean;
 }
 
-// ✅ UNION TYPES - Updated with 'partial'
+// ---------- UNION TYPES ----------
 export type PaymentMethod = "COD" | "RAZORPAY" | "ADVANCE";
-export type PaymentStatus = "paid" | "unpaid" | "partial" | "pending"; // ✅ Added 'partial'
+export type PaymentStatus = "paid" | "unpaid" | "partial" | "pending";
 export type OrderStatus =
   | "pending"
   | "confirmed"
@@ -59,7 +69,7 @@ export type OrderStatus =
   | "refunded"
   | "failed";
 
-// ✅ REQUEST INTERFACES
+// ---------- REQUEST INTERFACES ----------
 export interface PlaceOrderRequest {
   items: OrderItem[];
   shippingAddress: Address;
@@ -77,7 +87,7 @@ export interface VerifyAmountRequest {
   items: OrderItem[];
 }
 
-// ✅ RESPONSE INTERFACES - Updated with pagination
+// ---------- RESPONSE INTERFACES ----------
 export interface CheckoutPricingResponse extends FeeBreakdown {
   codTotal: number;
   checkoutTotal: number;
@@ -100,12 +110,13 @@ export interface VerifyAmountResponse extends FeeBreakdown {
   };
 }
 
-// ✅ Updated Order interface with return info
+// ---------- Order (UPDATED) ----------
 export interface Order {
   _id: string;
   orderId?: string;
   idempotencyKey?: string;
-  placedAt: string;
+  // placedAt may be missing in some responses -> keep optional
+  placedAt?: string;
   paymentStatus: PaymentStatus;
   status: OrderStatus;
   totalAmount: number;
@@ -115,7 +126,7 @@ export interface Order {
   advancePaymentAmount?: number;
   remainingAmount?: number;
 
-  // ✅ Added return info for MyOrders component
+  // return info
   hasActiveReturn?: boolean;
   returnInfo?: {
     hasActiveReturn: boolean;
@@ -124,24 +135,29 @@ export interface Order {
     returnRequestedAt: string;
   } | null;
 
+  // preview used in MyOrders list (first item snapshot)
   productPreview: {
     name: string;
     quantity: number;
+    // preview can be single image url or null
     images: string | null;
   };
 
-  shippingSummary: {
-    name: string;
-    city: string;
-    state: string;
-    pincode: string;
+  // full item list snapshot used in OrderDetail
+  orderItemsSnapshot?: OrderItemSnapshot[];
+
+  shippingSummary?: {
+    name?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
   };
 
   deliveryInfo?: DeliveryInfo;
   paymentInfo?: PaymentInfo;
 }
 
-// ✅ Pagination wrapper for API responses
+// ---------- Pagination wrapper ----------
 export interface OrderListResponse {
   orders: Order[];
   pagination: {

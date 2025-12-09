@@ -203,7 +203,7 @@ export default function AdminDashboard() {
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      {new Date(order.placedAt).toLocaleDateString()}
+                      {new Date(order.placedAt!).toLocaleDateString()}
                     </td>
                   </tr>
                 ))}

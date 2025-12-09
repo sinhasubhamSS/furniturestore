@@ -4,10 +4,8 @@ import { AuthRequest } from "../types/app-request";
 import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 import { ApiResponse } from "../utils/ApiResponse";
-import { paymentService } from "../services/paymentService";
 import { OrderStatus } from "../models/order.models";
-import { Order } from "../models/order.models";
-import { Return } from "../models/return.models";
+
 const orderService = new OrderService();
 
 export const placeOrder = catchAsync(

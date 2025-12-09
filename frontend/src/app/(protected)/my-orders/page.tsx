@@ -1,17 +1,20 @@
+// components/MyOrders.tsx  (with quick-review modal)
 "use client";
 
 import React from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 import {
   useGetMyOrdersQuery,
   useCancelOrderMutation,
 } from "@/redux/services/user/orderApi";
 import { formatDate } from "../../../../utils/formatDate";
 import Button from "@/components/ui/Button";
+import PostReviewModal from "@/components/reviews/PostReviewModel";
 import { Order } from "@/types/order";
 
-const MyOrders = () => {
+const MyOrders: React.FC = () => {
   const router = useRouter();
   const [currentPage, setCurrentPage] = React.useState(1);
 
@@ -22,25 +25,30 @@ const MyOrders = () => {
 
   const [cancelOrder, { isLoading: isCancelling }] = useCancelOrderMutation();
 
+  const [showReviewModal, setShowReviewModal] = React.useState(false);
+  const [activeProductId, setActiveProductId] = React.useState<string | null>(
+    null
+  );
+  const [reviewLoading, setReviewLoading] = React.useState(false);
+
   const handleCancel = async (orderId: string) => {
-    if (confirm("Are you sure you want to cancel this order?")) {
-      try {
-        await cancelOrder({ orderId }).unwrap();
-        alert("Order cancelled successfully.");
-        refetch();
-      } catch (err: unknown) {
-        // Use unknown and narrow type safely
-        alert(
-          (err as { data?: { message?: string } })?.data?.message ||
-            "Failed to cancel order"
-        );
-      }
+    if (!confirm("Are you sure you want to cancel this order?")) return;
+    try {
+      await cancelOrder({ orderId }).unwrap();
+      alert("Order cancelled successfully.");
+      refetch();
+    } catch (err: unknown) {
+      alert(
+        (err as { data?: { message?: string } })?.data?.message ||
+          "Failed to cancel order"
+      );
     }
   };
 
   const isReturnEligible = (order: Order) => {
     if (order.status !== "delivered") return false;
-    if (order.hasActiveReturn) return false;
+    // removed active-return check per your request
+    if (!order.placedAt) return false;
 
     const deliveredDate = new Date(order.placedAt);
     const now = new Date();
@@ -52,6 +60,50 @@ const MyOrders = () => {
 
   const handleReturn = (orderId: string) => {
     router.push(`/return/${orderId}`);
+  };
+
+  // fetch order details and open review modal for first product
+  const openQuickReview = async (orderId: string) => {
+    try {
+      setReviewLoading(true);
+      // fetch full order (server route you already have)
+      const res = await axios.get(`/api/orders/${orderId}`);
+      const payload = res.data?.order ?? res.data;
+      // try to read first productId from snapshot
+      let productId: string | null = null;
+
+      if (payload?.orderItemsSnapshot && payload.orderItemsSnapshot.length > 0) {
+        const first = payload.orderItemsSnapshot[0];
+        if (typeof first.productId === "string") {
+          productId = first.productId;
+        } else if (first.productId?._id) {
+          productId = String(first.productId._id);
+        }
+      }
+
+      if (!productId) {
+        // fallback: navigate to order-details page
+        router.push(`/order-details/${orderId}`);
+        return;
+      }
+
+      setActiveProductId(productId);
+      setShowReviewModal(true);
+    } catch (err) {
+      console.error("Failed to load order for quick review", err);
+      // fallback to details page so user can still review
+      router.push(`/order-details/${orderId}`);
+    } finally {
+      setReviewLoading(false);
+    }
+  };
+
+  // helper to safely extract preview image string
+  const getPreviewImage = (images: any) => {
+    if (!images) return "/placeholder.png";
+    if (Array.isArray(images)) return images[0] ?? "/placeholder.png";
+    if (typeof images === "string" && images.length > 0) return images;
+    return "/placeholder.png";
   };
 
   if (isLoading) {
@@ -138,10 +190,14 @@ const MyOrders = () => {
         {/* Orders List */}
         <div className="space-y-3">
           {orders.map((order: Order) => {
-            const placedAtDate = new Date(order.placedAt);
+            const placedAtDate = order.placedAt
+              ? new Date(order.placedAt)
+              : null;
             const now = new Date();
             const hoursSincePlaced =
-              (now.getTime() - placedAtDate.getTime()) / (1000 * 60 * 60);
+              placedAtDate !== null
+                ? (now.getTime() - placedAtDate.getTime()) / (1000 * 60 * 60)
+                : Number.POSITIVE_INFINITY;
 
             const canCancel =
               order.status !== "cancelled" &&
@@ -149,9 +205,15 @@ const MyOrders = () => {
               hoursSincePlaced <= 12;
             const canReturn = isReturnEligible(order);
 
+            // isDelivered flag for showing review button (no active-return check)
+            const isDelivered =
+              String(order.status ?? "").toLowerCase() === "delivered";
+
+            const previewImg = getPreviewImage(order.productPreview?.images);
+
             return (
               <div
-                key={order.orderId || order._id}
+                key={order.orderId || (order as any)._id}
                 className="bg-[var(--color-card)] rounded-lg shadow-sm border border-[var(--color-border-custom)] hover:shadow-md transition-shadow"
               >
                 <div className="p-3">
@@ -162,7 +224,9 @@ const MyOrders = () => {
                         Order ID: {order.orderId}
                       </p>
                       <p className="text-xs text-[var(--text-accent)]">
-                        {formatDate(order.placedAt)}
+                        {placedAtDate
+                          ? formatDate(placedAtDate.toISOString())
+                          : "—"}
                       </p>
                     </div>
                     <div className="text-right">
@@ -191,7 +255,7 @@ const MyOrders = () => {
                   <div className="flex items-center gap-3">
                     <div className="w-16 h-16 rounded-lg overflow-hidden bg-[var(--color-secondary)] flex items-center justify-center border border-[var(--color-border-custom)] p-2">
                       <Image
-                        src={order.productPreview?.images || "/placeholder.png"}
+                        src={previewImg}
                         alt={order.productPreview?.name || "Product"}
                         width={64}
                         height={64}
@@ -211,14 +275,13 @@ const MyOrders = () => {
                     </p>
                   </div>
 
-                  {/* Return Status */}
+                  {/* Return Status (unchanged) */}
                   {order.hasActiveReturn && order.returnInfo && (
                     <div className="mt-2 bg-yellow-100 border border-yellow-200 rounded p-2">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-xs font-medium text-yellow-800">
-                            Return Status:{" "}
-                            {order.returnInfo.returnStatus.toUpperCase()}
+                            Return Status: {order.returnInfo.returnStatus.toUpperCase()}
                           </p>
                           <p className="text-xs text-yellow-600">
                             Return ID: {order.returnInfo.returnId}
@@ -226,9 +289,7 @@ const MyOrders = () => {
                         </div>
                         <Button
                           onClick={() =>
-                            router.push(
-                              `/return-tracking/${order.returnInfo?.returnId}`
-                            )
+                            router.push(`/return-tracking/${order.returnInfo?.returnId}`)
                           }
                           className="text-xs px-2 py-1"
                           variant="outline"
@@ -243,7 +304,7 @@ const MyOrders = () => {
                   <div className="flex items-center gap-2 justify-end mt-3 pt-2 border-t border-[var(--color-border-custom)]">
                     <Button
                       onClick={() =>
-                        router.push(`/order-details/${order.orderId}`)
+                        router.push(`/order-details/${order.orderId || (order as any)._id}`)
                       }
                       variant="outline"
                       className="text-xs px-3 py-1"
@@ -251,7 +312,18 @@ const MyOrders = () => {
                       View Details
                     </Button>
 
-                    {canReturn && !order.hasActiveReturn && (
+                    {/* QUICK REVIEW: opens modal after fetching order details */}
+                    {isDelivered && (
+                      <Button
+                        onClick={() => openQuickReview(order.orderId!)}
+                        className="text-xs px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white"
+                        disabled={reviewLoading}
+                      >
+                        {reviewLoading ? "Preparing…" : "Write Review"}
+                      </Button>
+                    )}
+
+                    {canReturn && (
                       <Button
                         onClick={() => handleReturn(order.orderId!)}
                         className="text-xs px-3 py-1 bg-red-600 hover:bg-red-700 text-white"
@@ -280,7 +352,7 @@ const MyOrders = () => {
         {pagination && pagination.pages > 1 && (
           <div className="flex justify-center items-center gap-3 mt-6">
             <Button
-              onClick={() => setCurrentPage(currentPage - 1)}
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={!pagination.hasPrev}
               variant="outline"
               className="text-sm px-3 py-2"
@@ -291,7 +363,9 @@ const MyOrders = () => {
               Page {pagination.page} of {pagination.pages}
             </span>
             <Button
-              onClick={() => setCurrentPage(currentPage + 1)}
+              onClick={() =>
+                setCurrentPage(Math.min(pagination.pages, currentPage + 1))
+              }
               disabled={!pagination.hasNext}
               variant="outline"
               className="text-sm px-3 py-2"
@@ -301,6 +375,26 @@ const MyOrders = () => {
           </div>
         )}
       </div>
+
+      {/* PostReviewModal - opens when activeProductId is set */}
+      {activeProductId && (
+        <PostReviewModal
+          productId={activeProductId}
+          isOpen={showReviewModal}
+          onClose={() => {
+            setShowReviewModal(false);
+            setActiveProductId(null);
+          }}
+          onSuccess={() => {
+            // close and optionally refetch orders (to show "Reviewed" later if you track it)
+            setShowReviewModal(false);
+            setActiveProductId(null);
+            // refresh order list to reflect review flags if backend updates them
+            refetch();
+          }}
+          // orderId optional prop — pass last used order id if needed (you can add prop to modal)
+        />
+      )}
     </div>
   );
 };
