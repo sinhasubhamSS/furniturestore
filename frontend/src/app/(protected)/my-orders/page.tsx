@@ -1,4 +1,4 @@
-// components/MyOrders.tsx  (with quick-review modal)
+// components/MyOrders.tsx
 "use client";
 
 import React from "react";
@@ -11,12 +11,16 @@ import {
 } from "@/redux/services/user/orderApi";
 import { formatDate } from "../../../../utils/formatDate";
 import Button from "@/components/ui/Button";
-import PostReviewModal from "@/components/reviews/PostReviewModel";
+import PostReviewModal from "@/components/reviews/PostReviewModel"; // adjust path if needed
 import { Order } from "@/types/order";
+import { useSelector } from "react-redux";
+import { RootState } from "@/redux/store";
 
 const MyOrders: React.FC = () => {
   const router = useRouter();
+  const user = useSelector((state: RootState) => state.user.activeUser);
   const [currentPage, setCurrentPage] = React.useState(1);
+  const lastOrderRef = React.useRef<string | null>(null);
 
   const { data, isLoading, error, refetch } = useGetMyOrdersQuery({
     page: currentPage,
@@ -30,6 +34,9 @@ const MyOrders: React.FC = () => {
     null
   );
   const [reviewLoading, setReviewLoading] = React.useState(false);
+  const [initialRatingForModal, setInitialRatingForModal] = React.useState<
+    number | undefined
+  >(undefined);
 
   const handleCancel = async (orderId: string) => {
     if (!confirm("Are you sure you want to cancel this order?")) return;
@@ -47,7 +54,6 @@ const MyOrders: React.FC = () => {
 
   const isReturnEligible = (order: Order) => {
     if (order.status !== "delivered") return false;
-    // removed active-return check per your request
     if (!order.placedAt) return false;
 
     const deliveredDate = new Date(order.placedAt);
@@ -62,36 +68,53 @@ const MyOrders: React.FC = () => {
     router.push(`/return/${orderId}`);
   };
 
-  // fetch order details and open review modal for first product
-  const openQuickReview = async (orderId: string) => {
+  // Open quick review: fetch order, extract first productId from snapshot, open modal with orderId
+  const openQuickReview = async (orderId: string, prefillRating?: number) => {
     try {
       setReviewLoading(true);
-      // fetch full order (server route you already have)
-      const res = await axios.get(`/api/orders/${orderId}`);
+      // include credentials if your backend uses httpOnly cookies
+      const res = await axios.get(`/api/orders/${orderId}`, {
+        withCredentials: true,
+      });
       const payload = res.data?.order ?? res.data;
-      // try to read first productId from snapshot
+
+      // try to read first productId from snapshot (robust to shapes)
       let productId: string | null = null;
 
-      if (payload?.orderItemsSnapshot && payload.orderItemsSnapshot.length > 0) {
+      if (
+        payload?.orderItemsSnapshot &&
+        Array.isArray(payload.orderItemsSnapshot)
+      ) {
         const first = payload.orderItemsSnapshot[0];
-        if (typeof first.productId === "string") {
+        if (!first) productId = null;
+        else if (typeof first.productId === "string")
           productId = first.productId;
-        } else if (first.productId?._id) {
-          productId = String(first.productId._id);
+        else if (first.productId?._id) productId = String(first.productId._id);
+        else if (first.product) productId = String(first.product);
+      } else if (payload?.items && Array.isArray(payload.items)) {
+        // fallback if schema uses items array
+        const first = payload.items[0];
+        if (first) {
+          if (typeof first.productId === "string") productId = first.productId;
+          else if (first.productId?._id)
+            productId = String(first.productId._id);
+          else if (first.product) productId = String(first.product);
         }
       }
 
       if (!productId) {
-        // fallback: navigate to order-details page
+        // fallback: go to order details where user can review manually
         router.push(`/order-details/${orderId}`);
         return;
       }
 
+      lastOrderRef.current = orderId;
       setActiveProductId(productId);
+      setInitialRatingForModal(prefillRating);
       setShowReviewModal(true);
     } catch (err) {
       console.error("Failed to load order for quick review", err);
-      // fallback to details page so user can still review
+      // fallback to details page
       router.push(`/order-details/${orderId}`);
     } finally {
       setReviewLoading(false);
@@ -205,7 +228,6 @@ const MyOrders: React.FC = () => {
               hoursSincePlaced <= 12;
             const canReturn = isReturnEligible(order);
 
-            // isDelivered flag for showing review button (no active-return check)
             const isDelivered =
               String(order.status ?? "").toLowerCase() === "delivered";
 
@@ -275,13 +297,14 @@ const MyOrders: React.FC = () => {
                     </p>
                   </div>
 
-                  {/* Return Status (unchanged) */}
+                  {/* Return Status */}
                   {order.hasActiveReturn && order.returnInfo && (
                     <div className="mt-2 bg-yellow-100 border border-yellow-200 rounded p-2">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-xs font-medium text-yellow-800">
-                            Return Status: {order.returnInfo.returnStatus.toUpperCase()}
+                            Return Status:{" "}
+                            {order.returnInfo.returnStatus.toUpperCase()}
                           </p>
                           <p className="text-xs text-yellow-600">
                             Return ID: {order.returnInfo.returnId}
@@ -289,7 +312,9 @@ const MyOrders: React.FC = () => {
                         </div>
                         <Button
                           onClick={() =>
-                            router.push(`/return-tracking/${order.returnInfo?.returnId}`)
+                            router.push(
+                              `/return-tracking/${order.returnInfo?.returnId}`
+                            )
                           }
                           className="text-xs px-2 py-1"
                           variant="outline"
@@ -304,7 +329,11 @@ const MyOrders: React.FC = () => {
                   <div className="flex items-center gap-2 justify-end mt-3 pt-2 border-t border-[var(--color-border-custom)]">
                     <Button
                       onClick={() =>
-                        router.push(`/order-details/${order.orderId || (order as any)._id}`)
+                        router.push(
+                          `/order-details/${
+                            order.orderId || (order as any)._id
+                          }`
+                        )
                       }
                       variant="outline"
                       className="text-xs px-3 py-1"
@@ -376,7 +405,7 @@ const MyOrders: React.FC = () => {
         )}
       </div>
 
-      {/* PostReviewModal - opens when activeProductId is set */}
+      {/* PostReviewModal wired to online-order flow (pass orderId for verified purchase) */}
       {activeProductId && (
         <PostReviewModal
           productId={activeProductId}
@@ -384,15 +413,20 @@ const MyOrders: React.FC = () => {
           onClose={() => {
             setShowReviewModal(false);
             setActiveProductId(null);
+            setInitialRatingForModal(undefined);
+            lastOrderRef.current = null;
           }}
           onSuccess={() => {
-            // close and optionally refetch orders (to show "Reviewed" later if you track it)
             setShowReviewModal(false);
             setActiveProductId(null);
-            // refresh order list to reflect review flags if backend updates them
+            setInitialRatingForModal(undefined);
+            // refresh order list / product reviews if needed
             refetch();
+            lastOrderRef.current = null;
           }}
-          // orderId optional prop — pass last used order id if needed (you can add prop to modal)
+          existingReview={undefined}
+          initialRating={initialRatingForModal}
+          orderId={lastOrderRef.current ?? undefined} // important: server will verify & auto-approve if valid
         />
       )}
     </div>
