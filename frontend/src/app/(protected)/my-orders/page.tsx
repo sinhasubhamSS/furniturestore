@@ -1,26 +1,19 @@
-// components/MyOrders.tsx
 "use client";
 
 import React from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 import {
   useGetMyOrdersQuery,
   useCancelOrderMutation,
 } from "@/redux/services/user/orderApi";
 import { formatDate } from "../../../../utils/formatDate";
 import Button from "@/components/ui/Button";
-import PostReviewModal from "@/components/reviews/PostReviewModel"; // adjust path if needed
 import { Order } from "@/types/order";
-import { useSelector } from "react-redux";
-import { RootState } from "@/redux/store";
 
 const MyOrders: React.FC = () => {
   const router = useRouter();
-  const user = useSelector((state: RootState) => state.user.activeUser);
   const [currentPage, setCurrentPage] = React.useState(1);
-  const lastOrderRef = React.useRef<string | null>(null);
 
   const { data, isLoading, error, refetch } = useGetMyOrdersQuery({
     page: currentPage,
@@ -28,15 +21,6 @@ const MyOrders: React.FC = () => {
   });
 
   const [cancelOrder, { isLoading: isCancelling }] = useCancelOrderMutation();
-
-  const [showReviewModal, setShowReviewModal] = React.useState(false);
-  const [activeProductId, setActiveProductId] = React.useState<string | null>(
-    null
-  );
-  const [reviewLoading, setReviewLoading] = React.useState(false);
-  const [initialRatingForModal, setInitialRatingForModal] = React.useState<
-    number | undefined
-  >(undefined);
 
   const handleCancel = async (orderId: string) => {
     if (!confirm("Are you sure you want to cancel this order?")) return;
@@ -66,59 +50,6 @@ const MyOrders: React.FC = () => {
 
   const handleReturn = (orderId: string) => {
     router.push(`/return/${orderId}`);
-  };
-
-  // Open quick review: fetch order, extract first productId from snapshot, open modal with orderId
-  const openQuickReview = async (orderId: string, prefillRating?: number) => {
-    try {
-      setReviewLoading(true);
-      // include credentials if your backend uses httpOnly cookies
-      const res = await axios.get(`/api/orders/${orderId}`, {
-        withCredentials: true,
-      });
-      const payload = res.data?.order ?? res.data;
-
-      // try to read first productId from snapshot (robust to shapes)
-      let productId: string | null = null;
-
-      if (
-        payload?.orderItemsSnapshot &&
-        Array.isArray(payload.orderItemsSnapshot)
-      ) {
-        const first = payload.orderItemsSnapshot[0];
-        if (!first) productId = null;
-        else if (typeof first.productId === "string")
-          productId = first.productId;
-        else if (first.productId?._id) productId = String(first.productId._id);
-        else if (first.product) productId = String(first.product);
-      } else if (payload?.items && Array.isArray(payload.items)) {
-        // fallback if schema uses items array
-        const first = payload.items[0];
-        if (first) {
-          if (typeof first.productId === "string") productId = first.productId;
-          else if (first.productId?._id)
-            productId = String(first.productId._id);
-          else if (first.product) productId = String(first.product);
-        }
-      }
-
-      if (!productId) {
-        // fallback: go to order details where user can review manually
-        router.push(`/order-details/${orderId}`);
-        return;
-      }
-
-      lastOrderRef.current = orderId;
-      setActiveProductId(productId);
-      setInitialRatingForModal(prefillRating);
-      setShowReviewModal(true);
-    } catch (err) {
-      console.error("Failed to load order for quick review", err);
-      // fallback to details page
-      router.push(`/order-details/${orderId}`);
-    } finally {
-      setReviewLoading(false);
-    }
   };
 
   // helper to safely extract preview image string
@@ -216,20 +147,19 @@ const MyOrders: React.FC = () => {
             const placedAtDate = order.placedAt
               ? new Date(order.placedAt)
               : null;
-            const now = new Date();
-            const hoursSincePlaced =
-              placedAtDate !== null
-                ? (now.getTime() - placedAtDate.getTime()) / (1000 * 60 * 60)
-                : Number.POSITIVE_INFINITY;
 
             const canCancel =
               order.status !== "cancelled" &&
               order.status !== "delivered" &&
-              hoursSincePlaced <= 12;
-            const canReturn = isReturnEligible(order);
+              (() => {
+                if (!placedAtDate) return false;
+                const now = new Date();
+                const hoursSincePlaced =
+                  (now.getTime() - placedAtDate.getTime()) / (1000 * 60 * 60);
+                return hoursSincePlaced <= 12;
+              })();
 
-            const isDelivered =
-              String(order.status ?? "").toLowerCase() === "delivered";
+            const canReturn = isReturnEligible(order);
 
             const previewImg = getPreviewImage(order.productPreview?.images);
 
@@ -297,7 +227,7 @@ const MyOrders: React.FC = () => {
                     </p>
                   </div>
 
-                  {/* Return Status */}
+                  {/* Return Status (unchanged) */}
                   {order.hasActiveReturn && order.returnInfo && (
                     <div className="mt-2 bg-yellow-100 border border-yellow-200 rounded p-2">
                       <div className="flex items-center justify-between">
@@ -325,30 +255,14 @@ const MyOrders: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Action Buttons */}
+                  {/* Action Buttons: simplified - removed View Details & Quick Review */}
                   <div className="flex items-center gap-2 justify-end mt-3 pt-2 border-t border-[var(--color-border-custom)]">
-                    <Button
-                      onClick={() =>
-                        router.push(
-                          `/order-details/${
-                            order.orderId || (order as any)._id
-                          }`
-                        )
-                      }
-                      variant="outline"
-                      className="text-xs px-3 py-1"
-                    >
-                      View Details
-                    </Button>
-
-                    {/* QUICK REVIEW: opens modal after fetching order details */}
-                    {isDelivered && (
+                    {order.status === "delivered" && (
                       <Button
-                        onClick={() => openQuickReview(order.orderId!)}
+                        onClick={() => alert("Open review flow here")}
                         className="text-xs px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white"
-                        disabled={reviewLoading}
                       >
-                        {reviewLoading ? "Preparing…" : "Write Review"}
+                        Give Review
                       </Button>
                     )}
 
@@ -404,31 +318,6 @@ const MyOrders: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* PostReviewModal wired to online-order flow (pass orderId for verified purchase) */}
-      {activeProductId && (
-        <PostReviewModal
-          productId={activeProductId}
-          isOpen={showReviewModal}
-          onClose={() => {
-            setShowReviewModal(false);
-            setActiveProductId(null);
-            setInitialRatingForModal(undefined);
-            lastOrderRef.current = null;
-          }}
-          onSuccess={() => {
-            setShowReviewModal(false);
-            setActiveProductId(null);
-            setInitialRatingForModal(undefined);
-            // refresh order list / product reviews if needed
-            refetch();
-            lastOrderRef.current = null;
-          }}
-          existingReview={undefined}
-          initialRating={initialRatingForModal}
-          orderId={lastOrderRef.current ?? undefined} // important: server will verify & auto-approve if valid
-        />
-      )}
     </div>
   );
 };

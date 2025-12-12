@@ -1,5 +1,4 @@
 // src/services/reviewService.ts
-
 import { Review, IReview } from "../models/review.models";
 import Product from "../models/product.models";
 import { Order, OrderStatus } from "../models/order.models";
@@ -63,13 +62,29 @@ export class ReviewService {
       let isVerifiedPurchase = false;
       let status: "pending" | "approved" = "pending";
 
+      // We'll keep resolvedOrderDbId when we find it so we store DB ObjectId
+      let resolvedOrderDbId: string | undefined = undefined;
+
       if (orderId) {
-        // validate order (using your Order model fields)
-        const order = await Order.findById(orderId).lean();
+        // resolve order by either _id or external orderId field
+        let order: any = null;
+
+        // try treat orderId as MongoDB ObjectId first (fast path)
+        try {
+          order = await Order.findById(orderId).lean();
+        } catch (e) {
+          // invalid ObjectId -> ignore and fallback
+          order = null;
+        }
+
+        // fallback: try to find by external orderId field (e.g. "ORD-1234")
+        if (!order) {
+          order = await Order.findOne({ orderId: orderId }).lean();
+        }
+
         if (!order) throw new Error("Order not found");
 
         // ensure order belongs to user
-        // your Order schema uses `user` (ObjectId) not `userId`
         if (!order.user || order.user.toString() !== userId.toString()) {
           throw new Error("Order does not belong to user");
         }
@@ -77,9 +92,11 @@ export class ReviewService {
         // check delivered status — adapt to your actual schema fields:
         // prefer Order.status === OrderStatus.Delivered, fallback to trackingInfo.actualDelivery or deliverySnapshot.estimatedDelivery
         const isDelivered =
-          order.status === OrderStatus.Delivered ||
+          String(order.status) === String(OrderStatus.Delivered) ||
           !!order.trackingInfo?.actualDelivery ||
-          !!order.deliverySnapshot?.estimatedDelivery;
+          !!order.deliverySnapshot?.estimatedDelivery ||
+          // fallback: if you store deliveredAt date
+          !!order.deliveredAt;
 
         // check that the order contains the product using your `orderItemsSnapshot`
         const containsProduct =
@@ -100,6 +117,9 @@ export class ReviewService {
         finalIsOfflineBuyer = false;
         isVerifiedPurchase = true;
         status = "approved";
+
+        // store DB _id for order
+        resolvedOrderDbId = String(order._id);
       } else {
         // offline path - require media
         const hasMedia = (images?.length || 0) > 0 || (videos?.length || 0) > 0;
@@ -127,7 +147,7 @@ export class ReviewService {
 
       if (images !== undefined) updatePayload.images = images;
       if (videos !== undefined) updatePayload.videos = videos;
-      if (orderId) updatePayload.orderId = new Types.ObjectId(orderId);
+      if (resolvedOrderDbId) updatePayload.orderId = new Types.ObjectId(resolvedOrderDbId);
 
       // Use ObjectId for match keys and upsert (one review per user-product)
       const review = await Review.findOneAndUpdate(
