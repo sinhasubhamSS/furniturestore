@@ -12,6 +12,27 @@ app.use(
 );
 app.use(cookieParser());
 app.use(express.json());
+// debug middleware - add immediately after app.use(express.json())
+app.use((req, res, next) => {
+  if (
+    req.path.includes("/products/") &&
+    (req.path.endsWith("/createreview") || req.path.includes("/createreview"))
+  ) {
+    console.log("=== DEBUG REQ for createReview ===");
+    console.log("method:", req.method);
+    console.log("url:", req.originalUrl);
+    console.log("content-type:", req.headers["content-type"]);
+    console.log("body present?:", typeof req.body !== "undefined");
+    console.log("body value:", JSON.stringify(req.body));
+    console.log("cookies:", JSON.stringify(req.cookies || {}));
+    console.log(
+      "auth header:",
+      req.headers["authorization"] ? "[present]" : "[missing]"
+    );
+    console.log("==================================");
+  }
+  next();
+});
 
 import userRoutes from "./routes/userRoutes";
 import productRoutes from "./routes/productRoutes";

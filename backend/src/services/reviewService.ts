@@ -37,17 +37,29 @@ export class ReviewService {
   // ---------------------------------------
   static async createReview(reviewData: CreateReviewInput): Promise<IReview> {
     try {
+      console.debug("createReview called with:", JSON.stringify(reviewData));
       const { productId, userId, rating, content, images, videos, orderId } =
         reviewData;
+
+      // ---- Basic parameter validation ----
+      if (!productId) throw new Error("productId is required");
+      if (!userId)
+        throw new Error("userId is required (should come from auth)");
+      if (typeof rating !== "number" || rating < 1 || rating > 5)
+        throw new Error("rating must be a number between 1 and 5");
+
+      // Prevent invalid ObjectId casts
+      if (!Types.ObjectId.isValid(productId))
+        throw new Error("productId is not a valid id");
+      if (!Types.ObjectId.isValid(userId))
+        throw new Error("userId is not a valid id");
 
       // basic sanitization
       const trimmedContent = (content || "").trim().slice(0, 1000);
 
-      // Check product exists
+      // Check product exists & review settings
       const product = await Product.findById(productId).lean();
       if (!product) throw new Error("Product not found");
-
-      // Check if reviews allowed for product
       if (!product.reviewSettings?.allowReviews) {
         throw new Error("Reviews not allowed for this product");
       }
@@ -55,57 +67,55 @@ export class ReviewService {
       // -------------------------
       // Server-driven buyer type
       // -------------------------
-      // We DO NOT trust client-provided isOfflineBuyer flag.
-      // If orderId provided -> validate it belongs to user, contains product, and is delivered.
-      // Otherwise treat as offline buyer: require at least one image or video and mark pending.
       let finalIsOfflineBuyer = true;
       let isVerifiedPurchase = false;
       let status: "pending" | "approved" = "pending";
 
-      // We'll keep resolvedOrderDbId when we find it so we store DB ObjectId
+      // resolvedOrderDbId will store the Order._id (ObjectId string) when found
       let resolvedOrderDbId: string | undefined = undefined;
 
       if (orderId) {
-        // resolve order by either _id or external orderId field
+        // resolve order by either Mongo _id or external orderId field
         let order: any = null;
 
-        // try treat orderId as MongoDB ObjectId first (fast path)
-        try {
-          order = await Order.findById(orderId).lean();
-        } catch (e) {
-          // invalid ObjectId -> ignore and fallback
-          order = null;
+        // Try ObjectId lookup first (fast path)
+        if (Types.ObjectId.isValid(orderId)) {
+          order = await Order.findById(orderId)
+            .lean()
+            .catch(() => null);
         }
 
-        // fallback: try to find by external orderId field (e.g. "ORD-1234")
+        // Fallback: find by external orderId string
         if (!order) {
-          order = await Order.findOne({ orderId: orderId }).lean();
+          order = await Order.findOne({ orderId: orderId })
+            .lean()
+            .catch(() => null);
         }
 
         if (!order) throw new Error("Order not found");
 
         // ensure order belongs to user
-        if (!order.user || order.user.toString() !== userId.toString()) {
+        if (!order.user || String(order.user) !== String(userId)) {
           throw new Error("Order does not belong to user");
         }
 
-        // check delivered status — adapt to your actual schema fields:
-        // prefer Order.status === OrderStatus.Delivered, fallback to trackingInfo.actualDelivery or deliverySnapshot.estimatedDelivery
+        // check delivered status (defensive)
         const isDelivered =
-          String(order.status) === String(OrderStatus.Delivered) ||
+          String(order.status).toLowerCase() === "delivered" ||
           !!order.trackingInfo?.actualDelivery ||
           !!order.deliverySnapshot?.estimatedDelivery ||
-          // fallback: if you store deliveredAt date
           !!order.deliveredAt;
 
-        // check that the order contains the product using your `orderItemsSnapshot`
+        // check that the order contains the product (support snapshot or summary)
         const containsProduct =
-          Array.isArray(order.orderItemsSnapshot) &&
-          order.orderItemsSnapshot.some((it: any) => {
-            // productId may be ObjectId -> convert to string
-            const pid = it.productId?.toString?.();
-            return pid === productId.toString();
-          });
+          (Array.isArray(order.orderItemsSnapshot) &&
+            order.orderItemsSnapshot.some(
+              (it: any) => String(it.productId) === String(productId)
+            )) ||
+          (Array.isArray(order.orderItemsSummary) &&
+            order.orderItemsSummary.some(
+              (it: any) => String(it.productId) === String(productId)
+            ));
 
         if (!isDelivered || !containsProduct) {
           throw new Error(
@@ -113,12 +123,10 @@ export class ReviewService {
           );
         }
 
-        // If validations pass, mark as online verified
+        // Verified / online review
         finalIsOfflineBuyer = false;
         isVerifiedPurchase = true;
         status = "approved";
-
-        // store DB _id for order
         resolvedOrderDbId = String(order._id);
       } else {
         // offline path - require media
@@ -130,15 +138,15 @@ export class ReviewService {
         }
         finalIsOfflineBuyer = true;
         isVerifiedPurchase = false;
-        status = "pending"; // admin approval required
+        status = "pending";
       }
 
       // -------------------------
-      // Build update payload & upsert
+      // Build update payload & upsert (safe)
       // -------------------------
       const updatePayload: any = {
         rating,
-        content: trimmedContent,
+        content: trimmedContent || undefined,
         isOfflineBuyer: finalIsOfflineBuyer,
         isVerifiedPurchase,
         status,
@@ -147,28 +155,73 @@ export class ReviewService {
 
       if (images !== undefined) updatePayload.images = images;
       if (videos !== undefined) updatePayload.videos = videos;
-      if (resolvedOrderDbId) updatePayload.orderId = new Types.ObjectId(resolvedOrderDbId);
+      if (resolvedOrderDbId) {
+        // validated above so safe to convert
+        updatePayload.orderId = new Types.ObjectId(resolvedOrderDbId);
+      }
 
-      // Use ObjectId for match keys and upsert (one review per user-product)
-      const review = await Review.findOneAndUpdate(
-        {
+      // Upsert filter and update with $setOnInsert to ensure required fields on insert
+      const filter = {
+        productId: new Types.ObjectId(productId),
+        userId: new Types.ObjectId(userId),
+      };
+
+      const update = {
+        $set: updatePayload,
+        $setOnInsert: {
           productId: new Types.ObjectId(productId),
           userId: new Types.ObjectId(userId),
+          createdAt: new Date(),
         },
-        { $set: updatePayload },
-        {
-          upsert: true,
-          new: true,
-          runValidators: true,
-        }
-      );
+      };
 
-      // Update product stats (model getProductStats only counts approved)
-      await this.updateProductStats(productId);
+      const opts = {
+        upsert: true,
+        new: true,
+        runValidators: true,
+        setDefaultsOnInsert: true,
+      };
+
+      const reviewDoc = await Review.findOneAndUpdate(
+        filter,
+        update,
+        opts
+      ).exec();
+
+      // Defensive null-check so return type Promise<IReview> is satisfied
+      if (!reviewDoc) {
+        throw new Error("Failed to create or fetch review after upsert");
+      }
+
+      const review = reviewDoc as unknown as IReview;
+
+      // Update product stats (non-fatal; log errors but don't fail request)
+      try {
+        await this.updateProductStats(productId);
+      } catch (err) {
+        console.error("updateProductStats failed (non-fatal):", err);
+      }
+
+      // Best-effort: mark order item as reviewed (non-blocking)
+      if (resolvedOrderDbId) {
+        Order.updateOne(
+          {
+            _id: new Types.ObjectId(resolvedOrderDbId),
+            "orderItemsSnapshot.productId": new Types.ObjectId(productId),
+          },
+          { $set: { "orderItemsSnapshot.$._reviewedByUser": true } }
+        ).catch((e) => console.error("mark order item reviewed failed:", e));
+      }
 
       return review;
-    } catch (error) {
-      // bubble error up (controllers should handle and return proper HTTP codes)
+    } catch (error: any) {
+      // Improved logging for easier debugging
+      console.error("createReview error:", {
+        message: error?.message,
+        stack: error?.stack,
+        input: reviewData,
+      });
+      // Re-throw so controller can map to proper HTTP response
       throw error;
     }
   }

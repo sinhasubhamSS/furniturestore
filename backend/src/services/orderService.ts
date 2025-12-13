@@ -1,6 +1,11 @@
 // services/OrderService.ts
 import Product, { IVariant } from "../models/product.models";
-import { Order, OrderStatus } from "../models/order.models";
+import {
+  Order,
+  OrderStatus,
+  OrderItemSnapshot,
+  OrderDocument,
+} from "../models/order.models";
 import { Return } from "../models/return.models";
 import {
   PlaceOrderPayment,
@@ -112,7 +117,8 @@ class OrderService {
           : typeof selectedVariant.discountedPrice === "number" &&
             selectedVariant.discountedPrice > 0
           ? selectedVariant.discountedPrice
-          : typeof selectedVariant.price === "number" && selectedVariant.price > 0
+          : typeof selectedVariant.price === "number" &&
+            selectedVariant.price > 0
           ? selectedVariant.price
           : typeof selectedVariant.listingPrice === "number" &&
             selectedVariant.listingPrice > 0
@@ -128,9 +134,10 @@ class OrderService {
           ? selectedVariant.price
           : finalPrice;
 
-      const gstAmount = typeof selectedVariant.gstAmount === "number"
-        ? selectedVariant.gstAmount
-        : 0;
+      const gstAmount =
+        typeof selectedVariant.gstAmount === "number"
+          ? selectedVariant.gstAmount
+          : 0;
 
       const discountPercent =
         typeof selectedVariant.discountPercent === "number"
@@ -606,43 +613,100 @@ class OrderService {
     const filter = { user: userId };
     const result = await this.fetchOrdersWithReturns(filter, page, limit);
 
-    const userFormattedOrders = result.orders.map((order: any) => ({
-      orderId: order.orderId,
-      placedAt: order.placedAt,
-      totalAmount: order.totalAmount,
-      status: order.status,
-      hasActiveReturn: order.hasActiveReturn,
-      returnInfo: order.returnInfo,
+    const userFormattedOrders = result.orders.map(
+      (order: Partial<OrderDocument> & any) => {
+        // normalize items array (may be undefined)
+        const items: OrderItemSnapshot[] = Array.isArray(
+          order.orderItemsSnapshot
+        )
+          ? order.orderItemsSnapshot
+          : [];
 
-      deliveryInfo: {
-        pincode: order.shippingAddressSnapshot.pincode,
-        city: order.shippingAddressSnapshot.city,
-        zone: order.deliverySnapshot?.zone,
-        estimatedDays: order.deliverySnapshot?.estimatedDays,
-        deliveryCharge: order.deliverySnapshot?.deliveryCharge,
-        courierPartner: order.deliverySnapshot?.courierPartner,
-        trackingId: order.deliverySnapshot?.trackingId,
-        totalWeight: order.deliverySnapshot?.totalWeight,
-      },
+        // helper to get a canonical productId string from an OrderItemSnapshot (if present)
+        const getPidFromItem = (
+          item?: Partial<OrderItemSnapshot> | null
+        ): string | null => {
+          if (!item) return null;
+          // item.productId is defined in your schema as Types.ObjectId
+          if (item.productId) {
+            // productId may be a Types.ObjectId or string — convert to string
+            // Using String() is safe for both ObjectId and string
+            return String(item.productId);
+          }
+          // fallback checks (if your data shape includes nested product or id names)
+          if ((item as any)._id) return String((item as any)._id);
+          if ((item as any).id) return String((item as any).id);
+          return null;
+        };
 
-      productPreview: {
-        images: order.orderItemsSnapshot?.[0]?.image || null,
-        name: order.orderItemsSnapshot[0]?.name || "Product",
-        quantity: order.orderItemsSnapshot.reduce(
-          (acc: number, item: any) => acc + item.quantity,
-          0
-        ),
-      },
+        // build compact items summary (small payload)
+        const orderItemsSummary = items.map((it) => {
+          return {
+            productId: getPidFromItem(it),
+            name: it.name ?? (it as any).title ?? null,
+            image:
+              it.image ??
+              (Array.isArray((it as any).images)
+                ? (it as any).images[0]
+                : (it as any).images) ??
+              null,
+            quantity: typeof it.quantity === "number" ? it.quantity : 1,
+            price: typeof it.price === "number" ? it.price : null,
+          };
+        });
 
-      shippingSummary: {
-        name: order.shippingAddressSnapshot.fullName,
-        city: order.shippingAddressSnapshot.city,
-        state: order.shippingAddressSnapshot.state,
-        pincode: order.shippingAddressSnapshot.pincode,
-      },
+        const firstItem = items.length > 0 ? items[0] : null;
+        const firstPid = getPidFromItem(firstItem);
 
-      paymentStatus: order.paymentSnapshot?.status || "unpaid",
-    }));
+        return {
+          orderId: order.orderId,
+          placedAt: order.placedAt,
+          totalAmount: order.totalAmount,
+          status: order.status,
+          hasActiveReturn: !!order.hasActiveReturn,
+          returnInfo: order.returnInfo ?? null,
+
+          deliveryInfo: {
+            pincode: order.shippingAddressSnapshot?.pincode ?? null,
+            city: order.shippingAddressSnapshot?.city ?? null,
+            zone: order.deliverySnapshot?.zone ?? null,
+            estimatedDays: order.deliverySnapshot?.estimatedDays ?? null,
+            deliveryCharge: order.deliverySnapshot?.deliveryCharge ?? null,
+            courierPartner: order.deliverySnapshot?.courierPartner ?? null,
+            trackingId: order.deliverySnapshot?.trackingId ?? null,
+            totalWeight: order.deliverySnapshot?.totalWeight ?? null,
+          },
+
+          productPreview: {
+            images:
+              firstItem?.image ??
+              (firstItem &&
+                (Array.isArray((firstItem as any).images)
+                  ? (firstItem as any).images[0]
+                  : (firstItem as any).images)) ??
+              null,
+            name: firstItem?.name ?? (firstItem as any)?.title ?? "Product",
+            quantity:
+              items.length > 0
+                ? items.reduce((acc, it) => acc + Number(it.quantity ?? 0), 0)
+                : 1,
+            productId: firstPid, // <-- ADDED: product id (string or null)
+          },
+
+          // optional compact summary (useful when order has multiple items)
+          orderItemsSummary,
+
+          shippingSummary: {
+            name: order.shippingAddressSnapshot?.fullName ?? null,
+            city: order.shippingAddressSnapshot?.city ?? null,
+            state: order.shippingAddressSnapshot?.state ?? null,
+            pincode: order.shippingAddressSnapshot?.pincode ?? null,
+          },
+
+          paymentStatus: order.paymentSnapshot?.status ?? "unpaid",
+        };
+      }
+    );
 
     return {
       orders: userFormattedOrders,
@@ -827,7 +891,8 @@ class OrderService {
           : typeof selectedVariant.discountedPrice === "number" &&
             selectedVariant.discountedPrice > 0
           ? selectedVariant.discountedPrice
-          : typeof selectedVariant.price === "number" && selectedVariant.price > 0
+          : typeof selectedVariant.price === "number" &&
+            selectedVariant.price > 0
           ? selectedVariant.price
           : typeof selectedVariant.listingPrice === "number" &&
             selectedVariant.listingPrice > 0

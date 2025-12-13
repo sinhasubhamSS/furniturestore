@@ -1,12 +1,6 @@
 // src/validations/review.validation.ts
 import { z } from "zod";
 
-// Remove the ObjectId preprocessing - keep it simple
-// const productIdSchema = z
-//   .string()
-//   .min(1, "Product ID is required")
-//   .regex(/^[0-9a-fA-F]{24}$/, "Invalid product ID format");
-
 // Image schema for reviews
 const reviewImageSchema = z.object({
   url: z.string().url({ message: "Invalid image URL" }),
@@ -18,7 +12,8 @@ const reviewImageSchema = z.object({
 const reviewVideoSchema = z.object({
   url: z.string().url({ message: "Invalid video URL" }),
   publicId: z.string().min(1, "Video public ID required"),
-  duration: z.coerce
+  duration: z
+    .coerce
     .number()
     .min(1)
     .max(300, "Video too long (max 5 minutes)")
@@ -26,43 +21,46 @@ const reviewVideoSchema = z.object({
   caption: z.string().max(100, "Caption too long").optional(),
 });
 
-// ✅ FIXED: Create Review Schema (Myntra-style)
+// ✅ CREATE REVIEW SCHEMA - now supports optional orderId
 export const createReviewSchema = z.object({
   body: z.object({
-    // ✅ REMOVED: productId from body (comes from URL params)
-    // productId: productIdSchema,
+    // Optional: external order identifier (e.g. "SUVI-20251209-00001")
+    // When provided, must be a non-empty trimmed string.
+    orderId: z
+      .string()
+      .trim()
+      .min(1, "orderId must be a non-empty string")
+      .optional(),
 
-    // ✅ KEEP: Rating is required (star rating always needed)
     rating: z.coerce.number().int("Rating must be integer").min(1).max(5),
 
-    // ✅ FIXED: Content is now optional and minimum 1 char
+    // content optional but if provided must be at least 1 char
     content: z
       .string()
-      .min(1, "Review must be at least 1 character") // ✅ Changed from 10 to 1
+      .min(1, "Review must be at least 1 character")
       .max(1000, "Review cannot exceed 1000 characters")
       .trim()
-      .optional(), // ✅ Made optional
+      .optional(),
 
-    // ✅ KEEP: Images optional (already correct)
+    // default([]) ensures controller/service receives [] rather than undefined
     images: z
       .array(reviewImageSchema)
       .max(5, "Maximum 5 images allowed")
       .optional()
       .default([]),
 
-    // ✅ KEEP: Videos optional (already correct)
     videos: z
       .array(reviewVideoSchema)
       .max(2, "Maximum 2 videos allowed")
       .optional()
       .default([]),
 
-    // ✅ KEEP: Verified purchase optional (already correct)
+    // client may send this but server will not trust it — it's optional
     isVerifiedPurchase: z.coerce.boolean().optional().default(false),
   }),
 });
 
-// ✅ FIXED: Update Review Schema
+// UPDATE Review Schema (unchanged except small trimming)
 export const updateReviewSchema = z.object({
   params: z.object({
     reviewId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid review ID format"),
@@ -72,10 +70,9 @@ export const updateReviewSchema = z.object({
     .object({
       rating: z.coerce.number().int().min(1).max(5).optional(),
 
-      // ✅ FIXED: Content minimum 1 char in update too
       content: z
         .string()
-        .min(1, "Review must be at least 1 character") // ✅ Changed from 10 to 1
+        .min(1, "Review must be at least 1 character")
         .max(1000)
         .trim()
         .optional(),
@@ -88,7 +85,7 @@ export const updateReviewSchema = z.object({
     }),
 });
 
-// ✅ KEEP: Query Schema (already perfect)
+// Query schema unchanged
 export const reviewQuerySchema = z.object({
   page: z.coerce.number().min(1).optional().default(1),
   limit: z.coerce.number().min(1).max(50).optional().default(10),
