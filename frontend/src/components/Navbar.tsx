@@ -43,16 +43,15 @@ const Navbar = () => {
   const router = useRouter();
 
   const handleSignOut = async () => {
-  try {
-    await axiosClient.post("/user/logout"); // cookie clear
-  } catch (err) {
-    console.error("Logout failed:", err);
-  } finally {
-    dispatch(clearActiveUser());
-    router.push("/auth/login");
-  }
-};
-
+    try {
+      await axiosClient.post("/user/logout"); // cookie clear
+    } catch (err) {
+      console.warn("Logout API failed or token missing");
+    } finally {
+      dispatch(clearActiveUser());
+      window.location.href = "/auth/login";
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
