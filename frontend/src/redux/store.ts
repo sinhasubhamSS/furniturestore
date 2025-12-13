@@ -13,7 +13,6 @@ import {
   PURGE,
   REGISTER,
 } from "redux-persist";
-import storage from "redux-persist/lib/storage";
 
 import { adminProductApi } from "@/redux/services/admin/adminProductapi";
 import { adminCategoryApi } from "./services/admin/adminCategoryapi";
@@ -29,6 +28,7 @@ import { returnApi } from "./services/user/returnApi";
 import { deliveryApi } from "./services/user/deliveryApi";
 import { orderadminApi } from "./services/admin/adminOrderapi";
 import { adminReturnApi } from "./services/admin/adminReturnapi";
+import storage from "../../utils/storage";
 
 // Manually define PersistPartial to fix missing import error
 type PersistPartial = {
