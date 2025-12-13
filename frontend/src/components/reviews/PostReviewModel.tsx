@@ -12,18 +12,18 @@ import { ReviewDisplayType } from "@/types/review";
 import { Send, X } from "lucide-react";
 import { uploadImageToCloudinary } from "../../../utils/uploadToCloudinary";
 
-// small helper to make a short local id for temp previews
+// helper for temporary preview ids
 const makeLocalId = () =>
   `local-${Math.random().toString(36).slice(2, 9)}-${Date.now().toString(36)}`;
 
 interface MediaItem {
   url: string;
-  publicId?: string; // cloudinary public_id (camelCase)
-  public_id?: string; // cloudinary public_id (snake_case) — mapped into publicId on load
+  publicId?: string;
+  public_id?: string;
   caption?: string | undefined;
   thumbSafe?: string | undefined;
-  _tmp?: boolean; // internal: temporary preview before upload
-  _localId?: string; // internal: temporary stable key until publicId arrives
+  _tmp?: boolean;
+  _localId?: string;
 }
 
 interface PostReviewModalProps {
@@ -32,8 +32,8 @@ interface PostReviewModalProps {
   onClose: () => void;
   onSuccess?: () => void;
   existingReview?: ReviewDisplayType | null;
-  initialRating?: number; // from QuickRating
-  orderId?: string; // optional — if provided, backend will mark verified
+  initialRating?: number;
+  orderId?: string; // for verified purchases
 }
 
 const PostReviewModal: React.FC<PostReviewModalProps> = ({
@@ -50,7 +50,7 @@ const PostReviewModal: React.FC<PostReviewModalProps> = ({
   const [images, setImages] = useState<MediaItem[]>([]);
   const [videos, setVideos] = useState<MediaItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<number>(0); // 0-100 aggregated
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
 
   const [createReview, { isLoading: isCreating }] = useCreateReviewMutation();
   const [updateReview, { isLoading: isUpdating }] = useUpdateReviewMutation();
@@ -58,28 +58,28 @@ const PostReviewModal: React.FC<PostReviewModalProps> = ({
   const isEditing = !!existingReview;
   const isLoading = isCreating || isUpdating;
 
+  // Load existing review into modal
   useEffect(() => {
     if (isOpen) {
       if (existingReview) {
         setRating(existingReview.rating);
         setContent(existingReview.content || "");
-        // Map existing review images/videos (backend shape -> local shape)
+
         setImages(
           (existingReview.images || []).map((img: any) => ({
             url: img.url,
             publicId: img.publicId || img.public_id || "",
-            public_id: img.public_id || img.publicId || "",
             caption: img.caption || undefined,
-            thumbSafe: (img as any).thumbSafe || undefined,
+            thumbSafe: img.thumbSafe || undefined,
             _tmp: false,
             _localId: makeLocalId(),
           }))
         );
+
         setVideos(
           (existingReview.videos || []).map((v: any) => ({
             url: v.url,
             publicId: v.publicId || v.public_id || "",
-            public_id: v.public_id || v.publicId || "",
             caption: v.thumbnail || v.caption || undefined,
             _tmp: false,
             _localId: makeLocalId(),
@@ -92,137 +92,89 @@ const PostReviewModal: React.FC<PostReviewModalProps> = ({
         setVideos([]);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existingReview, isOpen, initialRating]);
 
-  // Upload images to Cloudinary and update state with returned url + public_id
+  // === IMAGE UPLOAD HANDLER ===
   const handleImageFiles = async (files: FileList | null) => {
     if (!files) return;
+
     const allowedCount = 8;
-    const remaining = Math.max(0, allowedCount - images.length);
+    const remaining = allowedCount - images.length;
     const arr = Array.from(files).slice(0, remaining);
+
     if (arr.length === 0) {
-      toast.error(`Only ${allowedCount} photos allowed`);
+      toast.error(`Max ${allowedCount} photos allowed`);
       return;
     }
 
-    // Basic client-side validation
+    // file validations
     const allowed = ["image/jpeg", "image/png", "image/webp", "image/avif"];
     const sizeLimitMB = 5;
-    for (const file of arr) {
-      if (!allowed.includes(file.type)) {
-        toast.error("Invalid file type");
-        return;
-      }
-      if (file.size > sizeLimitMB * 1024 * 1024) {
-        toast.error("Max file size is 5MB");
-        return;
-      }
+
+    for (const f of arr) {
+      if (!allowed.includes(f.type)) return toast.error("Invalid file type");
+      if (f.size > sizeLimitMB * 1024 * 1024)
+        return toast.error("Max size 5MB");
     }
 
-    // Add temporary previews immediately (no filename caption) with _localId
+    // temporary previews
     const previews: MediaItem[] = arr.map((f) => ({
       url: URL.createObjectURL(f),
       publicId: "",
-      public_id: "",
       caption: undefined,
-      thumbSafe: undefined,
       _tmp: true,
       _localId: makeLocalId(),
     }));
-    setImages((prev) => [...prev, ...previews]);
 
-    // Begin uploads sequentially so we can show progressive progress reliably
+    setImages((p) => [...p, ...previews]);
+
+    // upload sequentially for smooth progress
     setIsUploading(true);
     setUploadProgress(0);
+
     let completed = 0;
 
     try {
       for (let i = 0; i < arr.length; i++) {
         const file = arr[i];
+
         try {
           const resp: any = await uploadImageToCloudinary(
             file,
             `reviews/${productId}`,
             (p: number) => {
-              // p = 0..100 for this file; aggregate into overall progress
               const overall = Math.round(
                 (completed / arr.length) * 100 + p / arr.length
               );
-              setUploadProgress(Math.min(100, overall));
+              setUploadProgress(Math.min(overall, 100));
             }
           );
 
-          // normalize response (no caption set automatically)
           const uploaded: Partial<MediaItem> = {
-            url: resp.url || resp.secure_url || resp.secure || "",
-            publicId: resp.public_id || resp.publicId || "",
-            public_id: resp.public_id || resp.publicId || "",
+            url: resp.url || resp.secure_url || "",
+            publicId: resp.public_id,
             caption: undefined,
-            thumbSafe:
-              resp.thumbSafe || resp.eager?.[0]?.secure_url || undefined,
+            thumbSafe: resp.thumbSafe,
             _tmp: false,
           };
 
-          // replace the first _tmp preview (in insertion order) with this uploaded item
+          // replace preview with real uploaded version
           setImages((prev) => {
-            const copy = [...prev];
-            const tmpIndex = copy.findIndex((it) => it._tmp && it._localId);
-            if (tmpIndex >= 0) {
-              const old = copy[tmpIndex];
-              if (old?.url?.startsWith?.("blob:")) {
-                try {
-                  URL.revokeObjectURL(old.url);
-                } catch {}
-              }
-              copy[tmpIndex] = {
-                ...old,
-                ...(uploaded as MediaItem),
+            const c = [...prev];
+            const idx = c.findIndex((x) => x._tmp);
+            if (idx >= 0) {
+              c[idx] = {
+                ...c[idx],
+                ...uploaded,
                 _tmp: false,
-                // keep existing _localId so key remains stable until publicId arrives
-                _localId: old._localId,
               };
-            } else {
-              // fallback: push with a local id
-              copy.push({
-                ...(uploaded as MediaItem),
-                _localId: makeLocalId(),
-                _tmp: false,
-              });
             }
-            return copy;
+            return c;
           });
-        } catch (err: any) {
-          console.error("Image upload failed for file", file.name, err);
-          // mark as failed placeholder (keeps preview but publicId empty and no caption)
-          setImages((prev) => {
-            const copy = [...prev];
-            const tmpIndex = copy.findIndex((it) => it._tmp && it._localId);
-            if (tmpIndex >= 0) {
-              copy[tmpIndex] = {
-                ...copy[tmpIndex],
-                _tmp: false,
-                caption: undefined,
-                // publicId left empty to indicate upload failure
-              };
-            } else {
-              copy.push({
-                url: URL.createObjectURL(file),
-                publicId: "",
-                public_id: "",
-                caption: undefined,
-                _tmp: false,
-                _localId: makeLocalId(),
-              });
-            }
-            return copy;
-          });
-          toast.error(`Failed to upload ${file.name}`);
+        } catch {
+          toast.error("Image upload failed");
         } finally {
-          completed += 1;
-          setUploadProgress(
-            Math.min(100, Math.round((completed / arr.length) * 100))
-          );
+          completed++;
         }
       }
     } finally {
@@ -231,88 +183,63 @@ const PostReviewModal: React.FC<PostReviewModalProps> = ({
     }
   };
 
-  // Videos currently use local object URLs — you can wire video upload same way if needed.
+  // === VIDEO HANDLER (local only for now) ===
   const handleVideoFiles = async (files: FileList | null) => {
     if (!files) return;
     const arr = Array.from(files).slice(0, 2 - videos.length);
-    const uploaded = arr.map((f) => ({
+
+    const preview = arr.map((f) => ({
       url: URL.createObjectURL(f),
       publicId: "",
-      public_id: "",
       caption: undefined,
       _tmp: false,
       _localId: makeLocalId(),
     }));
-    setVideos((prev) => [...prev, ...uploaded]);
+
+    setVideos((p) => [...p, ...preview]);
   };
 
   const removeImage = (idx: number) =>
-    setImages((s) => {
-      const copy = [...s];
-      const [removed] = copy.splice(idx, 1);
-      // revoke blob URL if any
-      if (removed?.url?.startsWith?.("blob:")) {
-        try {
-          URL.revokeObjectURL(removed.url);
-        } catch {}
-      }
+    setImages((p) => {
+      const copy = [...p];
+      const removed = copy.splice(idx, 1)[0];
+      if (removed?.url?.startsWith("blob:")) URL.revokeObjectURL(removed.url);
       return copy;
     });
 
   const removeVideo = (idx: number) =>
-    setVideos((s) => {
-      const copy = [...s];
-      const [removed] = copy.splice(idx, 1);
-      if (removed?.url?.startsWith?.("blob:")) {
-        try {
-          URL.revokeObjectURL(removed.url);
-        } catch {}
-      }
+    setVideos((p) => {
+      const copy = [...p];
+      const removed = copy.splice(idx, 1)[0];
+      if (removed?.url?.startsWith("blob:")) URL.revokeObjectURL(removed.url);
       return copy;
     });
 
-  // Utility: normalize a media item into backend-friendly shape and ensure publicId is read from either key
-  const normalizeImageForPayload = (i: MediaItem) => ({
-    url: i.url,
-    publicId: i.publicId || i.public_id || "",
-    caption: i.caption || undefined,
-  });
-
-  const normalizeVideoForPayload = (v: MediaItem) => ({
-    url: v.url,
-    publicId: v.publicId || v.public_id || "",
-    thumbnail: v.caption || undefined,
-  });
-
+  // === SUBMIT ===
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (rating === 0) {
-      toast.error("Please select a rating");
-      return;
-    }
 
-    if (isUploading) {
-      toast.error("Please wait for uploads to finish before submitting");
-      return;
-    }
+    if (rating === 0) return toast.error("Please select a rating");
+    if (isUploading) return toast.error("Please wait for uploads to finish");
 
-    const isVerified = !!orderId;
+    const cleanedImages = images
+      .filter((i) => i.publicId)
+      .map((i) => ({
+        url: i.url,
+        publicId: i.publicId,
+        caption: i.caption,
+      }));
 
-    // Clean and normalize media before validating or sending
-    const cleanedImages = (images || [])
-      .map(normalizeImageForPayload)
-      .filter((i) => i.publicId && i.publicId.length > 0);
+    const cleanedVideos = videos
+      .filter((v) => v.publicId)
+      .map((v) => ({
+        url: v.url,
+        publicId: v.publicId,
+        thumbnail: v.caption,
+      }));
 
-    const cleanedVideos = (videos || [])
-      .map(normalizeVideoForPayload)
-      .filter((v) => v.publicId && v.publicId.length > 0);
-
-    // Offline flow requires at least one uploaded media
-    if (!isVerified && cleanedImages.length + cleanedVideos.length === 0) {
-      toast.error(
-        "Offline reviews require at least one uploaded image or video."
-      );
-      return;
+    if (!orderId && cleanedImages.length + cleanedVideos.length === 0) {
+      return toast.error("Offline reviews require a photo/video");
     }
 
     try {
@@ -327,44 +254,29 @@ const PostReviewModal: React.FC<PostReviewModalProps> = ({
       if (orderId) payload.orderId = orderId;
 
       if (isEditing && existingReview) {
-        await updateReview({
-          reviewId: existingReview._id,
-          ...payload,
-        }).unwrap();
-        toast.success("Review updated successfully!");
+        await updateReview({ reviewId: existingReview._id, ...payload });
+        toast.success("Review updated!");
       } else {
-        await createReview(payload).unwrap();
-        toast.success("Review posted successfully!");
+        await createReview(payload);
+        toast.success("Review posted!");
       }
 
       handleClose();
       onSuccess?.();
     } catch (err: any) {
-      // prefer backend message if available
-      const message =
-        err?.data?.message || err?.message || "Failed to submit review";
-      toast.error(message);
+      toast.error(err?.data?.message || "Failed to submit review");
     }
   };
 
   const handleClose = () => {
     setRating(0);
     setContent("");
-    // revoke object urls
-    images.forEach((img) => {
-      if (img.url?.startsWith?.("blob:")) {
-        try {
-          URL.revokeObjectURL(img.url);
-        } catch {}
-      }
-    });
-    videos.forEach((v) => {
-      if (v.url?.startsWith?.("blob:")) {
-        try {
-          URL.revokeObjectURL(v.url);
-        } catch {}
-      }
-    });
+    images.forEach(
+      (i) => i.url.startsWith("blob:") && URL.revokeObjectURL(i.url)
+    );
+    videos.forEach(
+      (v) => v.url.startsWith("blob:") && URL.revokeObjectURL(v.url)
+    );
     setImages([]);
     setVideos([]);
     onClose();
@@ -373,18 +285,23 @@ const PostReviewModal: React.FC<PostReviewModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* BACKDROP */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="fixed inset-0 bg-black bg-opacity-50"
         onClick={handleClose}
       />
 
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg transform transition-all">
-        {/* Header */}
+      {/* MODAL */}
+      <div
+        className="
+        relative bg-white rounded-xl shadow-xl
+        w-full max-w-md sm:max-w-lg
+        max-h-[90vh] overflow-y-auto   /* FIXED SCROLL */
+        transform transition-all scale-[0.97] sm:scale-100
+      "
+      >
+        {/* HEADER */}
         <header className="flex justify-between items-center p-6 border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900">
             {isEditing ? "Edit Your Review" : "Write a Review"}
@@ -394,16 +311,15 @@ const PostReviewModal: React.FC<PostReviewModalProps> = ({
             variant="secondary"
             size="sm"
             onClick={handleClose}
-            className="!p-1"
-            aria-label="Close modal"
           />
         </header>
 
+        {/* FORM */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Rating */}
+          {/* RATING */}
           <div>
-            <label className="block text-sm font-semibold mb-3 text-gray-900">
-              Your Rating <span className="text-red-500">*</span>
+            <label className="block text-sm font-semibold mb-2 text-gray-900">
+              Rating <span className="text-red-500">*</span>
             </label>
             <div className="flex items-center gap-3">
               <StarRating
@@ -417,32 +333,28 @@ const PostReviewModal: React.FC<PostReviewModalProps> = ({
             </div>
           </div>
 
-          {/* Content */}
+          {/* CONTENT */}
           <div>
-            <label
-              htmlFor="review-content"
-              className="block text-sm font-semibold mb-2 text-gray-900"
-            >
-              Your Review (Optional)
+            <label className="block text-sm font-semibold mb-2 text-gray-900">
+              Review (Optional)
             </label>
             <textarea
-              id="review-content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="Share your experience..."
-              className="w-full p-4 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+              placeholder="Share your experience…"
+              className="
+                w-full p-4 border border-gray-300 rounded-lg resize-none
+                focus:ring-2 focus:ring-pink-500 focus:border-transparent
+              "
               rows={4}
               maxLength={1000}
             />
-            <div className="text-xs text-gray-500 mt-2 flex justify-between">
-              <span>Help others by sharing your experience</span>
-              <span className={content.length > 800 ? "text-orange-500" : ""}>
-                {content.length}/1000
-              </span>
+            <div className="text-xs text-gray-500 mt-1 text-right">
+              {content.length}/1000
             </div>
           </div>
 
-          {/* Media upload (file inputs wired to Cloudinary) */}
+          {/* IMAGES */}
           <div>
             <label className="block text-sm font-semibold mb-2 text-gray-900">
               Photos (max 8)
@@ -451,33 +363,27 @@ const PostReviewModal: React.FC<PostReviewModalProps> = ({
               type="file"
               accept="image/*"
               multiple
-              onChange={(e) => handleImageFiles(e.target.files)}
               disabled={isUploading}
+              onChange={(e) => handleImageFiles(e.target.files)}
             />
+
             {isUploading && (
-              <div className="mt-2 text-sm text-gray-600">
-                Uploading... {uploadProgress}%
-              </div>
+              <p className="text-sm text-gray-600 mt-1">
+                Uploading… {uploadProgress}%
+              </p>
             )}
-            <div className="flex gap-2 mt-3 flex-wrap">
-              {images.map((img) => (
-                // KEY RULE: use Cloudinary public id when available; otherwise use internal local id for temp previews
+
+            <div className="flex gap-2 flex-wrap mt-3">
+              {images.map((img, idx) => (
                 <div key={img.publicId || img._localId} className="relative">
                   <img
                     src={img.url}
-                    alt={img.caption || "review image"}
                     className="w-20 h-20 object-cover rounded"
+                    alt="Preview"
                   />
                   <button
                     type="button"
-                    onClick={() => {
-                      const idx = images.findIndex(
-                        (i) =>
-                          (i.publicId || i._localId) ===
-                          (img.publicId || img._localId)
-                      );
-                      if (idx >= 0) removeImage(idx);
-                    }}
+                    onClick={() => removeImage(idx)}
                     className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow"
                   >
                     ✕
@@ -487,6 +393,7 @@ const PostReviewModal: React.FC<PostReviewModalProps> = ({
             </div>
           </div>
 
+          {/* VIDEOS */}
           <div>
             <label className="block text-sm font-semibold mb-2 text-gray-900">
               Videos (max 2)
@@ -497,24 +404,14 @@ const PostReviewModal: React.FC<PostReviewModalProps> = ({
               multiple
               onChange={(e) => handleVideoFiles(e.target.files)}
             />
-            <div className="flex gap-2 mt-3 flex-wrap">
-              {videos.map((v) => (
+
+            <div className="flex gap-2 flex-wrap mt-3">
+              {videos.map((v, idx) => (
                 <div key={v.publicId || v._localId} className="relative">
-                  <video
-                    src={v.url}
-                    className="w-28 h-20 object-cover rounded"
-                    muted
-                  />
+                  <video src={v.url} className="w-28 h-20 rounded" muted />
                   <button
                     type="button"
-                    onClick={() => {
-                      const idx = videos.findIndex(
-                        (x) =>
-                          (x.publicId || x._localId) ===
-                          (v.publicId || v._localId)
-                      );
-                      if (idx >= 0) removeVideo(idx);
-                    }}
+                    onClick={() => removeVideo(idx)}
                     className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow"
                   >
                     ✕
@@ -524,22 +421,15 @@ const PostReviewModal: React.FC<PostReviewModalProps> = ({
             </div>
           </div>
 
-          {/* Note about offline vs verified */}
-          <div className="text-sm text-gray-600">
-            {orderId ? (
-              <div className="text-green-700">
-                This review will be posted as a verified purchase.
-              </div>
-            ) : (
-              <div className="text-orange-600">
-                Offline reviews require at least one photo or video and will be
-                reviewed by admin before appearing publicly.
-              </div>
-            )}
-          </div>
+          {/* OFFLINE NOTICE */}
+          {!orderId && (
+            <p className="text-sm text-orange-600">
+              Offline reviews require at least one photo or video.
+            </p>
+          )}
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-4">
+          {/* BUTTONS */}
+          <div className="flex gap-3 pt-3">
             <ActionButton
               type="button"
               icon={X}
