@@ -86,17 +86,10 @@ const ProductCardListing = memo(
         if (Array.isArray(product.variants) && product.variants.length) {
           product.variants.forEach((v: any) => {
             const lp =
-              typeof v.listingPrice === "number"
-                ? v.listingPrice
-                : typeof v.price === "number"
-                ? v.price
-                : null;
+              typeof v.listingPrice === "number" ? v.listingPrice : null;
+
             const sp =
-              typeof v.sellingPrice === "number"
-                ? v.sellingPrice
-                : typeof v.discountedPrice === "number"
-                ? v.discountedPrice
-                : null;
+              typeof v.sellingPrice === "number" ? v.sellingPrice : null;
 
             if (lp != null && Number.isFinite(lp))
               variantListingPrices.push(lp);
@@ -117,7 +110,7 @@ const ProductCardListing = memo(
         const listingVal =
           typeof repPriceField !== "undefined"
             ? Number(repPriceField)
-            : variantMinListing ?? (product as any).price ?? null;
+            : variantMinListing ?? null;
 
         const sellingVal =
           typeof repDiscountedField !== "undefined"
@@ -128,21 +121,12 @@ const ProductCardListing = memo(
                 : null);
 
         // label logic
-        let priceLabel = "";
-        if (
-          variantMinListing != null &&
-          variantMaxListing != null &&
-          variantMaxListing > variantMinListing &&
-          typeof repPriceField === "undefined"
-        ) {
-          priceLabel = `From ₹${variantMinListing.toFixed(0)}`;
-        } else if (sellingVal != null) {
-          priceLabel = `₹${Number(sellingVal).toFixed(0)}`;
-        } else if (listingVal != null) {
-          priceLabel = `₹${Number(listingVal).toFixed(0)}`;
-        } else {
-          priceLabel = "—";
-        }
+        const priceLabel =
+          sellingVal != null
+            ? `₹${sellingVal.toFixed(0)}`
+            : listingVal != null
+            ? `₹${listingVal.toFixed(0)}`
+            : "—";
 
         return {
           imgSrc: src,
