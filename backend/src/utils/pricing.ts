@@ -1,31 +1,38 @@
-// utils/pricing.ts
 export type PricingResult = {
-  base: number; // taxable value (before GST)
+  base: number;
   gstAmount: number;
-  listingPrice: number; // marketing MRP (display)
-  sellingPrice: number; // final customer pays (inclusive of GST)
-  savings: number; // listingPrice - sellingPrice
-  discountPercent: number; // integer percent (rounded), derived from listingPrice vs sellingPrice
+  listingPrice: number;
+  sellingPrice: number;
+  savings: number;
+  discountPercent: number;
 };
 
-/** Round to 2 decimals */
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** safe percent calculation: (listing - selling) / listing * 100 */
 export function calcDiscountPercent(
   listingPrice: number,
   sellingPrice: number
 ): number {
-  if (!listingPrice || listingPrice <= 0) return 0;
+  if (!listingPrice || listingPrice <= sellingPrice) return 0;
   const raw = ((listingPrice - sellingPrice) / listingPrice) * 100;
-  // clamp and round to nearest integer (you may want 1 decimal instead, adjust if needed)
-  const pct = Math.round(Math.max(0, raw));
-  return pct;
+  return Math.round(raw);
 }
 
-/**
- * Compute pricing when admin provides basePrice (canonical)
- */
+function normalizeDiscount(listingPrice: number, sellingPrice: number) {
+  if (listingPrice <= sellingPrice) {
+    return {
+      listingPrice: sellingPrice,
+      savings: 0,
+      discountPercent: 0,
+    };
+  }
+
+  const savings = round2(listingPrice - sellingPrice);
+  const discountPercent = calcDiscountPercent(listingPrice, sellingPrice);
+
+  return { listingPrice, savings, discountPercent };
+}
+
 export function computeVariantFromBase(
   basePriceInput: number,
   gstRate: number,
@@ -35,13 +42,15 @@ export function computeVariantFromBase(
   const gstAmount = round2(base * ((gstRate || 0) / 100));
   const sellingPrice = round2(base + gstAmount);
 
-  const listingPrice =
+  const rawListing =
     typeof listingPriceInput === "number" && listingPriceInput > 0
       ? round2(listingPriceInput)
       : sellingPrice;
 
-  const savings = round2(listingPrice - sellingPrice);
-  const discountPercent = calcDiscountPercent(listingPrice, sellingPrice);
+  const { listingPrice, savings, discountPercent } = normalizeDiscount(
+    rawListing,
+    sellingPrice
+  );
 
   return {
     base,
@@ -53,29 +62,26 @@ export function computeVariantFromBase(
   };
 }
 
-/**
- * Compute pricing when admin provides final selling price (inclusive of GST)
- * Useful for merchant UX: they enter final price, we derive taxable base.
- */
 export function computeVariantFromSellingPrice(
   finalSellingInput: number,
   gstRate: number,
   listingPriceInput?: number | null
 ): PricingResult {
   const gstFactor = 1 + (gstRate || 0) / 100;
-  const sellingPriceCandidate = round2(finalSellingInput || 0);
-  const base = round2(sellingPriceCandidate / gstFactor);
+  const sellingCandidate = round2(finalSellingInput || 0);
+  const base = round2(sellingCandidate / gstFactor);
   const gstAmount = round2(base * ((gstRate || 0) / 100));
-  // recompute sellingPrice from base+gst to avoid fractional mismatch
   const sellingPrice = round2(base + gstAmount);
 
-  const listingPrice =
+  const rawListing =
     typeof listingPriceInput === "number" && listingPriceInput > 0
       ? round2(listingPriceInput)
       : sellingPrice;
 
-  const savings = round2(listingPrice - sellingPrice);
-  const discountPercent = calcDiscountPercent(listingPrice, sellingPrice);
+  const { listingPrice, savings, discountPercent } = normalizeDiscount(
+    rawListing,
+    sellingPrice
+  );
 
   return {
     base,
