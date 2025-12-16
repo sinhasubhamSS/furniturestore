@@ -110,40 +110,30 @@ class OrderService {
 
       // Determine final price customer will pay for this variant:
       // Prefer sellingPrice (new canonical), then legacy discountedPrice, then listingPrice/price.
+      // FINAL price customer pays
       const finalPrice =
         typeof selectedVariant.sellingPrice === "number" &&
         selectedVariant.sellingPrice > 0
           ? selectedVariant.sellingPrice
-          : typeof selectedVariant.discountedPrice === "number" &&
-            selectedVariant.discountedPrice > 0
-          ? selectedVariant.discountedPrice
-          : typeof selectedVariant.price === "number" &&
-            selectedVariant.price > 0
-          ? selectedVariant.price
-          : typeof selectedVariant.listingPrice === "number" &&
-            selectedVariant.listingPrice > 0
-          ? selectedVariant.listingPrice
           : 0;
 
-      // Choose listing/marketing MRP for UI
+      // Marketing MRP
       const listingPrice =
         typeof selectedVariant.listingPrice === "number" &&
         selectedVariant.listingPrice > 0
           ? selectedVariant.listingPrice
-          : typeof selectedVariant.price === "number"
-          ? selectedVariant.price
           : finalPrice;
 
+      // GST amount
       const gstAmount =
         typeof selectedVariant.gstAmount === "number"
           ? selectedVariant.gstAmount
           : 0;
 
+      // Discount percent (already computed in model, fallback safe)
       const discountPercent =
         typeof selectedVariant.discountPercent === "number"
           ? selectedVariant.discountPercent
-          : selectedVariant.hasDiscount && listingPrice > 0
-          ? Math.round(((listingPrice - finalPrice) / listingPrice) * 100)
           : 0;
 
       const itemTotal = finalPrice * item.quantity;
@@ -888,15 +878,6 @@ class OrderService {
         typeof selectedVariant.sellingPrice === "number" &&
         selectedVariant.sellingPrice > 0
           ? selectedVariant.sellingPrice
-          : typeof selectedVariant.discountedPrice === "number" &&
-            selectedVariant.discountedPrice > 0
-          ? selectedVariant.discountedPrice
-          : typeof selectedVariant.price === "number" &&
-            selectedVariant.price > 0
-          ? selectedVariant.price
-          : typeof selectedVariant.listingPrice === "number" &&
-            selectedVariant.listingPrice > 0
-          ? selectedVariant.listingPrice
           : 0;
 
       subtotal += finalPrice * item.quantity;

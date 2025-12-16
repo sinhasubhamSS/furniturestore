@@ -1,41 +1,69 @@
 import { DeliveryInfo } from "./delivery";
 import { DisplayProduct, Variant } from "./Product";
 
+/* =====================================================
+   CART ITEM (matches backend Cart API response)
+   ===================================================== */
 export type CartItem = {
-  productId: string; // Backend ObjectId as string
-  variantId: string; // Variant Id as string
+  /* ---------- Identity ---------- */
+  productId: string;
+  variantId: string;
   quantity: number;
   addedAt?: Date | string;
 
-  // Reference full product with variants populated
-  product?: DisplayProduct;
+  /* ---------- UI DISPLAY DATA (FROM BACKEND) ---------- */
+  name: string;
+  slug: string;
+  image: string;
 
-  // Optional convenience property for selected variant
-  variant?: Variant;
+  sku?: string;
+  color?: string;
+  size?: string;
+
+  /* ---------- PRICING (DISPLAY ONLY – NOT TRUSTED) ---------- */
+  listingPrice: number; // MRP
+  sellingPrice: number; // discounted / final price
+  discountPercent: number;
+  hasDiscount: boolean;
+
+  /* ---------- OPTIONAL (FOR LEGACY / SOME SCREENS) ---------- */
+  product?: DisplayProduct; // populated only where needed
+  variant?: Variant; // shortcut, not mandatory
 };
 
+/* =====================================================
+   CART API RESPONSE (SINGLE SOURCE OF TRUTH)
+   ===================================================== */
 export type CartResponse = {
   _id: string | null;
   user: string;
+
   items: CartItem[];
 
-  // Summaries, calculated on backend and sent here
+  /* ---------- SUMMARY (BACKEND CALCULATED) ---------- */
   totalItems: number;
-  cartSubtotal: number;
-  cartGST: number;
-  cartTotal: number;
+
+  cartListingTotal: number; // total MRP (before discount)
+  totalDiscount: number; // total savings
+  cartTotal: number; // final payable amount
 
   createdAt?: Date;
   updatedAt?: Date;
 };
 
+/* =====================================================
+   REDUX CART STATE
+   ===================================================== */
 export interface CartState {
   items: CartItem[];
+
   totalItems: number;
-  cartSubtotal: number;
-  cartGST: number;
+
+  cartListingTotal: number;
+  totalDiscount: number;
   cartTotal: number;
 
+  /* ---------- DELIVERY / FUTURE ---------- */
   totalWeight: number;
   deliveryCharges: number;
   finalTotal: number;
@@ -43,49 +71,3 @@ export interface CartState {
   syncing: boolean;
   deliveryInfo: DeliveryInfo | null;
 }
-
-// import { DeliveryInfo } from "./delivery";
-// import { DisplayProduct } from "./Product";
-
-// export type CartItem = {
-//   productId: string;           // Backend ObjectId as string
-//   variantId: string;           // Variant Id as string
-//   quantity: number;
-//   addedAt?: Date | string;
-//   product?: DisplayProduct;
-//   name?: string;
-//   image?: string;
-//   price?: number;
-//   hasDiscount?: boolean;
-//   discountPercent?: number;
-//   color?: string;
-//   size?: string;
-//   stock?: number;
-//   weight?: number;
-//   title?: string;
-// };
-
-// export type CartResponse = {
-//   _id: string | null;
-//   user: string;
-//   items: CartItem[];
-//   totalItems: number;
-//   cartSubtotal: number;
-//   cartGST: number;
-//   cartTotal: number;
-//   createdAt?: Date;
-//   updatedAt?: Date;
-// };
-
-// export interface CartState {
-//   items: CartItem[];
-//   totalItems: number;
-//   cartSubtotal: number;
-//   cartGST: number;
-//   cartTotal: number;
-//   totalWeight: number;
-//   deliveryCharges: number;
-//   finalTotal: number;
-//   syncing: boolean;
-//   deliveryInfo: DeliveryInfo | null;
-// }

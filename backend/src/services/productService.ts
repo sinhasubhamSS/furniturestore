@@ -237,15 +237,18 @@ class ProductService {
     });
     if (!product) throw new AppError("Product not found or unauthorized", 404);
 
+    // ---------- slug ----------
     if (updateData.name && updateData.name !== product.name) {
       product.slug = this.buildSlug(updateData.name);
     }
 
+    // ---------- variants ----------
     if (updateData.variants) {
       if (updateData.variants.length === 0) {
         throw new AppError("At least one variant is required", 400);
       }
 
+      /* ----- delete removed images ----- */
       const oldPublicIds = new Set<string>();
       product.variants.forEach((v: any) => {
         (v.images || []).forEach((img: any) => {
@@ -254,25 +257,33 @@ class ProductService {
       });
 
       const newPublicIds = new Set<string>();
-      (updateData.variants || []).forEach((v: any) => {
+      updateData.variants.forEach((v: any) => {
         (v.images || []).forEach((img: any) => {
           if (img?.public_id) newPublicIds.add(img.public_id);
         });
       });
 
-      const toDeleteIds = Array.from(oldPublicIds).filter(
+      const toDeleteIds = [...oldPublicIds].filter(
         (id) => !newPublicIds.has(id)
       );
-
       await this.deletePublicIds(toDeleteIds);
 
+      /* ----- rebuild variants ----- */
       const processedVariants: IVariant[] = updateData.variants.map(
         (variant) => {
           if (!this.validateImages(variant.images)) {
             throw new AppError(
-              "Each variant must have at least one valid uploaded image (url + public_id).",
+              "Each variant must have at least one valid image (url + public_id)",
               400
             );
+          }
+
+          if (typeof variant.basePrice !== "number" || variant.basePrice <= 0) {
+            throw new AppError("variant.basePrice must be > 0", 400);
+          }
+
+          if (typeof variant.gstRate !== "number" || variant.gstRate < 0) {
+            throw new AppError("variant.gstRate must be >= 0", 400);
           }
 
           const images = this.normalizeImages(variant.images);
@@ -281,21 +292,6 @@ class ProductService {
             variant.color,
             variant.size
           );
-
-          // If basePrice not provided in update, try to reuse existing product variant basePrice by matching SKU or index.
-          // Simpler: require basePrice in update payload for clarity.
-          if (typeof variant.basePrice !== "number" || variant.basePrice <= 0) {
-            throw new AppError(
-              "variant.basePrice is required and must be > 0",
-              400
-            );
-          }
-          if (typeof variant.gstRate !== "number" || variant.gstRate < 0) {
-            throw new AppError(
-              "variant.gstRate is required and must be >= 0",
-              400
-            );
-          }
 
           const pricing = computeVariantFromBase(
             Math.round(variant.basePrice * 100) / 100,
@@ -307,37 +303,38 @@ class ProductService {
             ...variant,
             images,
             sku,
-            basePrice: Math.round(variant.basePrice * 100) / 100,
+            basePrice: pricing.base,
             gstRate: variant.gstRate,
             gstAmount: pricing.gstAmount,
             sellingPrice: pricing.sellingPrice,
-            price: pricing.listingPrice,
-            discountedPrice: pricing.sellingPrice,
+            listingPrice: pricing.listingPrice,
             savings: pricing.savings,
             discountPercent: pricing.discountPercent ?? 0,
+            hasDiscount: pricing.savings > 0,
             stock: variant.stock ?? 0,
           } as IVariant;
         }
       );
 
+      /* ----- replace variants atomically ----- */
       product.variants.splice(
         0,
         product.variants.length,
         ...(processedVariants as any)
       );
 
-      product.price = Math.min(
-        ...processedVariants.map((v: any) => v.price ?? Infinity)
+      /* ----- product-level aggregates ----- */
+      product.lowestSellingPrice = Math.min(
+        ...processedVariants.map((v) => v.sellingPrice ?? Infinity)
       );
-      product.lowestDiscountedPrice = Math.min(
-        ...processedVariants.map((v: any) => v.discountedPrice ?? Infinity)
-      );
+
       product.maxSavings = Math.max(
-        ...processedVariants.map((v: any) => v.savings ?? 0),
-        product.maxSavings
+        ...processedVariants.map((v) => v.savings ?? Infinity),
+        0
       );
     }
 
+    // ---------- simple fields ----------
     const updatableFields: (keyof IProductInput)[] = [
       "name",
       "title",
@@ -349,6 +346,7 @@ class ProductService {
       "category",
       "isPublished",
     ];
+
     updatableFields.forEach((field) => {
       if ((updateData as any)[field] !== undefined) {
         (product as any)[field] = (updateData as any)[field];
@@ -357,6 +355,7 @@ class ProductService {
 
     await product.save();
 
+    // ---------- denormalized sync ----------
     try {
       await Product.recomputeDenorm(product._id);
     } catch (e) {

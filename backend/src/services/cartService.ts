@@ -3,7 +3,7 @@ import { Cart } from "../models/cart.model";
 import { AppError } from "../utils/AppError";
 
 class CartService {
-  // ✅ Add item with variant support
+  /* ---------- ADD TO CART ---------- */
   async addToCart(
     userId: string,
     productId: string,
@@ -11,10 +11,7 @@ class CartService {
     quantity: number
   ) {
     if (!productId || !variantId || quantity <= 0) {
-      throw new AppError(
-        "Product ID, Variant ID and quantity are required",
-        400
-      );
+      throw new AppError("Invalid cart input", 400);
     }
 
     let cart = await Cart.findOne({ user: userId });
@@ -22,18 +19,15 @@ class CartService {
       cart = new Cart({ user: userId, items: [] });
     }
 
-    // Check if item already exists (same product + variant)
-    const existingItemIndex = cart.items.findIndex(
-      (item) =>
-        item.product.toString() === productId &&
-        item.variantId.toString() === variantId
+    const idx = cart.items.findIndex(
+      (i) =>
+        i.product.toString() === productId &&
+        i.variantId.toString() === variantId
     );
 
-    if (existingItemIndex > -1) {
-      // Update existing item quantity
-      cart.items[existingItemIndex].quantity += quantity;
+    if (idx > -1) {
+      cart.items[idx].quantity += quantity;
     } else {
-      // Add new item
       cart.items.push({
         product: new Types.ObjectId(productId),
         variantId: new Types.ObjectId(variantId),
@@ -42,54 +36,65 @@ class CartService {
       });
     }
 
-    // ✅ Auto-calculate totals using the new method
-    await cart.calculateTotals();
+    await cart.populate("items.product");
+    await cart.save();
+
     return this.getCart(userId);
   }
 
-  // ✅ Get cart with populated data
+  /* ---------- GET CART ---------- */
   async getCart(userId: string) {
     const cart = await Cart.findOne({ user: userId }).populate({
       path: "items.product",
-      select: "name title variants category slug price lowestDiscountedPrice",
-      populate: {
-        path: "category",
-        select: "name",
-      },
+      select: "name slug variants",
     });
 
     if (!cart) {
       return {
-        _id: null,
-        user: userId,
         items: [],
         totalItems: 0,
-        cartSubtotal: 0,
-        cartGST: 0,
+        cartListingTotal: 0,
+        totalDiscount: 0,
         cartTotal: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       };
     }
 
-    await cart.calculateTotals();
+    const items = cart.items.map((item: any) => {
+      const product = item.product;
+      const variant = product.variants.find(
+        (v: any) => v._id.toString() === item.variantId.toString()
+      );
 
-    const cartObj = cart.toObject();
+      return {
+        productId: product._id,
+        name: product.name,
+        slug: product.slug,
 
-    // Removed variant filtering block to send full variants
+        variantId: variant._id,
+        sku: variant.sku,
+        color: variant.color,
+        size: variant.size,
+
+        image: variant.images?.[0]?.thumbSafe || variant.images?.[0]?.url,
+        quantity: item.quantity,
+
+        listingPrice: variant.listingPrice,
+        sellingPrice: variant.sellingPrice,
+        discountPercent: variant.discountPercent,
+        hasDiscount: variant.hasDiscount,
+      };
+    });
 
     return {
-      _id: cartObj._id,
-      user: cartObj.user,
-      items: cartObj.items,
-      totalItems: cartObj.totalItems,
-      cartSubtotal: cartObj.cartSubtotal,
-      cartGST: cartObj.cartGST,
-      cartTotal: cartObj.cartTotal,
+      items,
+      totalItems: cart.totalItems,
+      cartListingTotal: cart.cartListingTotal,
+      totalDiscount: cart.totalDiscount,
+      cartTotal: cart.cartTotal,
     };
   }
 
-  // ✅ Update quantity with variant support
+  /* ---------- UPDATE QUANTITY ---------- */
   async updateQuantity(
     userId: string,
     productId: string,
@@ -103,56 +108,56 @@ class CartService {
     const cart = await Cart.findOne({ user: userId });
     if (!cart) throw new AppError("Cart not found", 404);
 
-    const itemIndex = cart.items.findIndex(
-      (item) =>
-        item.product.toString() === productId &&
-        item.variantId.toString() === variantId
+    const item = cart.items.find(
+      (i) =>
+        i.product.toString() === productId &&
+        i.variantId.toString() === variantId
     );
 
-    if (itemIndex === -1) {
-      throw new AppError("Item not found in cart", 404);
-    }
+    if (!item) throw new AppError("Item not found", 404);
 
-    cart.items[itemIndex].quantity = quantity;
+    item.quantity = quantity;
 
-    await cart.calculateTotals();
+    await cart.populate("items.product");
+    await cart.save();
 
     return this.getCart(userId);
   }
 
-  // ✅ Remove item with variant support
+  /* ---------- REMOVE ITEM ---------- */
   async removeItem(userId: string, productId: string, variantId: string) {
     const cart = await Cart.findOne({ user: userId });
     if (!cart) throw new AppError("Cart not found", 404);
 
-    const itemIndex = cart.items.findIndex(
-      (item) =>
-        item.product.toString() === productId &&
-        item.variantId.toString() === variantId
+    cart.items = cart.items.filter(
+      (i) =>
+        !(
+          i.product.toString() === productId &&
+          i.variantId.toString() === variantId
+        )
     );
 
-    if (itemIndex === -1) {
-      throw new AppError("Item not found in cart", 404);
-    }
-
-    cart.items.splice(itemIndex, 1);
-    await cart.calculateTotals();
+    await cart.populate("items.product");
+    await cart.save();
 
     return this.getCart(userId);
   }
 
-  // ✅ Clear entire cart
+  /* ---------- CLEAR CART ---------- */
   async clearCart(userId: string) {
     const cart = await Cart.findOne({ user: userId });
     if (!cart) throw new AppError("Cart not found", 404);
 
     cart.items = [];
-    await cart.save(); // Will auto-calculate totals as 0
+    cart.cartListingTotal = 0;
+    cart.totalDiscount = 0;
+    cart.cartTotal = 0;
+    cart.totalItems = 0;
+
+    await cart.save();
 
     return this.getCart(userId);
   }
-
-  // ✅ Get cart count (total items)
   async getCartCount(userId: string) {
     const cart = await Cart.findOne({ user: userId }).select("totalItems");
     return cart?.totalItems || 0;

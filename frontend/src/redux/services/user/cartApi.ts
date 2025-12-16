@@ -51,124 +51,90 @@ export const cartApi = createApi({
         method: "PUT",
         data: { productId, variantId, quantity },
       }),
-      async onQueryStarted(arg, { dispatch, getState, queryFulfilled }) {
-        console.log("🟡 Optimistic update started:", arg);
-
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         let optimisticTotals = {
           totalItems: 0,
-          cartSubtotal: 0,
-          cartGST: 0,
+          cartListingTotal: 0,
+          totalDiscount: 0,
           cartTotal: 0,
         };
 
         const patchResult = dispatch(
           cartApi.util.updateQueryData("getCart", undefined, (draft) => {
-            if (!draft.items || draft.items.length === 0) {
-              console.log("No items found for optimistic patch");
-              return;
-            }
+            if (!draft.items || draft.items.length === 0) return;
 
             const existingItem = draft.items.find(
               (item) =>
-                item.product?._id === arg.productId &&
+                item.productId === arg.productId &&
                 item.variantId === arg.variantId
             );
-            if (!existingItem) {
-              console.warn("No matching item found in cache");
-              return;
-            }
 
+            if (!existingItem) return;
+
+            // ✅ update quantity
             existingItem.quantity = arg.quantity;
 
-            let subtotal = 0;
-            let gstAmount = 0;
+            let listingTotal = 0;
+            let discountTotal = 0;
 
             draft.items.forEach((item) => {
-              const variant =
-                item.variant ??
-                item.product?.variants?.find((v) => v._id === item.variantId);
-              if (!variant) return;
+              const qty = item.quantity;
 
-              const price = variant.price ?? variant.basePrice ?? 0;
-              const basePrice = variant.basePrice ?? 0;
-              const quantity = item.quantity;
+              const listing = (item.listingPrice ?? 0) * qty;
+              const selling = (item.sellingPrice ?? 0) * qty;
 
-              let itemBasePrice = 0,
-                itemGSTAmount = 0,
-                itemFinalPrice = 0;
-
-              if (
-                variant.hasDiscount &&
-                variant.discountedPrice !== undefined
-              ) {
-                itemFinalPrice = variant.discountedPrice * quantity;
-                itemBasePrice = basePrice * quantity;
-                itemGSTAmount = itemFinalPrice - itemBasePrice;
-              } else {
-                itemFinalPrice = price * quantity;
-                itemBasePrice = basePrice * quantity;
-                itemGSTAmount = itemFinalPrice - itemBasePrice;
-              }
-
-              subtotal += itemBasePrice;
-              gstAmount += itemGSTAmount;
+              listingTotal += listing;
+              discountTotal += Math.max(0, listing - selling);
             });
 
-            const itemsArray = draft.items as unknown as CartItem[];
-            draft.totalItems = itemsArray.reduce(
-              (acc, item) => acc + item.quantity,
-              0
-            );
+            let totalItems = 0;
 
-            draft.cartSubtotal = subtotal;
-            draft.cartGST = gstAmount;
-            draft.cartTotal = subtotal + gstAmount;
+            for (const item of draft.items) {
+              totalItems += item.quantity;
+            }
+
+            draft.totalItems = totalItems;
+
+            draft.cartListingTotal = Math.round(listingTotal);
+            draft.totalDiscount = Math.round(discountTotal);
+            draft.cartTotal = Math.round(listingTotal - discountTotal);
 
             optimisticTotals = {
               totalItems: draft.totalItems,
-              cartSubtotal: draft.cartSubtotal,
-              cartGST: draft.cartGST,
+              cartListingTotal: draft.cartListingTotal,
+              totalDiscount: draft.totalDiscount,
               cartTotal: draft.cartTotal,
             };
-
-          
           })
         );
 
-        if (debounceTimers.has(arg.productId + "-" + arg.variantId)) {
-          clearTimeout(debounceTimers.get(arg.productId + "-" + arg.variantId));
-        }
-
         try {
           const serverResponse = await queryFulfilled;
-
-          // Agar andar "data" field hai to use karo, warna direct use karo
           const serverData =
-            (serverResponse.data as any).data ?? serverResponse.data;
-          
+            (serverResponse.data as any)?.data ?? serverResponse.data;
 
-         
           const totalsMatch =
             serverData.totalItems === optimisticTotals.totalItems &&
             numbersCloseEnough(
-              serverData.cartSubtotal,
-              optimisticTotals.cartSubtotal
+              serverData.cartListingTotal,
+              optimisticTotals.cartListingTotal
             ) &&
-            numbersCloseEnough(serverData.cartGST, optimisticTotals.cartGST) &&
+            numbersCloseEnough(
+              serverData.totalDiscount,
+              optimisticTotals.totalDiscount
+            ) &&
             numbersCloseEnough(
               serverData.cartTotal,
               optimisticTotals.cartTotal
             );
 
           if (!totalsMatch) {
-            console.warn("❌ Totals mismatch! Rolling back optimistic update.");
             patchResult.undo();
-            throw new Error("Optimistic totals mismatch rollback");
+            throw new Error("Optimistic totals mismatch");
           }
 
           dispatch(cartApi.util.invalidateTags(["Cart"]));
-        } catch (error) {
-          console.error("API update error, rolling back", error);
+        } catch (err) {
           patchResult.undo();
         }
       },

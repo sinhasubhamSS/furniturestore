@@ -196,7 +196,12 @@ export default function CheckoutPage() {
   // redirect if no checkout data
   useEffect(() => {
     if (!isRehydrated) return;
-    if (!type || items.length === 0) {
+
+    // cart_purchase: cart API se aane do
+    if (type === "cart_purchase") return;
+
+    // direct_purchase: item required
+    if (type === "direct_purchase" && items.length === 0) {
       router.push("/cart");
     }
   }, [type, items, router, isRehydrated]);
@@ -206,7 +211,7 @@ export default function CheckoutPage() {
     const item = checkoutItems[index];
     if (!item) return;
     const variant = item.product.variants?.find(
-      (v:Variant) => v._id === item.variantId
+      (v: Variant) => v._id === item.variantId
     );
     if (!variant) return;
 
@@ -300,7 +305,11 @@ export default function CheckoutPage() {
   }
 
   // empty state
-  if (checkoutItems.length === 0) {
+  if (
+    type === "direct_purchase" &&
+    isRehydrated &&
+    checkoutItems.length === 0
+  ) {
     return (
       <div
         className="min-h-screen flex items-center justify-center"
