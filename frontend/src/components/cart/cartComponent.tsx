@@ -4,22 +4,7 @@ import Image from "next/image";
 import ActionButton from "@/components/ui/ActionButton";
 import { Minus, Plus } from "lucide-react";
 import React from "react";
-
-type CartItem = {
-  productId: string;
-  name: string;
-  slug: string;
-  variantId: string;
-  sku: string;
-  color?: string;
-  size?: string;
-  image?: string;
-  quantity: number;
-  listingPrice: number;
-  sellingPrice: number;
-  discountPercent: number;
-  hasDiscount: boolean;
-};
+import { CartItem } from "@/types/cart";
 
 type Props = {
   item: CartItem;
@@ -29,15 +14,23 @@ type Props = {
 
 const ProductCartItem = React.memo(
   ({ item, onRemove, onQuantityChange }: Props) => {
+    // ✅ Guaranteed by backend
+    const variant = item.product.variants[0]!;
+
+    const image =
+      variant.images?.[0]?.thumbSafe ||
+      variant.images?.[0]?.url ||
+      "/placeholder.jpg";
+
     return (
       <div className="bg-[var(--color-card)] rounded shadow-sm border border-[var(--color-border-custom)]">
         <div className="flex gap-4 p-3">
-          {/* Image + Qty */}
+          {/* IMAGE + QTY */}
           <div className="flex flex-col items-center gap-2">
             <div className="w-24 h-24 rounded bg-[var(--color-secondary)] overflow-hidden border">
               <Image
-                src={item.image || "/placeholder.jpg"}
-                alt={item.name}
+                src={image}
+                alt={item.product.name}
                 width={96}
                 height={96}
                 className="w-full h-full object-contain"
@@ -53,7 +46,9 @@ const ProductCartItem = React.memo(
                 }
                 disabled={item.quantity <= 1}
               />
-              <span className="px-2 text-sm font-medium">{item.quantity}</span>
+              <span className="px-2 text-sm font-medium">
+                {item.quantity}
+              </span>
               <ActionButton
                 icon={Plus}
                 size="sm"
@@ -62,27 +57,30 @@ const ProductCartItem = React.memo(
             </div>
           </div>
 
-          {/* Info */}
+          {/* INFO */}
           <div className="flex-1">
-            <h3 className="font-semibold truncate">{item.name}</h3>
+            <h3 className="font-semibold truncate">
+              {item.product.name}
+            </h3>
 
             <p className="text-sm text-[var(--text-accent)]">
-              {item.color} {item.size ? `• ${item.size}` : ""}
+              {variant.color}
+              {variant.size ? ` • ${variant.size}` : ""}
             </p>
 
-            {/* Price */}
+            {/* PRICE */}
             <div className="mt-2 flex items-center gap-2">
               <span className="text-lg font-bold">
-                ₹{item.sellingPrice.toLocaleString()}
+                ₹{variant.sellingPrice!.toLocaleString()}
               </span>
 
-              {item.hasDiscount && (
+              {variant.hasDiscount && (
                 <>
                   <span className="line-through text-gray-500 text-sm">
-                    ₹{item.listingPrice.toLocaleString()}
+                    ₹{variant.listingPrice!.toLocaleString()}
                   </span>
                   <span className="text-green-600 text-xs font-semibold">
-                    {item.discountPercent}% OFF
+                    {variant.discountPercent}% OFF
                   </span>
                 </>
               )}
@@ -101,4 +99,5 @@ const ProductCartItem = React.memo(
   }
 );
 
+ProductCartItem.displayName = "ProductCartItem";
 export default ProductCartItem;

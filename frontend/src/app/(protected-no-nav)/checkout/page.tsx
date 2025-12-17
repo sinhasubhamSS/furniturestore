@@ -70,21 +70,34 @@ export default function CheckoutPage() {
       const item = items[0];
       const variant = product.variants?.find((v) => v._id === item.variantId);
       if (!variant) return 0;
-      const price = variant.hasDiscount
-        ? variant.discountedPrice ?? 0
-        : variant.price ?? 0;
+      const sellingPrice =
+        variant.sellingPrice ??
+        variant.discountedPrice ?? // backup
+        0;
+
+      const listingPrice =
+        variant.listingPrice ?? variant.price ?? sellingPrice;
+
+      const price = variant.hasDiscount ? sellingPrice : listingPrice;
+
       return price * item.quantity;
     }
 
     if (type === "cart_purchase" && cartData?.items?.length) {
       return cartData.items.reduce((sum, item) => {
-        const variant = item.product?.variants.find(
-          (v) => v._id === item.variantId
-        );
+        const variant = item.product.variants[0];
         if (!variant) return sum;
-        const price = variant.hasDiscount
-          ? variant.discountedPrice ?? 0
-          : variant.price ?? 0;
+
+        const sellingPrice =
+          variant.sellingPrice ??
+          variant.discountedPrice ?? // backup
+          0;
+
+        const listingPrice =
+          variant.listingPrice ?? variant.price ?? sellingPrice;
+
+        const price = variant.hasDiscount ? sellingPrice : listingPrice;
+
         return sum + price * item.quantity;
       }, 0);
     }
@@ -94,46 +107,78 @@ export default function CheckoutPage() {
 
   // checkout items shape (same)
   const checkoutItems: CheckoutItem[] = useMemo(() => {
+    // ---------- DIRECT PURCHASE ----------
     if (type === "direct_purchase" && items.length > 0 && product) {
       const item = items[0];
       const selectedVariant = product.variants?.find(
         (v) => v._id === item.variantId
       );
-      if (selectedVariant) {
-        return [
-          {
-            product,
-            variantId: selectedVariant._id!,
-            quantity: item.quantity,
-          },
-        ];
-      }
-    } else if (type === "cart_purchase" && cartData?.items?.length) {
-      return cartData.items
-        .filter((item) => item.product !== undefined)
-        .map((item) => ({
-          product: item.product!,
-          variantId: item.variantId,
+
+      if (!selectedVariant) return [];
+
+      return [
+        {
           quantity: item.quantity,
-        }));
+          variantId: selectedVariant._id!,
+
+          product: {
+            _id: product._id,
+            name: product.name,
+            slug: product.slug,
+            variants: [selectedVariant], // 👈 ONLY selected variant
+          },
+        },
+      ];
     }
+
+    // ---------- CART PURCHASE ----------
+    if (type === "cart_purchase" && cartData?.items?.length) {
+      return cartData.items.map((item) => {
+        const variant = item.product.variants[0]!;
+
+        return {
+          quantity: item.quantity,
+          variantId: variant._id!, // 👈 derived from variant
+
+          product: {
+            _id: item.product._id,
+            name: item.product.name,
+            slug: item.product.slug,
+            variants: [variant], // 👈 exactly one
+          },
+        };
+      });
+    }
+
     return [];
   }, [type, items, product, cartData]);
 
   // fetch pricing when address chosen (same logic)
   useEffect(() => {
-    if (!isRehydrated || !selectedAddress?.pincode || items.length === 0)
-      return;
+    if (!isRehydrated || !selectedAddress?.pincode) return;
+
+    // 🔒 cart_purchase: cartData must be present
+    if (type === "cart_purchase" && !cartData?.items?.length) return;
+
+    // 🔒 direct_purchase: redux items must be present
+    if (type === "direct_purchase" && items.length === 0) return;
 
     let cancelled = false;
     const fetchPricing = async () => {
       setLoadingPricing(true);
       try {
-        const orderItems = items.map((item) => ({
-          productId: item.productId,
-          variantId: item.variantId || "",
-          quantity: item.quantity,
-        }));
+        const orderItems =
+          type === "cart_purchase"
+            ? (cartData?.items ?? []).map((item) => ({
+                productId: item.product._id,
+                variantId: item.product.variants[0]._id,
+                quantity: item.quantity,
+              }))
+            : items.map((item) => ({
+                productId: item.productId,
+                variantId: item.variantId!,
+                quantity: item.quantity,
+              }));
 
         const response = await getCheckoutPricing({
           items: orderItems,

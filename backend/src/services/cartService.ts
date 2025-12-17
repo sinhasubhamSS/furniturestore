@@ -43,56 +43,71 @@ class CartService {
   }
 
   /* ---------- GET CART ---------- */
-  async getCart(userId: string) {
-    const cart = await Cart.findOne({ user: userId }).populate({
-      path: "items.product",
-      select: "name slug variants",
-    });
+async getCart(userId: string) {
+  const cart = await Cart.findOne({ user: userId }).populate({
+    path: "items.product",
+    select: "name slug variants",
+  });
 
-    if (!cart) {
-      return {
-        items: [],
-        totalItems: 0,
-        cartListingTotal: 0,
-        totalDiscount: 0,
-        cartTotal: 0,
-      };
-    }
+  if (!cart) {
+    return {
+      items: [],
+      totalItems: 0,
+      cartListingTotal: 0,
+      totalDiscount: 0,
+      cartTotal: 0,
+    };
+  }
 
-    const items = cart.items.map((item: any) => {
+  const items = cart.items
+    .map((item: any) => {
       const product = item.product;
+
       const variant = product.variants.find(
         (v: any) => v._id.toString() === item.variantId.toString()
       );
 
+      if (!variant) return null;
+
       return {
-        productId: product._id,
-        name: product.name,
-        slug: product.slug,
-
-        variantId: variant._id,
-        sku: variant.sku,
-        color: variant.color,
-        size: variant.size,
-
-        image: variant.images?.[0]?.thumbSafe || variant.images?.[0]?.url,
         quantity: item.quantity,
 
-        listingPrice: variant.listingPrice,
-        sellingPrice: variant.sellingPrice,
-        discountPercent: variant.discountPercent,
-        hasDiscount: variant.hasDiscount,
-      };
-    });
+        product: {
+          _id: product._id,
+          name: product.name,
+          slug: product.slug,
 
-    return {
-      items,
-      totalItems: cart.totalItems,
-      cartListingTotal: cart.cartListingTotal,
-      totalDiscount: cart.totalDiscount,
-      cartTotal: cart.cartTotal,
-    };
-  }
+          // ✅ ONLY requested variant
+          variants: [
+            {
+              _id: variant._id,
+              sku: variant.sku,
+              color: variant.color,
+              size: variant.size,
+
+              listingPrice: variant.listingPrice,
+              sellingPrice: variant.sellingPrice,
+              discountPercent: variant.discountPercent,
+              hasDiscount: variant.hasDiscount,
+
+              stock: variant.stock ?? 0,
+              images: variant.images ?? [],
+            },
+          ],
+        },
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    items,
+    totalItems: cart.totalItems,
+    cartListingTotal: cart.cartListingTotal,
+    totalDiscount: cart.totalDiscount,
+    cartTotal: cart.cartTotal,
+  };
+}
+
 
   /* ---------- UPDATE QUANTITY ---------- */
   async updateQuantity(

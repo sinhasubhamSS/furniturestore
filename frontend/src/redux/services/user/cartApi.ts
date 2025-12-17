@@ -51,6 +51,7 @@ export const cartApi = createApi({
         method: "PUT",
         data: { productId, variantId, quantity },
       }),
+
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         let optimisticTotals = {
           totalItems: 0,
@@ -63,11 +64,14 @@ export const cartApi = createApi({
           cartApi.util.updateQueryData("getCart", undefined, (draft) => {
             if (!draft.items || draft.items.length === 0) return;
 
-            const existingItem = draft.items.find(
-              (item) =>
-                item.productId === arg.productId &&
-                item.variantId === arg.variantId
-            );
+            // 🔥 FIND ITEM USING NEW STRUCTURE
+            const existingItem = draft.items.find((item) => {
+              const variant = item.product.variants[0];
+              return (
+                item.product._id === arg.productId &&
+                variant?._id === arg.variantId
+              );
+            });
 
             if (!existingItem) return;
 
@@ -76,25 +80,23 @@ export const cartApi = createApi({
 
             let listingTotal = 0;
             let discountTotal = 0;
+            let totalItems = 0;
 
+            // 🔥 RECALCULATE TOTALS USING VARIANT
             draft.items.forEach((item) => {
               const qty = item.quantity;
+              const variant = item.product.variants[0];
+              if (!variant) return;
 
-              const listing = (item.listingPrice ?? 0) * qty;
-              const selling = (item.sellingPrice ?? 0) * qty;
+              const listing = (variant.listingPrice ?? 0) * qty;
+              const selling = (variant.sellingPrice ?? 0) * qty;
 
               listingTotal += listing;
               discountTotal += Math.max(0, listing - selling);
+              totalItems += qty;
             });
 
-            let totalItems = 0;
-
-            for (const item of draft.items) {
-              totalItems += item.quantity;
-            }
-
             draft.totalItems = totalItems;
-
             draft.cartListingTotal = Math.round(listingTotal);
             draft.totalDiscount = Math.round(discountTotal);
             draft.cartTotal = Math.round(listingTotal - discountTotal);

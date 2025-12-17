@@ -1,19 +1,26 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useMemo } from "react";
-import React from "react";
-import { Product, DisplayProduct } from "@/types/Product";
+import React, { useMemo, useState } from "react";
+import { Variant } from "@/types/Product";
+
+/* ---------- Types ---------- */
+export type CheckoutProductSnapshot = {
+  _id: string;
+  name: string;
+  slug: string;
+  variants: Variant[]; // ALWAYS exactly one variant
+};
 
 export type CheckoutItem = {
-  product: Product | DisplayProduct;
+  product: CheckoutProductSnapshot;
   variantId: string;
   quantity: number;
 };
 
 interface CheckoutSummaryProps {
   items: CheckoutItem[];
-  subtotal?: number; // optional: parent can pass subtotal for totals calculation
+  subtotal?: number;
   allowQuantityEdit?: boolean;
   onQuantityChange?: (index: number, quantity: number) => void | Promise<void>;
   pricingData?: any;
@@ -21,11 +28,10 @@ interface CheckoutSummaryProps {
   deliveryInfo?: any;
   deliveryAvailable?: boolean;
   hasSelectedAddress?: boolean;
-  /** If true, show subtotal/packaging/delivery/total inside this component.
-   * Default false because your right-side totals already show them. */
   showTotals?: boolean;
 }
 
+/* ---------- Component ---------- */
 const CheckoutSummary = React.memo(
   ({
     items,
@@ -35,18 +41,12 @@ const CheckoutSummary = React.memo(
     pricingData,
     loadingPricing = false,
     deliveryAvailable = true,
-    hasSelectedAddress = false,
     showTotals = false,
   }: CheckoutSummaryProps) => {
     const [showBreakdown, setShowBreakdown] = useState(false);
 
     const safeToFixed = (value: number | undefined | null, decimals = 2) => {
-      if (
-        typeof value !== "number" ||
-        value === null ||
-        value === undefined ||
-        isNaN(value)
-      )
+      if (typeof value !== "number" || isNaN(value))
         return (0).toFixed(decimals);
       return value.toFixed(decimals);
     };
@@ -66,30 +66,24 @@ const CheckoutSummary = React.memo(
 
     return (
       <aside
-        role="region"
-        aria-labelledby="order-summary-heading"
         style={{
           background: "var(--color-surface)",
           padding: 12,
           borderRadius: 10,
         }}
       >
+        {/* Header */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
             marginBottom: 8,
           }}
         >
-          <h3
-            id="order-summary-heading"
-            style={{ fontSize: 15, fontWeight: 700, color: "var(--text-dark)" }}
-          >
+          <h3 style={{ fontSize: 15, fontWeight: 700 }}>
             Items ({items.length})
           </h3>
 
-          {/* Details toggle only toggles a lightweight breakdown UI (not main totals) */}
           <button
             onClick={() => setShowBreakdown((s) => !s)}
             style={{
@@ -98,25 +92,30 @@ const CheckoutSummary = React.memo(
               color: "var(--color-accent)",
               cursor: "pointer",
             }}
-            aria-expanded={showBreakdown}
-            aria-controls="order-items-breakdown"
           >
             {showBreakdown ? "Hide" : "Details"}
           </button>
         </div>
 
-        <div
-          style={{ display: "grid", gap: 8, maxHeight: 320, overflow: "auto" }}
-        >
+        {/* Items */}
+        <div style={{ display: "grid", gap: 8 }}>
           {items.map(({ product, variantId, quantity }, idx) => {
-            const selectedVariant = product.variants?.find(
-              (v) => v._id === variantId
-            );
-            if (!selectedVariant) return null;
+            const variant = product.variants.find((v) => v._id === variantId);
+            if (!variant) return null;
 
-            const finalPrice = selectedVariant.hasDiscount
-              ? selectedVariant.discountedPrice ?? 0
-              : selectedVariant.price ?? 0;
+            /* ---------- PRICE RESOLUTION (FINAL RULE) ---------- */
+            const sellingPrice =
+              variant.sellingPrice ??
+              variant.discountedPrice ?? // BACKUP only
+              0;
+
+            const listingPrice =
+              variant.listingPrice ?? variant.price ?? sellingPrice;
+
+            const finalPrice = variant.hasDiscount
+              ? sellingPrice
+              : listingPrice;
+
             const itemTotal = finalPrice * quantity;
 
             return (
@@ -125,12 +124,12 @@ const CheckoutSummary = React.memo(
                 style={{
                   display: "flex",
                   gap: 10,
-                  alignItems: "center",
                   padding: 8,
                   borderRadius: 8,
                   background: "var(--color-surface)",
                 }}
               >
+                {/* Image */}
                 <div
                   style={{
                     width: 64,
@@ -138,16 +137,10 @@ const CheckoutSummary = React.memo(
                     borderRadius: 8,
                     overflow: "hidden",
                     background: "var(--color-primary)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: 6,
-                    flexShrink: 0,
                   }}
-                  aria-hidden="true"
                 >
                   <Image
-                    src={selectedVariant.images?.[0]?.url || "/placeholder.jpg"}
+                    src={variant.images?.[0]?.url || "/placeholder.jpg"}
                     alt={product.name}
                     width={64}
                     height={64}
@@ -155,17 +148,9 @@ const CheckoutSummary = React.memo(
                   />
                 </div>
 
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                    title={product.name}
-                  >
+                {/* Info */}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>
                     {product.name}
                   </div>
 
@@ -176,24 +161,34 @@ const CheckoutSummary = React.memo(
                       marginTop: 4,
                     }}
                   >
-                    {selectedVariant.color
-                      ? `${selectedVariant.color}${
-                          selectedVariant.size
-                            ? ` • ${selectedVariant.size}`
-                            : ""
-                        }`
-                      : selectedVariant.size || ""}
+                    {variant.color}
+                    {variant.size ? ` • ${variant.size}` : ""}
                   </div>
 
+                  {/* PRICE ROW */}
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 8,
+                      gap: 6,
                       marginTop: 6,
                     }}
                   >
-                    <div
+                    {/* MRP (cut) */}
+                    {variant.hasDiscount && (
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: "var(--text-accent)",
+                          textDecoration: "line-through",
+                        }}
+                      >
+                        ₹{safeToFixed(listingPrice)}
+                      </span>
+                    )}
+
+                    {/* Selling / Final */}
+                    <span
                       style={{
                         fontSize: 13,
                         fontWeight: 700,
@@ -201,78 +196,48 @@ const CheckoutSummary = React.memo(
                       }}
                     >
                       ₹{safeToFixed(finalPrice)}
-                    </div>
+                    </span>
 
+                    {/* Discount */}
+                    {variant.hasDiscount &&
+                      (variant.discountPercent ?? 0) > 0 && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "green",
+                          }}
+                        >
+                          {variant.discountPercent ?? 0}% OFF
+                        </span>
+                      )}
+
+                    {/* Quantity + Total */}
                     <div
-                      style={{
-                        marginLeft: "auto",
-                        display: "flex",
-                        gap: 8,
-                        alignItems: "center",
-                      }}
+                      style={{ marginLeft: "auto", display: "flex", gap: 8 }}
                     >
                       {allowQuantityEdit && onQuantityChange ? (
                         <>
                           <button
-                            aria-label={`Decrease quantity for ${product.name}`}
                             onClick={() =>
                               onQuantityChange(idx, Math.max(1, quantity - 1))
                             }
                             disabled={quantity <= 1}
-                            style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: 999,
-                              background: "var(--color-surface-secondary)",
-                              border: "none",
-                              cursor: quantity <= 1 ? "not-allowed" : "pointer",
-                              fontSize: 14,
-                            }}
                           >
                             −
                           </button>
-                          <div
-                            style={{
-                              minWidth: 28,
-                              textAlign: "center",
-                              fontWeight: 600,
-                            }}
-                          >
-                            {quantity}
-                          </div>
+                          <strong>{quantity}</strong>
                           <button
-                            aria-label={`Increase quantity for ${product.name}`}
                             onClick={() => onQuantityChange(idx, quantity + 1)}
-                            style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: 999,
-                              background: "var(--color-surface-secondary)",
-                              border: "none",
-                              cursor: "pointer",
-                              fontSize: 14,
-                            }}
                           >
                             +
                           </button>
                         </>
                       ) : (
-                        <div
-                          style={{ fontSize: 12, color: "var(--text-accent)" }}
-                        >
-                          x{quantity}
-                        </div>
+                        <span>x{quantity}</span>
                       )}
 
-                      <div
-                        style={{
-                          fontSize: 13,
-                          color: "var(--text-accent)",
-                          fontWeight: 600,
-                        }}
-                      >
-                        ₹{safeToFixed(itemTotal)}
-                      </div>
+                      <strong>₹{safeToFixed(itemTotal)}</strong>
                     </div>
                   </div>
                 </div>
@@ -281,75 +246,18 @@ const CheckoutSummary = React.memo(
           })}
         </div>
 
-        {/* Optional totals block: shown only when showTotals=true */}
+        {/* Totals (optional) */}
         {showTotals && (
-          <div
-            id="order-items-breakdown"
-            style={{
-              borderTop: `1px solid var(--color-border-custom)`,
-              paddingTop: 10,
-              marginTop: 10,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: 6,
-              }}
-            >
-              <span style={{ color: "var(--text-accent)", fontSize: 13 }}>
-                Subtotal
-              </span>
-              <span style={{ fontWeight: 700 }}>₹{safeToFixed(subtotal)}</span>
+          <div style={{ marginTop: 12 }}>
+            <div>Subtotal: ₹{safeToFixed(subtotal)}</div>
+            <div>Packaging: ₹{safeToFixed(packagingFee)}</div>
+            <div>
+              Delivery:{" "}
+              {deliveryCharge === 0
+                ? "FREE"
+                : `₹${safeToFixed(deliveryCharge)}`}
             </div>
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: 8,
-              }}
-            >
-              <span style={{ color: "var(--text-accent)", fontSize: 13 }}>
-                Packaging
-              </span>
-              <span>₹{safeToFixed(packagingFee)}</span>
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: 8,
-              }}
-            >
-              <span style={{ color: "var(--text-accent)", fontSize: 13 }}>
-                Delivery
-              </span>
-              <span>
-                {loadingPricing
-                  ? "Checking..."
-                  : deliveryCharge === 0
-                  ? "FREE"
-                  : `₹${safeToFixed(deliveryCharge)}`}
-              </span>
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginTop: 8,
-                paddingTop: 8,
-                borderTop: `1px solid var(--color-border-custom)`,
-              }}
-            >
-              <span style={{ fontWeight: 800 }}>Total</span>
-              <span style={{ fontWeight: 800, color: "var(--color-accent)" }}>
-                ₹{safeToFixed(grandTotal)}
-              </span>
-            </div>
+            <strong>Total: ₹{safeToFixed(grandTotal)}</strong>
           </div>
         )}
       </aside>
