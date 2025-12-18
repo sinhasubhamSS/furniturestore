@@ -23,11 +23,9 @@ const APP_CONFIG = {
 const generateIdempotencyKey = () =>
   `order_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-const safeNumber = (v: any) =>
-  typeof v === "number" && !isNaN(v) ? v : 0;
+const safeNumber = (v: any) => (typeof v === "number" && !isNaN(v) ? v : 0);
 
-const safeToFixed = (v: any, d = 2) =>
-  safeNumber(v).toFixed(d);
+const safeToFixed = (v: any, d = 2) => safeNumber(v).toFixed(d);
 
 /* ================= COMPONENT ================= */
 
@@ -41,17 +39,17 @@ const PaymentPage = () => {
     selectedAddress: shippingAddress,
   } = useSelector((state: RootState) => state.checkout);
 
-  /* ---------- MUTATIONS ---------- */
+  /* ================= MUTATIONS ================= */
 
-  const [createOrder, { isLoading: placingOrder }] =
-    useCreateOrderMutation();
+  const [createOrder, { isLoading: placingOrder }] = useCreateOrderMutation();
   const [createRazorpayOrder] = useCreateRazorpayOrderMutation();
   const [getCheckoutPricing] = useGetCheckoutPricingMutation();
 
-  /* ---------- LOCAL STATE ---------- */
+  /* ================= LOCAL STATE ================= */
 
-  const [selectedMethod, setSelectedMethod] =
-    useState<PaymentMethod | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(
+    null
+  );
   const [pricingData, setPricingData] = useState<any>(null);
   const [loadingPricing, setLoadingPricing] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState("");
@@ -60,7 +58,7 @@ const PaymentPage = () => {
     setIdempotencyKey(generateIdempotencyKey());
   }, []);
 
-  /* ================= ORDER ITEMS (REDUX ONLY) ================= */
+  /* ================= ORDER ITEMS (REDUX = SOURCE OF TRUTH) ================= */
 
   const orderItems = useMemo(() => {
     return items.map((it) => ({
@@ -70,7 +68,7 @@ const PaymentPage = () => {
     }));
   }, [items]);
 
-  /* ================= PRICING (BACKEND = SOURCE OF TRUTH) ================= */
+  /* ================= PRICING (BACKEND AUTHORITY) ================= */
 
   useEffect(() => {
     if (!shippingAddress?.pincode || orderItems.length === 0) return;
@@ -100,7 +98,7 @@ const PaymentPage = () => {
           });
         }
       } catch (e) {
-        console.error("Pricing fetch failed", e);
+        console.error("❌ Pricing fetch failed", e);
       } finally {
         if (!cancelled) setLoadingPricing(false);
       }
@@ -111,7 +109,7 @@ const PaymentPage = () => {
     };
   }, [shippingAddress?.pincode, orderItems]);
 
-  /* ================= PAYABLE AMOUNT ================= */
+  /* ================= TOTAL CALC ================= */
 
   const payableNow = useMemo(() => {
     if (!pricingData) return 0;
@@ -146,11 +144,11 @@ const PaymentPage = () => {
   /* ================= PAYMENT HANDLER ================= */
 
   const handlePayment = async () => {
-    if (!selectedMethod) return alert("Select payment method");
-    if (!shippingAddress) return alert("Select address");
+    if (!selectedMethod) return alert("Please select payment method");
+    if (!shippingAddress) return alert("Please select address");
     if (!pricingData) return alert("Pricing not ready");
 
-    /* ---------- COD ---------- */
+    // COD
     if (selectedMethod === "COD") {
       const res: OrderCreationResponse = await createOrder({
         data: {
@@ -167,10 +165,9 @@ const PaymentPage = () => {
       return;
     }
 
-    /* ---------- ONLINE / ADVANCE ---------- */
-
+    // ONLINE / ADVANCE
     const ok = await loadRazorpay();
-    if (!ok) return alert("Razorpay load failed");
+    if (!ok) return alert("Payment system failed to load");
 
     const razorpayOrder = await createRazorpayOrder(payableNow).unwrap();
 
@@ -210,7 +207,7 @@ const PaymentPage = () => {
   if (loadingPricing) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        Loading payment…
+        Loading payment details…
       </div>
     );
   }
@@ -223,63 +220,269 @@ const PaymentPage = () => {
     );
   }
 
-  /* ================= UI ================= */
+  /* ================= PREMIUM UI ================= */
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">Choose Payment Method</h1>
+    <div className="min-h-screen bg-[--color-primary] py-8 px-4">
+      <div className="max-w-2xl mx-auto">
+        {/* ONLY THIS CARD IS WHITE */}
+        <div
+          className="bg-white rounded-xl shadow-lg border border-gray-200
+                      transition-all duration-300 hover:shadow-xl"
+        >
+          {/* HEADER */}
+          <div className="p-6 border-b border-gray-200 text-center">
+            <h1 className="text-2xl font-bold text-gray-800">
+              Choose Payment Method
+            </h1>
+            <p className="text-gray-600 mt-1">Complete your order safely</p>
+          </div>
 
-      <div className="space-y-4 mb-6">
-        <label className="block border p-4 rounded cursor-pointer">
-          <input
-            type="radio"
-            checked={selectedMethod === "RAZORPAY"}
-            onChange={() => setSelectedMethod("RAZORPAY")}
-            className="mr-2"
-          />
-          Pay Online – ₹{safeToFixed(pricingData.checkoutTotal)}
-        </label>
+          {/* PAYMENT OPTIONS */}
+          <div className="p-6 space-y-4">
+            {/* ================= ONLINE PAYMENT ================= */}
+            <label
+              className={`block p-4 rounded-lg border-2 cursor-pointer
+              transition-all duration-200 ease-out
+              hover:-translate-y-0.5 hover:shadow-lg
+              ${
+                selectedMethod === "RAZORPAY"
+                  ? "border-blue-500 bg-blue-50 shadow-md scale-[1.01]"
+                  : "border-gray-200 hover:bg-gray-50"
+              }`}
+            >
+              <input
+                type="radio"
+                className="sr-only"
+                checked={selectedMethod === "RAZORPAY"}
+                onChange={() => setSelectedMethod("RAZORPAY")}
+              />
 
-        {pricingData.advanceEligible && (
-          <label className="block border p-4 rounded cursor-pointer">
-            <input
-              type="radio"
-              checked={selectedMethod === "ADVANCE"}
-              onChange={() => setSelectedMethod("ADVANCE")}
-              className="mr-2"
-            />
-            {pricingData.advancePercentage}% Advance – Pay ₹
-            {safeToFixed(
-              pricingData.advanceAmount +
-                pricingData.packagingFee +
-                pricingData.deliveryCharge
+              <div className="flex items-start">
+                <span className="text-3xl mr-4">💳</span>
+
+                <div className="flex-1">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h4 className="font-semibold text-gray-800">
+                        Pay Online (Full Amount)
+                      </h4>
+                      <p className="text-sm text-gray-600 mt-1">
+                        UPI • Cards • Net Banking
+                      </p>
+                      <p className="text-xs text-green-600 mt-1">
+                        ✅ Secure & No extra charges
+                      </p>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-xl font-bold text-blue-600 transition-all duration-300">
+                        ₹
+                        {safeToFixed(
+                          pricingData.subtotal +
+                            pricingData.packagingFee +
+                            pricingData.deliveryCharge
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500">Pay now</div>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedMethod === "RAZORPAY" && (
+                  <span className="text-blue-600 text-xl ml-2">✓</span>
+                )}
+              </div>
+            </label>
+
+            {/* ================= ADVANCE PAYMENT ================= */}
+            {pricingData?.advanceEligible && (
+              <label
+                className={`block p-4 rounded-lg border-2 cursor-pointer
+                transition-all duration-200 ease-out
+                hover:-translate-y-0.5 hover:shadow-lg
+                ${
+                  selectedMethod === "ADVANCE"
+                    ? "border-green-500 bg-green-50 shadow-md scale-[1.01]"
+                    : "border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  className="sr-only"
+                  checked={selectedMethod === "ADVANCE"}
+                  onChange={() => setSelectedMethod("ADVANCE")}
+                />
+
+                <div className="flex items-start">
+                  <span className="text-3xl mr-4">⚡</span>
+
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-semibold text-gray-800">
+                          {pricingData.advancePercentage}% Advance Payment
+                        </h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Pay less now, rest on delivery
+                        </p>
+                        <p className="text-xs text-green-600 mt-1">
+                          💰 Save ₹{safeToFixed(pricingData.codHandlingFee)} COD
+                          fee
+                        </p>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-xl font-bold text-green-600 transition-all duration-300">
+                          ₹
+                          {safeToFixed(
+                            pricingData.advanceAmount +
+                              pricingData.packagingFee +
+                              pricingData.deliveryCharge
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500">Pay now</div>
+                        <div className="text-xs text-orange-600 mt-1">
+                          + ₹{safeToFixed(pricingData.remainingAmount)} on
+                          delivery
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedMethod === "ADVANCE" && (
+                    <span className="text-green-600 text-xl ml-2">✓</span>
+                  )}
+                </div>
+              </label>
             )}
-            <div className="text-xs text-gray-500">
-              Remaining ₹{safeToFixed(pricingData.remainingAmount)} on delivery
-            </div>
-          </label>
-        )}
 
-        <label className="block border p-4 rounded cursor-pointer">
-          <input
-            type="radio"
-            checked={selectedMethod === "COD"}
-            onChange={() => setSelectedMethod("COD")}
-            className="mr-2"
-          />
-          Cash on Delivery – ₹{safeToFixed(pricingData.codTotal)}
-        </label>
+            {/* ================= COD ================= */}
+            <label
+              className={`block p-4 rounded-lg border-2 cursor-pointer
+              transition-all duration-200 ease-out
+              hover:-translate-y-0.5 hover:shadow-lg
+              ${
+                selectedMethod === "COD"
+                  ? "border-orange-500 bg-orange-50 shadow-md scale-[1.01]"
+                  : "border-gray-200 hover:bg-gray-50"
+              }`}
+            >
+              <input
+                type="radio"
+                className="sr-only"
+                checked={selectedMethod === "COD"}
+                onChange={() => setSelectedMethod("COD")}
+              />
+
+              <div className="flex items-start">
+                <span className="text-3xl mr-4">💵</span>
+
+                <div className="flex-1">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h4 className="font-semibold text-gray-800">
+                        Cash on Delivery
+                      </h4>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Pay when order arrives
+                      </p>
+                      <p className="text-xs text-orange-600 mt-1">
+                        + ₹{safeToFixed(pricingData.codHandlingFee)} handling
+                        fee
+                      </p>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-xl font-bold text-orange-600 transition-all duration-300">
+                        ₹{safeToFixed(pricingData.codTotal)}
+                      </div>
+                      <div className="text-xs text-gray-500">Pay later</div>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedMethod === "COD" && (
+                  <span className="text-orange-600 text-xl ml-2">✓</span>
+                )}
+              </div>
+            </label>
+
+            {/* ================= PRICE BREAKDOWN ================= */}
+            {selectedMethod && (
+              <div
+                className="mt-6 p-4 bg-white rounded-lg border border-gray-200
+                            transition-all duration-300"
+              >
+                <h5 className="font-semibold text-gray-800 mb-3">
+                  Price Breakdown
+                </h5>
+
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Product Total</span>
+                    <span>₹{safeToFixed(pricingData.subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Packaging</span>
+                    <span>₹{safeToFixed(pricingData.packagingFee)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Delivery</span>
+                    <span>₹{safeToFixed(pricingData.deliveryCharge)}</span>
+                  </div>
+
+                  {selectedMethod === "COD" && (
+                    <div className="flex justify-between text-orange-600">
+                      <span>COD Fee</span>
+                      <span>₹{safeToFixed(pricingData.codHandlingFee)}</span>
+                    </div>
+                  )}
+
+                  <hr />
+
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>Total to Pay</span>
+                    <span className="text-green-600 transition-all duration-300">
+                      ₹{safeToFixed(payableNow)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* CTA */}
+          <div className="p-6 border-t border-gray-200">
+            <button
+              onClick={handlePayment}
+              disabled={!selectedMethod || placingOrder}
+              className={`w-full py-4 rounded-lg font-semibold text-lg
+              transition-all duration-150 active:scale-[0.98]
+              ${
+                placingOrder || !selectedMethod
+                  ? "bg-gray-300 text-gray-500"
+                  : selectedMethod === "COD"
+                  ? "bg-orange-600 hover:bg-orange-700 text-white shadow-lg"
+                  : selectedMethod === "ADVANCE"
+                  ? "bg-green-600 hover:bg-green-700 text-white shadow-lg"
+                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+              }`}
+            >
+              {placingOrder
+                ? "Processing..."
+                : selectedMethod === "COD"
+                ? "Place COD Order"
+                : `Proceed to Pay ₹${safeToFixed(payableNow)}`}
+            </button>
+
+            <p className="mt-4 text-center text-xs text-gray-500">
+              🔒 Your payment information is secure and encrypted
+            </p>
+          </div>
+        </div>
       </div>
-
-      <button
-        onClick={handlePayment}
-        disabled={placingOrder}
-        className="w-full bg-blue-600 text-white py-3 rounded"
-      >
-        Pay ₹{safeToFixed(payableNow)}
-      </button>
     </div>
   );
 };
-
 export default PaymentPage;
