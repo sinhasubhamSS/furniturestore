@@ -260,7 +260,7 @@ export default function ImageUploader({
             <div key={makeKey(img, i)} className="relative group">
               <img
                 src={getPreviewSrc(i, img)}
-                className="w-full h-28 object-cover rounded shadow border"
+                className="w-full h-28 object-contain rounded shadow border"
                 alt={img._origFileName || `Uploaded ${i}`}
               />
               <div className="absolute top-1 left-1 p-1">
