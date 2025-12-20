@@ -1,15 +1,25 @@
-import CategorySection from "@/components/homeComponents/CategorySection";
 import HeroSection from "@/components/homeComponents/HeroSection";
-import LatestProduct from "@/components/homeComponents/LatestProduct";
+import CategorySection from "@/components/homeComponents/CategorySection";
+import TrendingSectionClient from "@/components/homeComponents/TrendingSectionClient";
 
-// app/(main)/page.tsx
-export default function HomePage() {
-  return (
-    <div>
-      <HeroSection />
-      <CategorySection />
-      <LatestProduct/>
-    </div>
+async function getLatestProducts() {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/latest`,
+    { next: { revalidate: 60 } }
   );
-  
+
+  const json = await res.json();
+  return json.data;
+}
+
+export default async function HomePage() {
+  const products = await getLatestProducts();
+
+  return (
+    <>
+      <HeroSection products={products.slice(0, 3)} />
+      <CategorySection /> {/* ✅ NO PROPS */}
+      <TrendingSectionClient data={products.slice(0, 6)} />
+    </>
+  );
 }
