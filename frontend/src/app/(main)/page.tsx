@@ -1,5 +1,5 @@
 import HeroSection from "@/components/homeComponents/HeroSection";
-import CategorySection from "@/components/homeComponents/CategorySection";
+import CategorySection from "@/components/homeComponents/CatergorySection";
 import TrendingSectionClient from "@/components/homeComponents/TrendingSectionClient";
 
 async function getLatestProducts() {

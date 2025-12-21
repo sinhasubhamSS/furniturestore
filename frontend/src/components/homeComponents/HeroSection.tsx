@@ -173,6 +173,9 @@ const HeroSection: React.FC<Props> = ({ products = [], isLoading = false }) => {
                     alt={`Slide ${index + 1}`}
                     fill
                     priority={index === 0}
+                    sizes="(max-width: 768px) 100vw,
+         (max-width: 1024px) 70vw,
+         600px"
                     style={{ objectFit: "contain" }}
                   />
                 </div>
