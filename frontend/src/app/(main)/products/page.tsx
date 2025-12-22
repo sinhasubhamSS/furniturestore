@@ -1,199 +1,118 @@
-"use client";
-
-import React, { useState, useMemo } from "react";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import ProductCardListing from "@/components/product/ProductCardListing";
-import { useGetPublishedProductsQuery } from "@/redux/services/user/publicProductApi";
-import { useGetCategoriesQuery } from "@/redux/services/admin/adminCategoryapi";
 import Link from "next/link";
-import Button from "@/components/ui/Button";
-import SortDropdown from "@/components/filter/SortDropdown";
-import ProductCardSkeleton from "@/components/skleton/productList";
+import ProductCardListing from "@/components/product/ProductCardListing";
+import Pagination from "@/components/pagination/Pagination";
+import SortDropdownClient from "@/components/filter/SortDropdownClient";
 import type { DisplayProduct } from "@/types/Product";
 
-const ProductsPage = () => {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
+/* ================= TYPES ================= */
 
-  const categoryFromUrl = searchParams.get("category") || "";
-  const sortFromUrl = searchParams.get("sortBy") || "latest";
-  const [page, setPage] = useState(1);
+type SearchParams = {
+  page?: string;
+  sortBy?: string;
+  category?: string;
+};
 
-  const apiFilters = useMemo(() => {
-    const filters: any = {};
-    if (categoryFromUrl) filters.category = categoryFromUrl;
-    return filters;
-  }, [categoryFromUrl]);
+type ApiResponse<T> = {
+  statusCode: number;
+  success: boolean;
+  message: string;
+  data: T;
+};
 
-  const { data, isLoading, isError } = useGetPublishedProductsQuery(
-    {
-      page,
-      limit: 12,
-      filter: apiFilters,
-      sortBy: sortFromUrl as "latest" | "price_low" | "price_high" | "discount",
-    },
-    {
-      refetchOnMountOrArgChange: false,
-      refetchOnReconnect: true,
-      refetchOnFocus: false,
-    }
+type ProductsPayload = {
+  products: DisplayProduct[];
+  totalPages: number;
+  totalItems: number;
+};
+
+type Props = {
+  searchParams: Promise<SearchParams>; // ✅ Next.js 15 requirement
+};
+
+/* ================= API CALL ================= */
+
+async function getProducts({
+  page,
+  sortBy,
+  category,
+}: {
+  page: number;
+  sortBy: string;
+  category?: string;
+}): Promise<ApiResponse<ProductsPayload>> {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: "12",
+    sortBy,
+  });
+
+  if (category) params.set("category", category);
+
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/all?${params.toString()}`,
+    { cache: "no-store" } // ✅ pure SSR
   );
 
-  const { data: categories } = useGetCategoriesQuery();
-
-  // <-- typed filteredProducts
-  const filteredProducts = useMemo<DisplayProduct[]>(() => {
-    if (!data?.products) return [];
-    return data.products as DisplayProduct[];
-  }, [data]);
-
-  const selectedCategoryName = useMemo(() => {
-    if (!categoryFromUrl || !categories) return null;
-    const category = categories.find(
-      (cat: any) => cat.slug === categoryFromUrl
-    );
-    return category?.name || null;
-  }, [categoryFromUrl, categories]);
-
-  const updateURL = (params: { [key: string]: string | null }) => {
-    const current = new URLSearchParams(Array.from(searchParams.entries()));
-    Object.entries(params).forEach(([key, value]) => {
-      if (value) current.set(key, value);
-      else current.delete(key);
-    });
-    const search = current.toString();
-    const query = search ? `?${search}` : "";
-    router.replace(`${pathname}${query}`, { scroll: false });
-  };
-
-  const handleSortChange = (sortValue: string) => {
-    updateURL({ sortBy: sortValue });
-    setPage(1);
-  };
-
-  const clearCategoryFilter = () => {
-    updateURL({ category: null });
-    setPage(1);
-  };
-
-  if (isLoading) {
-    const skeletonCount = 12;
-    return (
-      <div
-        style={{ background: "var(--color-primary)" }}
-        className="min-h-[calc(100vh-64px)] py-4 px-0"
-      >
-        {/* skeleton UI omitted for brevity — keep your existing skeleton */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-[1px] px-0 sm:px-4">
-          {Array.from({ length: skeletonCount }).map((_, i) => (
-            <ProductCardSkeleton key={i} />
-          ))}
-        </div>
-      </div>
-    );
+  if (!res.ok) {
+    throw new Error("Failed to fetch products");
   }
 
-  if (isError) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: "var(--color-primary)" }}
-      >
-        <div className="text-center">
-          <div className="text-red-500 text-4xl mb-3">⚠️</div>
-          <p className="text-red-600 text-lg font-semibold">
-            Failed to load products
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-3 px-4 py-2 rounded-md"
-            style={{
-              background: "var(--color-accent)",
-              color: "var(--text-light)",
-            }}
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
+  return res.json();
+}
+
+/* ================= PAGE ================= */
+
+export default async function ProductsPage({ searchParams }: Props) {
+  // ✅ Next.js 15 fix
+  const params = await searchParams;
+
+  const page = Number(params.page ?? 1);
+  const sortBy = params.sortBy ?? "latest";
+  const category = params.category;
+
+  const response = await getProducts({ page, sortBy, category });
+
+  // ✅ SAFE UNWRAP
+  const products: DisplayProduct[] = response.data?.products ?? [];
+  const totalPages: number = response.data?.totalPages ?? 1;
 
   return (
     <div
+      className="min-h-[calc(100vh-64px)] py-4"
       style={{ background: "var(--color-primary)" }}
-      className="min-h-[calc(100vh-64px)] py-4 px-0"
     >
-      <div>
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <div className="min-w-0">
-            <h1
-              className="text-lg font-semibold truncate"
-              style={{ color: "var(--text-dark)" }}
-              title={selectedCategoryName || "All Products"}
-            >
-              {selectedCategoryName || "All Products"}
-            </h1>
-          </div>
+      {/* ================= HEADER ================= */}
+      <div className="flex items-center justify-between gap-3 mb-4 px-4">
+        <h1 className="text-lg font-semibold truncate">
+          {category ?? "All Products"}
+        </h1>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <SortDropdown
-              currentSort={sortFromUrl}
-              onSortChange={handleSortChange}
-            />
-          </div>
-        </div>
+        <SortDropdownClient currentSort={sortBy} />
+      </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-[1px] px-0 sm:px-4">
-          {filteredProducts.length > 0 ? (
-            filteredProducts.map((product: DisplayProduct) => (
-              <Link
-                key={product._id}
-                href={`/products/${product.slug}`}
-                className="block h-full"
-              >
-                <div className="h-full">
-                  <ProductCardListing product={product} />
-                </div>
-              </Link>
-            ))
-          ) : (
-            <div
-              className="col-span-full text-center py-20"
-              style={{ color: "var(--text-accent)" }}
+      {/* ================= PRODUCTS ================= */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-[1px] px-4">
+        {products.length > 0 ? (
+          products.map((product) => (
+            <Link
+              key={product._id}
+              href={`/products/${product.slug}`}
+              className="block h-full"
             >
-              No products found
-            </div>
-          )}
-        </div>
-
-        {(data?.totalPages || 1) > 1 && filteredProducts.length > 0 && (
-          <div className="flex justify-center gap-3 mt-6">
-            <Button
-              onClick={() => setPage((p) => Math.max(p - 1, 1))}
-              disabled={page === 1}
-              variant="outline"
-            >
-              ← Previous
-            </Button>
-            <span className="self-center" style={{ color: "var(--text-dark)" }}>
-              Page {page} of {data?.totalPages || 1}
-            </span>
-            <Button
-              onClick={() =>
-                setPage((p) => Math.min(p + 1, data?.totalPages || 1))
-              }
-              disabled={page === (data?.totalPages || 1)}
-              variant="outline"
-            >
-              Next →
-            </Button>
+              <ProductCardListing product={product} />
+            </Link>
+          ))
+        ) : (
+          <div className="col-span-full text-center py-20">
+            No products found
           </div>
         )}
       </div>
+
+      {/* ================= PAGINATION ================= */}
+      {totalPages > 1 && (
+        <Pagination currentPage={page} totalPages={totalPages} />
+      )}
     </div>
   );
-};
-
-export default ProductsPage;
+}
