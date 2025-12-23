@@ -63,7 +63,7 @@ async function getProducts({
 /* ================= PAGE ================= */
 
 export default async function ProductsPage({ searchParams }: Props) {
-  // ✅ Next.js 15 fix
+ 
   const params = await searchParams;
 
   const page = Number(params.page ?? 1);
