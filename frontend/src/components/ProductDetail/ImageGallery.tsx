@@ -12,7 +12,8 @@ const ImageGallery = () => {
   );
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
-  const mainImage = selectedImage || selectedVariant?.images?.[0]?.url || "/placeholder.png";
+  const mainImage: string | undefined =
+    selectedImage || selectedVariant?.images?.[0]?.url;
 
   return (
     <div className="w-full">
@@ -34,7 +35,7 @@ const ImageGallery = () => {
       <div className="w-full relative p-4 lg:p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border-2 border-gray-200 shadow-xl">
         {/* Decorative Frame Border */}
         <div className="absolute inset-3 lg:inset-4 border-2 border-gray-300 rounded-xl opacity-20 pointer-events-none"></div>
-        
+
         <div className="flex gap-3 lg:gap-4 relative z-10">
           {/* Thumbnails */}
           <div className="w-14 lg:w-16 flex flex-col gap-2 max-h-80 lg:max-h-96 overflow-y-auto bg-white rounded-lg p-1 lg:p-2 shadow-inner">
@@ -48,11 +49,13 @@ const ImageGallery = () => {
                 }`}
                 onClick={() => dispatch(setSelectedImage(img.url))}
               >
-                <img
-                  src={img.url}
-                  alt={`View ${idx + 1}`}
-                  className="w-12 h-12 lg:w-14 lg:h-14 object-cover"
-                />
+                {mainImage && (
+                  <img
+                    src={mainImage}
+                    alt="Full View"
+                    className="max-w-full max-h-[90vh] object-contain cursor-zoom-out"
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -60,12 +63,13 @@ const ImageGallery = () => {
           {/* Main Image - Full Available Width */}
           <div className="flex-1">
             <div className="w-full h-64 sm:h-80 lg:h-96 bg-white rounded-xl border-2 border-gray-300 shadow-inner p-2 lg:p-4 flex items-center justify-center overflow-hidden">
-              <img
-                src={mainImage}
-                alt="Product"
-                className="w-full h-full object-contain cursor-zoom-in transition-transform duration-300 hover:scale-105 rounded-lg shadow-md"
-                onClick={() => setIsLightboxOpen(true)}
-              />
+              {mainImage && (
+                <img
+                  src={mainImage}
+                  alt="Full View"
+                  className="max-w-full max-h-[90vh] object-contain cursor-zoom-out"
+                />
+              )}
             </div>
           </div>
         </div>
