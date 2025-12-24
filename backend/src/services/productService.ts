@@ -483,40 +483,49 @@ class ProductService {
     };
   }
 
-  async getLatestProducts(limit: number = 8, isAdmin: boolean = false) {
-    const query = this.buildProductQuery({}, isAdmin)
-      .sort({ createdAt: -1 })
-      .select(
-        "name slug variants category repImage repThumbSafe repPrice repDiscountedPrice createdAt"
-      );
+ async getLatestProducts(
+  limit: number = 6,
+  isAdmin: boolean = false
+) {
+  const query = this.buildProductQuery({}, isAdmin)
+    .sort({ createdAt: -1 })
+    .select(
+      "name slug category repImage repThumbSafe repSellingPrice repInStock createdAt"
+    );
 
-    const paginated = this.applyPagination(query, 1, limit).lean();
-    const products = await paginated;
+  const products = await this.applyPagination(query, 1, limit).lean();
 
-    return products.map((product: any) => {
-      const firstVariant = Array.isArray(product.variants)
-        ? product.variants[0]
-        : undefined;
-      return {
-        _id: product._id,
-        name: product.name,
-        slug: product.slug,
-        category: product.category,
-        image:
-          product.repThumbSafe ||
-          product.repImage ||
-          firstVariant?.images?.[0]?.url ||
-          "",
-        price: product.repPrice ?? firstVariant?.price ?? null,
-        discountedPrice:
-          product.repDiscountedPrice ?? firstVariant?.discountedPrice ?? null,
-        hasDiscount:
-          (product.repDiscountedPrice ?? firstVariant?.discountedPrice) <
-          (product.repPrice ?? firstVariant?.price ?? Infinity),
-        createdAt: (product as any).createdAt || null,
-      };
+  // 🔍 DEBUG: raw DB output
+  console.log("🟡 RAW PRODUCTS FROM DB:", JSON.stringify(products, null, 2));
+
+  return products.map((product: any) => {
+    // 🔍 DEBUG: per product rep fields
+    console.log("🟢 PRODUCT CHECK:", {
+      id: product._id,
+      repSellingPrice: product.repSellingPrice,
+      repImage: product.repImage,
+      repThumbSafe: product.repThumbSafe,
+      repInStock: product.repInStock,
     });
-  }
+
+    return {
+      _id: product._id,
+      name: product.name,
+      slug: product.slug,
+      category: product.category,
+
+      image: product.repThumbSafe || product.repImage || "",
+
+      price: product.repSellingPrice ?? null,
+
+      inStock: product.repInStock ?? false,
+
+      createdAt: product.createdAt || null,
+    };
+  });
+}
+
+
 
   async getFeaturedProducts(limit: number = 8, isAdmin: boolean = false) {
     const featuredFilter = { "reviewStats.averageRating": { $gte: 4 } };

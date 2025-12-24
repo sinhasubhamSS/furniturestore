@@ -9,6 +9,7 @@ async function getLatestProducts() {
   );
 
   const json = await res.json();
+  console.log("🟢 /products/latest RESPONSE:", json.data);
   return json.data;
 }
 

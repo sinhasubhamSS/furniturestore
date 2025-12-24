@@ -206,7 +206,11 @@ const productSchema = new Schema<IProduct, IProductModel>(
 
     repImage: String,
     repThumbSafe: String,
-    repSellingPrice: Number,
+    repSellingPrice: {
+  type: Number,
+  required: true,
+
+},
     repInStock: Boolean,
 
     totalStock: { type: Number, default: 0 },

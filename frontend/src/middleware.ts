@@ -72,14 +72,22 @@ export async function middleware(req: NextRequest) {
   const accessToken = req.cookies.get("accessToken")?.value;
 
   // Access token missing → try refresh
+  // Access token missing
   if (!accessToken) {
     console.warn("⚠️ middleware: accessToken missing");
 
-    const refreshed = await tryServerRefresh(req);
-    if (refreshed) {
-      return refreshed;
+    // 🔴 IMPORTANT FIX
+    // Agar refresh-token bhi nahi hai → tryServerRefresh MAT karo
+    const refreshToken = req.cookies.get("refreshToken")?.value;
+
+    if (refreshToken) {
+      const refreshed = await tryServerRefresh(req);
+      if (refreshed) {
+        return refreshed;
+      }
     }
 
+    // Direct redirect
     const loginUrl = new URL("/auth/login", req.url);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);

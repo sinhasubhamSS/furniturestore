@@ -15,20 +15,26 @@ export const useLogin = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dispatch = useDispatch();
+
   const login = async (data: LoginData) => {
     setLoading(true);
     setError(null);
 
     try {
-      console.log("Attempting login with data:", data);
       const res = await axiosClient.post("/user/login", data);
-      console.log("Login success:", res.data);
+
       dispatch(setActiveUser(res.data.user));
-      console.log("User data:", res.data.user);
       return res.data;
     } catch (err: any) {
-      console.error("Login error:", err);
-      setError(err?.response?.data?.message || "Login failed");
+      // ✅ EXPECTED AUTH FAILURE (NO CONSOLE ERROR)
+      if (err?.response?.status === 401) {
+        setError(err.response.data?.message || "Invalid email or password");
+        return null;
+      }
+
+      // 🔴 UNEXPECTED ERROR ONLY
+      console.error("Login failed:", err);
+      setError("Something went wrong. Please try again.");
       return null;
     } finally {
       setLoading(false);
