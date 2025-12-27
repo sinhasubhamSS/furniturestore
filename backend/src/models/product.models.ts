@@ -58,13 +58,15 @@ export interface IProduct extends Document {
   // denormalized
   lowestSellingPrice?: number;
   maxSavings: number;
-
+  maxDiscountPercent?: number;
   primaryVariantId?: Types.ObjectId;
   primaryLocked?: boolean;
 
   repImage?: string;
   repThumbSafe?: string;
   repSellingPrice?: number;
+  repListingPrice?: number;
+
   repInStock?: boolean;
 
   totalStock?: number;
@@ -200,6 +202,7 @@ const productSchema = new Schema<IProduct, IProductModel>(
 
     lowestSellingPrice: Number,
     maxSavings: { type: Number, default: 0 },
+    maxDiscountPercent: { type: Number, default: 0 },
 
     primaryVariantId: Schema.Types.ObjectId,
     primaryLocked: { type: Boolean, default: false },
@@ -207,10 +210,10 @@ const productSchema = new Schema<IProduct, IProductModel>(
     repImage: String,
     repThumbSafe: String,
     repSellingPrice: {
-  type: Number,
-  required: true,
+      type: Number,
+    },
+    repListingPrice: Number,
 
-},
     repInStock: Boolean,
 
     totalStock: { type: Number, default: 0 },
@@ -327,6 +330,7 @@ productSchema.statics.pickRepresentative = function (doc: any) {
     vid: v._id,
     img,
     sellingPrice: v.sellingPrice,
+    listingPrice: v.listingPrice,
     inStock: v.stock > 0,
   };
 };
@@ -342,6 +346,10 @@ productSchema.statics.recomputeDenorm = async function (productDoc: any) {
     (s: number, v: any) => s + Math.max(0, v.stock - v.reservedStock),
     0
   );
+  const maxDiscountPercent = Math.max(
+    ...doc.variants.map((v: any) => v.discountPercent || 0),
+    0
+  );
 
   const rep = Product.pickRepresentative(doc);
 
@@ -352,9 +360,12 @@ productSchema.statics.recomputeDenorm = async function (productDoc: any) {
       inStock: totalStock > 0,
       primaryVariantId: rep?.vid,
       repSellingPrice: rep?.sellingPrice,
+      repListingPrice: rep?.listingPrice,
+
       repInStock: rep?.inStock,
       repImage: rep?.img?.url,
       repThumbSafe: rep?.img?.thumbSafe,
+      maxDiscountPercent,
     },
     { new: true }
   );

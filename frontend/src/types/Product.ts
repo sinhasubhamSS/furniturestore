@@ -10,10 +10,16 @@ export type homeProduct = {
   _id: string;
   name: string;
   slug: string;
-  image?: string; // representative image url (repThumbSafe/repImage)
-  // legacy listing / selling fields for quick listing compatibility
-  price?: number; // legacy listing price (lowest listing)
-  discountedPrice?: number; // legacy selling price (lowest selling)
+  image?: string;
+
+  // ✅ NEW (homepage specific)
+  startingPrice?: number; // lowestSellingPrice
+  discountPercent?: number; // maxDiscountPercent
+  inStock?: boolean;
+
+  // 🧯 legacy (keep – do NOT remove)
+  price?: number;
+  discountedPrice?: number;
 };
 
 /**

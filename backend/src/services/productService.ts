@@ -483,49 +483,63 @@ class ProductService {
     };
   }
 
- async getLatestProducts(
-  limit: number = 6,
-  isAdmin: boolean = false
-) {
-  const query = this.buildProductQuery({}, isAdmin)
-    .sort({ createdAt: -1 })
-    .select(
-      "name slug category repImage repThumbSafe repSellingPrice repInStock createdAt"
+  async getLatestProducts(limit: number = 6, isAdmin: boolean = false) {
+    const query = this.buildProductQuery({}, isAdmin)
+      .sort({ createdAt: -1 })
+      .select(
+        `
+      name
+      slug
+      category
+      repImage
+      repThumbSafe
+      lowestSellingPrice
+      maxDiscountPercent
+      inStock
+      createdAt
+      `
+      );
+
+    const products = await this.applyPagination(query, 1, limit).lean();
+
+    // 🔍 1️⃣ RAW DATA FROM DB
+    console.log(
+      "🟡 [LatestProducts] RAW FROM DB:",
+      JSON.stringify(products, null, 2)
     );
 
-  const products = await this.applyPagination(query, 1, limit).lean();
+    const result = products.map((product: any) => {
+      const mapped = {
+        _id: product._id,
+        name: product.name,
+        slug: product.slug,
+        category: product.category,
 
-  // 🔍 DEBUG: raw DB output
-  console.log("🟡 RAW PRODUCTS FROM DB:", JSON.stringify(products, null, 2));
+        image: product.repThumbSafe || product.repImage || "",
 
-  return products.map((product: any) => {
-    // 🔍 DEBUG: per product rep fields
-    console.log("🟢 PRODUCT CHECK:", {
-      id: product._id,
-      repSellingPrice: product.repSellingPrice,
-      repImage: product.repImage,
-      repThumbSafe: product.repThumbSafe,
-      repInStock: product.repInStock,
+        startingPrice: product.lowestSellingPrice ?? null,
+
+        discountPercent: product.maxDiscountPercent ?? 0,
+
+        inStock: product.inStock ?? false,
+
+        createdAt: product.createdAt || null,
+      };
+
+      // 🔍 2️⃣ PER PRODUCT MAPPED DATA
+      console.log("🟢 [LatestProducts] MAPPED PRODUCT:", mapped);
+
+      return mapped;
     });
 
-    return {
-      _id: product._id,
-      name: product.name,
-      slug: product.slug,
-      category: product.category,
+    // 🔍 3️⃣ FINAL RESPONSE SENT TO FRONTEND
+    console.log(
+      "🔵 [LatestProducts] FINAL RESPONSE:",
+      JSON.stringify(result, null, 2)
+    );
 
-      image: product.repThumbSafe || product.repImage || "",
-
-      price: product.repSellingPrice ?? null,
-
-      inStock: product.repInStock ?? false,
-
-      createdAt: product.createdAt || null,
-    };
-  });
-}
-
-
+    return result;
+  }
 
   async getFeaturedProducts(limit: number = 8, isAdmin: boolean = false) {
     const featuredFilter = { "reviewStats.averageRating": { $gte: 4 } };

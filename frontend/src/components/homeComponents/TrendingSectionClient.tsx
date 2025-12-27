@@ -49,22 +49,18 @@ export default function TrendingSectionClient({ data }: Props) {
           </Link>
         </div>
 
-        {/* ---------- SINGLE ROW STRIP (ALL SCREENS) ---------- */}
+        {/* ---------- SINGLE ROW STRIP ---------- */}
         <div className="overflow-x-auto scrollbar-custom">
           <div className="flex gap-4 min-w-max pb-2">
             {/* ---------- SKELETON ---------- */}
             {!data &&
-              Array.from({ length: 6 }).map((_, i) => (
-                <SkeletonCard key={i} />
-              ))}
+              Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
 
             {/* ---------- PRODUCTS ---------- */}
             {products.map((p) => {
-              const hasDiscount = p.hasDiscount;
-              const final = hasDiscount ? p.discountedPrice : p.price;
-              const discountPercent = hasDiscount
-                ? Math.round(((p.price - final) / p.price) * 100)
-                : 0;
+              const startingPrice = p.startingPrice;
+              const discountPercent = p.discountPercent ?? 0;
+              const inStock = p.inStock !== false;
 
               return (
                 <Link
@@ -77,16 +73,18 @@ export default function TrendingSectionClient({ data }: Props) {
                     bg-[--color-card]
                     border border-[--color-border-custom]
                     rounded-xl p-3
-                    hover:shadow-md transition
+                    hover:shadow-lg hover:-translate-y-0.5 transition
                   "
                 >
-                  {hasDiscount && (
+                  {/* ---------- DISCOUNT BADGE ---------- */}
+                  {discountPercent > 0 && (
                     <span className="absolute top-2 right-2 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded">
-                      {discountPercent}% OFF
+                      Up to {discountPercent}% OFF
                     </span>
                   )}
 
-                  <div className="h-40 sm:h-44 flex items-center justify-center border mb-2">
+                  {/* ---------- IMAGE ---------- */}
+                  <div className="h-40 sm:h-44 flex items-center justify-center border mb-2 bg-white rounded">
                     <img
                       src={p.image}
                       alt={p.name}
@@ -95,20 +93,22 @@ export default function TrendingSectionClient({ data }: Props) {
                     />
                   </div>
 
+                  {/* ---------- NAME ---------- */}
                   <h3 className="text-sm font-semibold truncate mb-1">
                     {p.name}
                   </h3>
 
-                  <div className="text-sm">
-                    <span className="font-bold text-[var(--color-accent)]">
-                      ₹{final.toLocaleString()}
-                    </span>
-                    {hasDiscount && (
-                      <span className="ml-1 text-xs line-through text-gray-400">
-                        ₹{p.price.toLocaleString()}
-                      </span>
-                    )}
+                  {/* ---------- PRICE ---------- */}
+                  <div className="text-sm font-semibold text-[var(--color-accent)]">
+                    Starting from ₹{startingPrice?.toLocaleString()}
                   </div>
+
+                  {/* ---------- STOCK ---------- */}
+                  {!inStock && (
+                    <div className="text-xs text-red-500 mt-1">
+                      Out of stock
+                    </div>
+                  )}
                 </Link>
               );
             })}
