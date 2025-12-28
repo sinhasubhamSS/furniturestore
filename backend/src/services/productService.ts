@@ -495,48 +495,30 @@ class ProductService {
       repThumbSafe
       lowestSellingPrice
       maxDiscountPercent
+      repSellingPrice
+      repListingPrice
       inStock
       createdAt
       `
       );
 
     const products = await this.applyPagination(query, 1, limit).lean();
-
-    // 🔍 1️⃣ RAW DATA FROM DB
-    console.log(
-      "🟡 [LatestProducts] RAW FROM DB:",
-      JSON.stringify(products, null, 2)
-    );
-
     const result = products.map((product: any) => {
       const mapped = {
         _id: product._id,
         name: product.name,
         slug: product.slug,
         category: product.category,
-
         image: product.repThumbSafe || product.repImage || "",
-
-        startingPrice: product.lowestSellingPrice ?? null,
-
+        listingPrice: product.repListingPrice,
+        sellingPrice: product.repSellingPrice,
         discountPercent: product.maxDiscountPercent ?? 0,
-
         inStock: product.inStock ?? false,
-
         createdAt: product.createdAt || null,
       };
-
-      // 🔍 2️⃣ PER PRODUCT MAPPED DATA
-      console.log("🟢 [LatestProducts] MAPPED PRODUCT:", mapped);
-
       return mapped;
     });
 
-    // 🔍 3️⃣ FINAL RESPONSE SENT TO FRONTEND
-    console.log(
-      "🔵 [LatestProducts] FINAL RESPONSE:",
-      JSON.stringify(result, null, 2)
-    );
 
     return result;
   }

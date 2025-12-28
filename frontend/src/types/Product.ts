@@ -11,15 +11,10 @@ export type homeProduct = {
   name: string;
   slug: string;
   image?: string;
-
-  // ✅ NEW (homepage specific)
-  startingPrice?: number; // lowestSellingPrice
-  discountPercent?: number; // maxDiscountPercent
+  listingPrice?: number; 
+  discountPercent?: number;
   inStock?: boolean;
-
-  // 🧯 legacy (keep – do NOT remove)
-  price?: number;
-  discountedPrice?: number;
+  sellingPrice?: number;
 };
 
 /**
