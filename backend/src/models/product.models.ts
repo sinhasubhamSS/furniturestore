@@ -66,7 +66,7 @@ export interface IProduct extends Document {
   repThumbSafe?: string;
   repSellingPrice?: number;
   repListingPrice?: number;
-
+  repSavings?: number;
   repInStock?: boolean;
 
   totalStock?: number;
@@ -213,6 +213,7 @@ const productSchema = new Schema<IProduct, IProductModel>(
       type: Number,
     },
     repListingPrice: Number,
+    repSavings: Number,
 
     repInStock: Boolean,
 
@@ -331,6 +332,7 @@ productSchema.statics.pickRepresentative = function (doc: any) {
     img,
     sellingPrice: v.sellingPrice,
     listingPrice: v.listingPrice,
+    savings: v.savings,
     inStock: v.stock > 0,
   };
 };
@@ -361,7 +363,7 @@ productSchema.statics.recomputeDenorm = async function (productDoc: any) {
       primaryVariantId: rep?.vid,
       repSellingPrice: rep?.sellingPrice,
       repListingPrice: rep?.listingPrice,
-
+      repSavings: rep?.savings,
       repInStock: rep?.inStock,
       repImage: rep?.img?.url,
       repThumbSafe: rep?.img?.thumbSafe,

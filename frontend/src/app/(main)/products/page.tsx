@@ -63,7 +63,6 @@ async function getProducts({
 /* ================= PAGE ================= */
 
 export default async function ProductsPage({ searchParams }: Props) {
- 
   const params = await searchParams;
 
   const page = Number(params.page ?? 1);
@@ -75,7 +74,7 @@ export default async function ProductsPage({ searchParams }: Props) {
   // ✅ SAFE UNWRAP
   const products: DisplayProduct[] = response.data?.products ?? [];
   const totalPages: number = response.data?.totalPages ?? 1;
-
+ 
   return (
     <div
       className="min-h-[calc(100vh-64px)] py-4"

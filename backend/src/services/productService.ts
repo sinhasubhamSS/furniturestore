@@ -113,11 +113,14 @@ class ProductService {
   private buildSortOptions(sortBy: string): { [key: string]: 1 | -1 } {
     switch (sortBy) {
       case "price_low":
-        return { repDiscountedPrice: 1, repPrice: 1 };
+        return { repSellingPrice: 1, repListingPrice: 1 };
+
       case "price_high":
-        return { repDiscountedPrice: -1, repPrice: -1 };
+        return { repSellingPrice: -1, repListingPrice: -1 };
+
       case "discount":
-        return { maxSavings: -1, repDiscountedPrice: 1 };
+        return { maxDiscountPercent: -1, repSellingPrice: 1 };
+
       case "best":
         return { repInStock: -1, repDiscountedPrice: 1 };
       case "latest":
@@ -133,13 +136,17 @@ class ProductService {
       slug: p.slug,
       title: p.title,
       image: p.repThumbSafe || p.repImage || "",
-      price: p.repPrice ?? p.price ?? null,
-      discountedPrice: p.repDiscountedPrice ?? p.lowestDiscountedPrice ?? null,
+
+      listingPrice: p.repListingPrice ?? null,
+      sellingPrice: p.repSellingPrice ?? null,
+      savings: p.repSavings,
+
+      discountPercent: p.maxDiscountPercent ?? 0,
       inStock: !!p.repInStock,
       totalStock: p.totalStock ?? 0,
-      metaTitle: p.metaTitle,
-      metaDescription: p.metaDescription,
-      createdAt: (p as any).createdAt || null,
+
+      createdAt: p.createdAt || null,
+      //meta title/description
     };
   }
 
@@ -407,24 +414,23 @@ class ProductService {
 
     const sortOptions = this.buildSortOptions(sortBy);
 
-    const LISTING_PROJECTION: any = {
+    const LISTING_PROJECTION = {
       _id: 1,
       slug: 1,
       name: 1,
       title: 1,
+
       repImage: 1,
       repThumbSafe: 1,
-      repPrice: 1,
-      repDiscountedPrice: 1,
+
+      repListingPrice: 1,
+      repSellingPrice: 1,
+      maxDiscountPercent: 1,
+
       repInStock: 1,
       totalStock: 1,
       inStock: 1,
-      price: 1,
-      lowestDiscountedPrice: 1,
-      metaTitle: 1,
-      metaDescription: 1,
-      searchTags: 1,
-      visibleOnHomepage: 1,
+
       createdAt: 1,
       updatedAt: 1,
       category: 1,
@@ -495,6 +501,7 @@ class ProductService {
       repThumbSafe
       lowestSellingPrice
       maxDiscountPercent
+      repSavings
       repSellingPrice
       repListingPrice
       inStock
@@ -510,15 +517,15 @@ class ProductService {
         slug: product.slug,
         category: product.category,
         image: product.repThumbSafe || product.repImage || "",
-        listingPrice: product.repListingPrice,
+        listingPrice: product.repListingPrice ?? product.repSellingPrice,
         sellingPrice: product.repSellingPrice,
+        savings: product.repSavings,
         discountPercent: product.maxDiscountPercent ?? 0,
         inStock: product.inStock ?? false,
         createdAt: product.createdAt || null,
       };
       return mapped;
     });
-
 
     return result;
   }

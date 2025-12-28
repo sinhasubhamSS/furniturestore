@@ -11,10 +11,11 @@ export type homeProduct = {
   name: string;
   slug: string;
   image?: string;
-  listingPrice?: number; 
+  listingPrice?: number;
   discountPercent?: number;
   inStock?: boolean;
   sellingPrice?: number;
+  savings?: number;
 };
 
 /**

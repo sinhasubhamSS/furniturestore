@@ -81,6 +81,7 @@ function ProductCard({ product }: { product: homeProduct }) {
     listingPrice,
     sellingPrice,
     discountPercent = 0,
+    savings = 0,
     inStock = true,
   } = product;
 
@@ -125,6 +126,11 @@ function ProductCard({ product }: { product: homeProduct }) {
           <span className="ml-2 text-xs line-through text-gray-400">
             ₹{listingPrice.toLocaleString()}
           </span>
+        )}
+        {savings > 0 && (
+          <div className="text-xs font-medium text-green-600 mt-0.5">
+            You save ₹{savings.toLocaleString()}
+          </div>
         )}
       </div>
 
