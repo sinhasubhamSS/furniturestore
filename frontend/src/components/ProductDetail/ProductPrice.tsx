@@ -35,11 +35,13 @@ const ProductPrice: React.FC = () => {
         )}
 
         {/* Discount % */}
-        {hasDiscount && discountPercent > 0 && (
-          <span className="text-sm font-semibold text-green-600">
-            {discountPercent}% OFF
-          </span>
-        )}
+        {hasDiscount &&
+          typeof discountPercent === "number" &&
+          discountPercent > 0 && (
+            <span className="text-sm font-semibold text-green-600">
+              {discountPercent}% OFF
+            </span>
+          )}
       </div>
 
       {/* Savings */}

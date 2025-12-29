@@ -54,8 +54,8 @@ export type Variant = {
   savings: number; // listingPrice - sellingPrice
 
   // discount display fields
-  hasDiscount: boolean;
-  discountPercent: number; // rounded integer percent for "XX% off"
+  hasDiscount?: boolean;
+  discountPercent?: number; // rounded integer percent for "XX% off"
   discountValidUntil?: string | Date;
 
   // audit / meta (optional)

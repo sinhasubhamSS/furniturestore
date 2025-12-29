@@ -1,4 +1,12 @@
 "use client";
+function assertSellingPrice(
+  value: unknown,
+  context: string
+): asserts value is number {
+  if (typeof value !== "number") {
+    throw new Error(`Invariant failed: sellingPrice missing (${context})`);
+  }
+}
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
@@ -66,39 +74,26 @@ export default function CheckoutPage() {
 
   // subtotal computation (same as before)
   const subtotal = useMemo(() => {
+    // ---------- DIRECT PURCHASE ----------
     if (type === "direct_purchase" && items.length && product) {
       const item = items[0];
       const variant = product.variants?.find((v) => v._id === item.variantId);
       if (!variant) return 0;
-      const sellingPrice =
-        variant.sellingPrice ??
-        variant.discountedPrice ?? // backup
-        0;
 
-      const listingPrice =
-        variant.listingPrice ?? variant.price ?? sellingPrice;
+      assertSellingPrice(variant.sellingPrice, "direct_purchase variant");
 
-      const price = variant.hasDiscount ? sellingPrice : listingPrice;
-
-      return price * item.quantity;
+      return variant.sellingPrice * item.quantity;
     }
 
+    // ---------- CART PURCHASE ----------
     if (type === "cart_purchase" && cartData?.items?.length) {
       return cartData.items.reduce((sum, item) => {
         const variant = item.product.variants[0];
         if (!variant) return sum;
 
-        const sellingPrice =
-          variant.sellingPrice ??
-          variant.discountedPrice ?? // backup
-          0;
+        assertSellingPrice(variant.sellingPrice, "cart_purchase variant");
 
-        const listingPrice =
-          variant.listingPrice ?? variant.price ?? sellingPrice;
-
-        const price = variant.hasDiscount ? sellingPrice : listingPrice;
-
-        return sum + price * item.quantity;
+        return sum + variant.sellingPrice * item.quantity;
       }, 0);
     }
 

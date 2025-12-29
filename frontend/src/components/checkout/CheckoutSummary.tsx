@@ -25,7 +25,7 @@ interface CheckoutSummaryProps {
   onQuantityChange?: (index: number, quantity: number) => void | Promise<void>;
   pricingData?: any;
   loadingPricing?: boolean;
-  deliveryInfo?: any;
+  deliveryInfo?: any; // ✅ RETAINED
   deliveryAvailable?: boolean;
   hasSelectedAddress?: boolean;
   showTotals?: boolean;
@@ -40,14 +40,14 @@ const CheckoutSummary = React.memo(
     onQuantityChange,
     pricingData,
     loadingPricing = false,
+    deliveryInfo, // ✅ still here
     deliveryAvailable = true,
     showTotals = false,
   }: CheckoutSummaryProps) => {
     const [showBreakdown, setShowBreakdown] = useState(false);
 
     const safeToFixed = (value: number | undefined | null, decimals = 2) => {
-      if (typeof value !== "number" || isNaN(value))
-        return (0).toFixed(decimals);
+      if (typeof value !== "number" || isNaN(value)) return "0.00";
       return value.toFixed(decimals);
     };
 
@@ -103,20 +103,9 @@ const CheckoutSummary = React.memo(
             const variant = product.variants.find((v) => v._id === variantId);
             if (!variant) return null;
 
-            /* ---------- PRICE RESOLUTION (FINAL RULE) ---------- */
-            const sellingPrice =
-              variant.sellingPrice ??
-              variant.discountedPrice ?? // BACKUP only
-              0;
-
-            const listingPrice =
-              variant.listingPrice ?? variant.price ?? sellingPrice;
-
-            const finalPrice = variant.hasDiscount
-              ? sellingPrice
-              : listingPrice;
-
-            const itemTotal = finalPrice * quantity;
+            // 🔒 FINAL PRICE RULE
+            const sellingPrice = variant.sellingPrice;
+            const itemTotal = sellingPrice * quantity;
 
             return (
               <div
@@ -165,7 +154,7 @@ const CheckoutSummary = React.memo(
                     {variant.size ? ` • ${variant.size}` : ""}
                   </div>
 
-                  {/* PRICE ROW */}
+                  {/* Price Row */}
                   <div
                     style={{
                       display: "flex",
@@ -174,8 +163,8 @@ const CheckoutSummary = React.memo(
                       marginTop: 6,
                     }}
                   >
-                    {/* MRP (cut) */}
-                    {variant.hasDiscount && (
+                    {/* Optional MRP display */}
+                    {variant.listingPrice > variant.sellingPrice && (
                       <span
                         style={{
                           fontSize: 12,
@@ -183,11 +172,10 @@ const CheckoutSummary = React.memo(
                           textDecoration: "line-through",
                         }}
                       >
-                        ₹{safeToFixed(listingPrice)}
+                        ₹{safeToFixed(variant.listingPrice)}
                       </span>
                     )}
 
-                    {/* Selling / Final */}
                     <span
                       style={{
                         fontSize: 13,
@@ -195,24 +183,9 @@ const CheckoutSummary = React.memo(
                         color: "var(--color-accent)",
                       }}
                     >
-                      ₹{safeToFixed(finalPrice)}
+                      ₹{safeToFixed(sellingPrice)}
                     </span>
 
-                    {/* Discount */}
-                    {variant.hasDiscount &&
-                      (variant.discountPercent ?? 0) > 0 && (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: "green",
-                          }}
-                        >
-                          {variant.discountPercent ?? 0}% OFF
-                        </span>
-                      )}
-
-                    {/* Quantity + Total */}
                     <div
                       style={{ marginLeft: "auto", display: "flex", gap: 8 }}
                     >
