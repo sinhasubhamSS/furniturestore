@@ -10,11 +10,11 @@ export type homeProduct = {
   _id: string;
   name: string;
   slug: string;
-  image?: string;
-  listingPrice?: number;
-  discountPercent?: number;
+  image: string;
+  listingPrice: number;
+  discountPercent: number;
   inStock?: boolean;
-  sellingPrice?: number;
+  sellingPrice: number;
   savings?: number;
 };
 
@@ -45,20 +45,12 @@ export type Variant = {
   // Marketing vs final:
   listingPrice?: number; // marketing MRP (display - strike-through)
   sellingPrice?: number; // final customer pays (includes GST)
-
-  // Optional merchant-input field (input-only). If you support merchant sending final price,
-  // you can accept this in API payload and backend will derive basePrice from it.
-  // Not persisted in canonical model unless you intentionally store it.
-  finalSellingPrice?: number;
-
   stock: number;
   reservedStock?: number;
-
   images: VariantImage[];
 
   // legacy/compat (kept in many places)
-  price?: number; // legacy listingPrice for older code
-  discountedPrice?: number; // legacy sellingPrice for older code
+
   savings?: number; // listingPrice - sellingPrice
 
   // discount display fields
@@ -101,23 +93,20 @@ export type BaseProduct = {
   disclaimer?: string;
   slug: string;
 
-  // pricing (top-level aggregates) - denormalized for listing performance
-  price?: number; // lowest listingPrice among variants (legacy/marketing)
-  lowestDiscountedPrice?: number; // lowest sellingPrice among variants (final)
+  discountPercent?: number;
   maxSavings?: number;
 
   // denormalized representative snapshot (for fast listing)
   image?: string; // top-level canonical representative image (frontend)
   repImage?: string; // full image url (may be repThumbSafe or repImage)
   repThumbSafe?: string; // low-quality safe thumb for list
-  repPrice?: number; // denormalized listingPrice (for fast listing)
-  repDiscountedPrice?: number; // denormalized sellingPrice (for fast listing)
-  repSavings?: number;
-  repInStock?: boolean;
+  listingPrice: number; // denormalized listingPrice (for fast listing)
+  sellingPrice: number; // denormalized sellingPrice (for fast listing)
+  savings?: number;
+  inStock?: boolean;
 
   // stock / availability denorms (add these so frontend can safely read them)
   totalStock?: number;
-  inStock?: boolean;
 
   // optional admin/meta fields
   primaryVariantId?: string;

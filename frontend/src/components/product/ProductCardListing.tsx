@@ -1,340 +1,148 @@
-// components/product/ProductCardListing.tsx
 "use client";
 
-import React, { memo, useMemo } from "react";
+import React, { memo } from "react";
 import Image from "next/image";
 import { FaHeart, FaRegHeart, FaShoppingCart } from "react-icons/fa";
 import type { DisplayProduct } from "@/types/Product";
 import { useWishlistManager } from "@/hooks/useWishlistManger";
 
-interface ProductCardListingProps {
+interface Props {
   product: DisplayProduct;
 }
 
 const PLACEHOLDER = "/placeholder.jpg";
 
-const ProductCardListing = memo(
-  ({ product }: ProductCardListingProps) => {
-    const variant = (product.variants && product.variants[0]) ?? ({} as any);
+const ProductCardListing = memo(({ product }: Props) => {
+  const { isInWishlist, addToWishlist, removeFromWishlist, isProductLoading } =
+    useWishlistManager();
 
-    const {
-      isInWishlist,
-      addToWishlist,
-      removeFromWishlist,
-      isProductLoading,
-    } = useWishlistManager();
+  const isWishlisted = isInWishlist(product._id);
+  const isLoading = isProductLoading(product._id);
 
-    const isProductInWishlist = useMemo(
-      () => isInWishlist(product._id),
-      [isInWishlist, product._id]
-    );
+  const handleWishlist = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isWishlisted
+      ? await removeFromWishlist(product._id)
+      : await addToWishlist(product._id);
+  };
 
-    const isLoading = useMemo(
-      () => isProductLoading(product._id),
-      [isProductLoading, product._id]
-    );
+  /* BACKEND DATA */
+  const image = product.image || PLACEHOLDER;
+  const sellingPrice = product.sellingPrice;
+  const listingPrice = product.listingPrice;
+  const discountPercent = product.discountPercent ?? 0;
+  const hasDiscount =
+    listingPrice && sellingPrice && sellingPrice < listingPrice;
 
-    const handleWishlist = async (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      try {
-        if (isProductInWishlist) await removeFromWishlist(product._id);
-        else await addToWishlist(product._id);
-      } catch (err) {
-        console.error("Wishlist action failed:", err);
-      }
-    };
+  const categoryName =
+    typeof product.category === "string" ? "" : product.category?.name ?? "";
 
-    const { imgSrc, blurDataURL, listingVal, sellingVal, priceLabel } =
-      useMemo(() => {
-        const imgFromProduct =
-          typeof (product as any).image === "string" && (product as any).image
-            ? (product as any).image
-            : null;
+  return (
+    <div
+      className="
+        group relative flex flex-col
+        rounded-lg overflow-hidden
+        bg-[var(--color-card)]
+        border border-[var(--color-border-custom)]
+        transition-all duration-200
+        hover:shadow-lg hover:-translate-y-0.5
+      "
+    >
+      {/* ================= IMAGE ================= */}
+      <div className="relative aspect-[4/3] bg-[var(--color-primary)]">
+        <Image
+          src={image}
+          alt={product.name}
+          fill
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 20vw"
+          className="object-contain p-3"
+          priority
+        />
 
-        const repThumb =
-          typeof (product as any).repThumbSafe === "string" &&
-          (product as any).repThumbSafe
-            ? (product as any).repThumbSafe
-            : null;
+        {/* DISCOUNT BADGE */}
+        {hasDiscount && discountPercent > 0 && (
+          <span className="absolute top-2 left-2 bg-red-600 text-white text-[11px] font-bold px-2 py-0.5 rounded">
+            {discountPercent}% OFF
+          </span>
+        )}
 
-        const repImage =
-          typeof (product as any).repImage === "string" &&
-          (product as any).repImage
-            ? (product as any).repImage
-            : null;
-
-        const maybeFirst = variant?.images?.[0];
-        const firstUrl =
-          typeof maybeFirst === "string" ? maybeFirst : maybeFirst?.url;
-        const variantImage =
-          typeof firstUrl === "string" && firstUrl ? firstUrl : null;
-
-        const src = imgFromProduct || repImage || variantImage || PLACEHOLDER;
-        const blur =
-          repThumb ||
-          (imgFromProduct === null && repImage === null ? variantImage : null);
-
-        // PRICING: prefer denorm rep fields (repPrice = listingPrice, repDiscountedPrice = sellingPrice)
-        const repPriceField = (product as any).repPrice;
-        const repDiscountedField = (product as any).repDiscountedPrice;
-
-        // If rep fields absent calculate from variants
-        let variantListingPrices: number[] = [];
-        let variantSellingPrices: number[] = [];
-
-        if (Array.isArray(product.variants) && product.variants.length) {
-          product.variants.forEach((v: any) => {
-            const lp =
-              typeof v.listingPrice === "number" ? v.listingPrice : null;
-
-            const sp =
-              typeof v.sellingPrice === "number" ? v.sellingPrice : null;
-
-            if (lp != null && Number.isFinite(lp))
-              variantListingPrices.push(lp);
-            if (sp != null && Number.isFinite(sp))
-              variantSellingPrices.push(sp);
-          });
-        }
-
-        const variantMinListing =
-          variantListingPrices.length > 0
-            ? Math.min(...variantListingPrices)
-            : null;
-        const variantMaxListing =
-          variantListingPrices.length > 0
-            ? Math.max(...variantListingPrices)
-            : null;
-
-        const listingVal =
-          typeof repPriceField !== "undefined"
-            ? Number(repPriceField)
-            : variantMinListing ?? null;
-
-        const sellingVal =
-          typeof repDiscountedField !== "undefined"
-            ? Number(repDiscountedField)
-            : (product as any).lowestDiscountedPrice ??
-              (variantSellingPrices.length > 0
-                ? Math.min(...variantSellingPrices)
-                : null);
-
-        // label logic
-        const priceLabel =
-          sellingVal != null
-            ? `₹${sellingVal.toFixed(0)}`
-            : listingVal != null
-            ? `₹${listingVal.toFixed(0)}`
-            : "—";
-
-        return {
-          imgSrc: src,
-          blurDataURL: blur || undefined,
-          listingVal,
-          sellingVal,
-          priceLabel,
-        };
-      }, [product, variant]);
-
-    // discount detection for badge/strike-through
-    const originalPrice = listingVal ?? null;
-    const finalPrice = sellingVal ?? listingVal ?? null;
-    const hasDiscount =
-      originalPrice != null &&
-      finalPrice != null &&
-      Number(finalPrice) < Number(originalPrice);
-    const discountPercent = hasDiscount
-      ? Math.round(
-          ((Number(originalPrice) - Number(finalPrice)) /
-            Number(originalPrice)) *
-            100
-        )
-      : 0;
-
-    const categoryName =
-      typeof product.category === "string" ? "" : product.category?.name ?? "";
-
-    return (
-      <div
-        className="group relative flex flex-col h-80 cursor-pointer transition-transform duration-200 rounded-md"
-        style={{
-          background: "var(--color-card)",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-        }}
-      >
-        <div
-          className="relative flex items-center justify-center overflow-hidden"
-          style={{
-            height: "56%",
-            background: "var(--color-primary)",
-          }}
+        {/* WISHLIST */}
+        <button
+          onClick={handleWishlist}
+          disabled={isLoading}
+          className="
+            absolute top-2 right-2
+            w-8 h-8 rounded-full
+            bg-white shadow
+            flex items-center justify-center
+            hover:scale-105 transition
+          "
         >
-          <Image
-            src={imgSrc}
-            alt={product.name}
-            width={400}
-            height={320}
-            style={{ objectFit: "contain", padding: "1rem" }}
-            priority={false}
-            placeholder={blurDataURL ? "blur" : "empty"}
-            blurDataURL={blurDataURL}
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px"
-          />
-
-          {hasDiscount && discountPercent > 0 && (
-            <div
-              className="absolute top-3 left-3 text-xs font-semibold px-2 py-0.5 rounded"
-              style={{
-                background: "var(--color-secondary)",
-                color: "var(--text-light)",
-              }}
-            >
-              {discountPercent}% OFF
-            </div>
+          {isWishlisted ? (
+            <FaHeart className="text-red-500" size={14} />
+          ) : (
+            <FaRegHeart className="text-gray-600" size={14} />
           )}
-
-          <button
-            onClick={handleWishlist}
-            disabled={isLoading}
-            aria-label={
-              isProductInWishlist ? "Remove from wishlist" : "Add to wishlist"
-            }
-            aria-pressed={isProductInWishlist}
-            className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center z-10 bg-[var(--color-card)] shadow-sm"
-          >
-            {isLoading ? (
-              <div
-                className="animate-spin w-4 h-4 rounded-full"
-                style={{
-                  border: "2px solid var(--color-accent)",
-                  borderTopColor: "transparent",
-                }}
-              />
-            ) : isProductInWishlist ? (
-              <FaHeart style={{ color: "var(--color-accent)" }} />
-            ) : (
-              <FaRegHeart style={{ color: "var(--text-accent)" }} />
-            )}
-          </button>
-
-          <div
-            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
-            style={{
-              background:
-                "linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,0,0,0.15))",
-            }}
-          >
-            <div className="pointer-events-auto flex gap-2">
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.info("Quick view:", product._id);
-                }}
-                className="px-3 py-1 rounded bg-[rgba(0,0,0,0.6)] text-white text-sm hover:opacity-90"
-              >
-                Quick view
-              </button>
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.info("Add to cart:", product._id);
-                }}
-                className="px-3 py-1 rounded bg-[var(--color-accent)] text-white text-sm hover:opacity-90 flex items-center gap-2"
-              >
-                <FaShoppingCart /> Add
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div
-          className="flex-1 flex flex-col justify-between px-3 py-2"
-          style={{ background: "var(--color-card-secondary)" }}
-        >
-          <div>
-            <h3
-              className="text-sm font-semibold line-clamp-2 mb-1"
-              style={{ color: "var(--color-foreground)" }}
-            >
-              {product.name}
-            </h3>
-            {categoryName && (
-              <div
-                className="text-xs mb-1"
-                style={{ color: "var(--text-accent)" }}
-              >
-                {categoryName}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex items-baseline gap-2">
-              {priceLabel !== "—" ? (
-                <>
-                  <span
-                    className="text-base font-bold"
-                    style={{ color: "var(--color-accent)" }}
-                  >
-                    {priceLabel}
-                  </span>
-
-                  {hasDiscount && originalPrice != null && (
-                    <span
-                      className="text-xs line-through"
-                      style={{ color: "var(--text-accent)" }}
-                    >
-                      ₹{Number(originalPrice).toFixed(0)}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span
-                  className="text-base font-bold"
-                  style={{ color: "var(--color-accent)" }}
-                >
-                  ₹
-                  {originalPrice != null
-                    ? Number(originalPrice).toFixed(0)
-                    : "—"}
-                </span>
-              )}
-            </div>
-
-            <div
-              className="ml-auto text-xs font-semibold"
-              style={{ color: "var(--text-accent)" }}
-            >
-              {product.repInStock ? "In stock" : "Free delivery"}
-            </div>
-          </div>
-        </div>
-
-        <style jsx>{`
-          .group:hover {
-            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
-            transform: translateY(-4px);
-          }
-        `}</style>
+        </button>
       </div>
-    );
-  },
-  (prev, next) =>
-    prev.product._id === next.product._id &&
-    ((prev.product as any).image ??
-      (prev.product as any).repImage ??
-      (prev.product as any).repThumbSafe) ===
-      ((next.product as any).image ??
-        (next.product as any).repImage ??
-        (next.product as any).repThumbSafe) &&
-    (prev.product as any).repPrice === (next.product as any).repPrice &&
-    (prev.product as any).repDiscountedPrice ===
-      (next.product as any).repDiscountedPrice &&
-    prev.product.repInStock === next.product.repInStock
-);
+
+      {/* ================= CONTENT ================= */}
+      <div className="flex flex-col justify-between p-3 flex-1">
+        {/* TITLE */}
+        <div>
+          <h3 className="text-sm font-semibold leading-snug line-clamp-2">
+            {product.name}
+          </h3>
+
+          {categoryName && (
+            <p className="text-xs text-gray-500 mt-0.5">{categoryName}</p>
+          )}
+        </div>
+
+        {/* PRICE */}
+        <div className="mt-2">
+          <div className="flex items-center gap-2">
+            <span className="text-base font-bold text-[var(--color-accent)]">
+              ₹{sellingPrice.toLocaleString()}
+            </span>
+
+            {hasDiscount && (
+              <span className="text-xs line-through text-gray-400">
+                ₹{listingPrice.toLocaleString()}
+              </span>
+            )}
+          </div>
+
+          {/* FOOTER */}
+          <div className="mt-2 flex items-center justify-between">
+            <span
+              className={`text-xs font-semibold ${
+                product.inStock ? "text-green-600" : "text-gray-500"
+              }`}
+            >
+              {product.inStock ? "In stock" : "Free delivery"}
+            </span>
+
+            <button
+              className="
+                flex items-center gap-1
+                text-xs font-semibold
+                px-3 py-1.5
+                rounded-md
+                bg-[var(--color-accent)]
+                text-white
+                hover:opacity-90
+              "
+            >
+              <FaShoppingCart size={12} /> Add
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 ProductCardListing.displayName = "ProductCardListing";
 export default ProductCardListing;

@@ -56,8 +56,12 @@ async function getProducts({
   if (!res.ok) {
     throw new Error("Failed to fetch products");
   }
+ const data = await res.json();
 
-  return res.json();
+
+  console.log("PRODUCTS API RESPONSE:", JSON.stringify(data, null, 2));
+
+  return data;
 }
 
 /* ================= PAGE ================= */
@@ -74,7 +78,7 @@ export default async function ProductsPage({ searchParams }: Props) {
   // ✅ SAFE UNWRAP
   const products: DisplayProduct[] = response.data?.products ?? [];
   const totalPages: number = response.data?.totalPages ?? 1;
- 
+
   return (
     <div
       className="min-h-[calc(100vh-64px)] py-4"

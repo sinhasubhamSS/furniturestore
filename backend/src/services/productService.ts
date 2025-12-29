@@ -110,24 +110,26 @@ class ProductService {
     return query;
   }
 
-  private buildSortOptions(sortBy: string): { [key: string]: 1 | -1 } {
-    switch (sortBy) {
-      case "price_low":
-        return { repSellingPrice: 1, repListingPrice: 1 };
+private buildSortOptions(sortBy: string): { [key: string]: 1 | -1 } {
+  switch (sortBy) {
+    case "price_low":
+      return { repSellingPrice: 1 };
 
-      case "price_high":
-        return { repSellingPrice: -1, repListingPrice: -1 };
+    case "price_high":
+      return { repSellingPrice: -1 };
 
-      case "discount":
-        return { maxDiscountPercent: -1, repSellingPrice: 1 };
+    case "discount":
+      return { maxDiscountPercent: -1, repSellingPrice: 1 };
 
-      case "best":
-        return { repInStock: -1, repDiscountedPrice: 1 };
-      case "latest":
-      default:
-        return { createdAt: -1 };
-    }
+    case "best":
+      return { repInStock: -1, repSellingPrice: 1 };
+
+    case "latest":
+    default:
+      return { createdAt: -1 };
   }
+}
+
 
   private mapToListingDTO(p: any) {
     return {
@@ -394,100 +396,94 @@ class ProductService {
   }
 
   // -------------------- listing & read methods --------------------
-  async getAllProducts(
-    filter: any = {},
-    page: number = 1,
-    limit = 10,
-    isAdmin: boolean = false,
-    populateCreatedBy: boolean = false,
-    sortBy: string = "latest"
-  ) {
-    const mongoFilter: any = {};
-    if (filter.category) {
-      const category = await Category.findOne({ slug: filter.category });
-      if (category) {
-        mongoFilter.category = category._id;
-      } else {
-        return { products: [], page, limit, totalPages: 0, totalItems: 0 };
-      }
+ async getAllProducts(
+  filter: any = {},
+  page: number = 1,
+  limit = 10,
+  isAdmin: boolean = false,
+  populateCreatedBy: boolean = false,
+  sortBy: string = "latest"
+) {
+  const mongoFilter: any = {};
+
+  if (filter.category) {
+    const category = await Category.findOne({ slug: filter.category });
+    if (!category) {
+      return { products: [], page, limit, totalPages: 0, totalItems: 0 };
     }
-
-    const sortOptions = this.buildSortOptions(sortBy);
-
-    const LISTING_PROJECTION = {
-      _id: 1,
-      slug: 1,
-      name: 1,
-      title: 1,
-
-      repImage: 1,
-      repThumbSafe: 1,
-
-      repListingPrice: 1,
-      repSellingPrice: 1,
-      maxDiscountPercent: 1,
-
-      repInStock: 1,
-      totalStock: 1,
-      inStock: 1,
-
-      createdAt: 1,
-      updatedAt: 1,
-      category: 1,
-    };
-
-    const finalFilter = isAdmin
-      ? mongoFilter
-      : { ...mongoFilter, isPublished: true };
-    let query = this.buildProductQuery(finalFilter, isAdmin, populateCreatedBy);
-
-    query = query.select(LISTING_PROJECTION).sort(sortOptions);
-
-    // use helper for pagination
-    query = this.applyPagination(query, page, limit);
-
-    const [products, total] = await Promise.all([
-      query.lean(),
-      Product.countDocuments(finalFilter),
-    ]);
-
-    const dto = (products || []).map((p: any) => {
-      const base = this.mapToListingDTO(p);
-
-      const repPriceVal =
-        typeof p.repPrice !== "undefined" ? p.repPrice : p.price ?? null;
-      const repDiscountedVal =
-        typeof p.repDiscountedPrice !== "undefined"
-          ? p.repDiscountedPrice
-          : p.lowestDiscountedPrice ?? null;
-      const repSavings =
-        repPriceVal && repDiscountedVal
-          ? Math.round((repPriceVal - repDiscountedVal) * 100) / 100
-          : 0;
-
-      return {
-        ...base,
-        repThumbSafe: p.repThumbSafe ?? null,
-        repImage: p.repImage ?? null,
-        repPrice: repPriceVal,
-        repDiscountedPrice: repDiscountedVal,
-        repSavings,
-        repInStock:
-          typeof p.repInStock !== "undefined" ? p.repInStock : !!p.inStock,
-        category: p.category?.name
-          ? { name: p.category.name, _id: p.category._id }
-          : p.category,
-      };
-    });
-
-    return {
-      products: dto,
-      page,
-      limit,
-      totalPages: Math.max(1, Math.ceil(total / limit)),
-      totalItems: total,
-    };
+    mongoFilter.category = category._id;
   }
+
+  const sortOptions = this.buildSortOptions(sortBy);
+
+  const LISTING_PROJECTION = {
+    _id: 1,
+    slug: 1,
+    name: 1,
+    title: 1,
+
+    repImage: 1,
+    repThumbSafe: 1,
+
+    repSellingPrice: 1,
+    repListingPrice: 1,
+    maxDiscountPercent: 1,
+
+    repInStock: 1,
+    totalStock: 1,
+    inStock: 1,
+
+    createdAt: 1,
+    category: 1,
+  };
+
+  const finalFilter = isAdmin
+    ? mongoFilter
+    : { ...mongoFilter, isPublished: true };
+
+  const query = this.buildProductQuery(finalFilter, isAdmin, populateCreatedBy)
+    .select(LISTING_PROJECTION)
+    .sort(sortOptions);
+
+  const paginatedQuery = this.applyPagination(query, page, limit);
+
+  const [products, total] = await Promise.all([
+    paginatedQuery.lean(),
+    Product.countDocuments(finalFilter),
+  ]);
+
+  const dto = products.map((p: any) => ({
+    _id: p._id,
+    name: p.name,
+    slug: p.slug,
+    title: p.title,
+
+    image: p.repThumbSafe || p.repImage || "",
+
+    sellingPrice: p.repSellingPrice,
+    listingPrice: p.repListingPrice ?? p.repSellingPrice,
+    discountPercent: p.maxDiscountPercent ?? 0,
+
+    inStock:
+      typeof p.repInStock !== "undefined" ? p.repInStock : !!p.inStock,
+
+    totalStock: p.totalStock ?? 0,
+
+    category: p.category?.name
+      ? { _id: p.category._id, name: p.category.name }
+      : p.category,
+
+    createdAt: p.createdAt ?? null,
+  }));
+
+  return {
+    products: dto,
+    page,
+    limit,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+    totalItems: total,
+  };
+}
 
   async getLatestProducts(limit: number = 6, isAdmin: boolean = false) {
     const query = this.buildProductQuery({}, isAdmin)
@@ -501,7 +497,6 @@ class ProductService {
       repThumbSafe
       lowestSellingPrice
       maxDiscountPercent
-      repSavings
       repSellingPrice
       repListingPrice
       inStock
@@ -519,7 +514,7 @@ class ProductService {
         image: product.repThumbSafe || product.repImage || "",
         listingPrice: product.repListingPrice ?? product.repSellingPrice,
         sellingPrice: product.repSellingPrice,
-        savings: product.repSavings,
+      
         discountPercent: product.maxDiscountPercent ?? 0,
         inStock: product.inStock ?? false,
         createdAt: product.createdAt || null,
@@ -661,7 +656,9 @@ class ProductService {
     const product = await this.buildProductQuery(finalQuery, isAdmin)
       .findOne()
       .lean();
+ 
     if (!product) throw new AppError("Product not found", 404);
+         console.log(product);
     return product;
   }
 
