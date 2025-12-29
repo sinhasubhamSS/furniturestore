@@ -110,26 +110,25 @@ class ProductService {
     return query;
   }
 
-private buildSortOptions(sortBy: string): { [key: string]: 1 | -1 } {
-  switch (sortBy) {
-    case "price_low":
-      return { repSellingPrice: 1 };
+  private buildSortOptions(sortBy: string): { [key: string]: 1 | -1 } {
+    switch (sortBy) {
+      case "price_low":
+        return { repSellingPrice: 1 };
 
-    case "price_high":
-      return { repSellingPrice: -1 };
+      case "price_high":
+        return { repSellingPrice: -1 };
 
-    case "discount":
-      return { maxDiscountPercent: -1, repSellingPrice: 1 };
+      case "discount":
+        return { maxDiscountPercent: -1, repSellingPrice: 1 };
 
-    case "best":
-      return { repInStock: -1, repSellingPrice: 1 };
+      case "best":
+        return { repInStock: -1, repSellingPrice: 1 };
 
-    case "latest":
-    default:
-      return { createdAt: -1 };
+      case "latest":
+      default:
+        return { createdAt: -1 };
+    }
   }
-}
-
 
   private mapToListingDTO(p: any) {
     return {
@@ -396,94 +395,97 @@ private buildSortOptions(sortBy: string): { [key: string]: 1 | -1 } {
   }
 
   // -------------------- listing & read methods --------------------
- async getAllProducts(
-  filter: any = {},
-  page: number = 1,
-  limit = 10,
-  isAdmin: boolean = false,
-  populateCreatedBy: boolean = false,
-  sortBy: string = "latest"
-) {
-  const mongoFilter: any = {};
+  async getAllProducts(
+    filter: any = {},
+    page: number = 1,
+    limit = 10,
+    isAdmin: boolean = false,
+    populateCreatedBy: boolean = false,
+    sortBy: string = "latest"
+  ) {
+    const mongoFilter: any = {};
 
-  if (filter.category) {
-    const category = await Category.findOne({ slug: filter.category });
-    if (!category) {
-      return { products: [], page, limit, totalPages: 0, totalItems: 0 };
+    if (filter.category) {
+      const category = await Category.findOne({ slug: filter.category });
+      if (!category) {
+        return { products: [], page, limit, totalPages: 0, totalItems: 0 };
+      }
+      mongoFilter.category = category._id;
     }
-    mongoFilter.category = category._id;
+
+    const sortOptions = this.buildSortOptions(sortBy);
+
+    const LISTING_PROJECTION = {
+      _id: 1,
+      slug: 1,
+      name: 1,
+      title: 1,
+
+      repImage: 1,
+      repThumbSafe: 1,
+
+      repSellingPrice: 1,
+      repListingPrice: 1,
+      maxDiscountPercent: 1,
+
+      repInStock: 1,
+      totalStock: 1,
+      inStock: 1,
+
+      createdAt: 1,
+      category: 1,
+    };
+
+    const finalFilter = isAdmin
+      ? mongoFilter
+      : { ...mongoFilter, isPublished: true };
+
+    const query = this.buildProductQuery(
+      finalFilter,
+      isAdmin,
+      populateCreatedBy
+    )
+      .select(LISTING_PROJECTION)
+      .sort(sortOptions);
+
+    const paginatedQuery = this.applyPagination(query, page, limit);
+
+    const [products, total] = await Promise.all([
+      paginatedQuery.lean(),
+      Product.countDocuments(finalFilter),
+    ]);
+
+    const dto = products.map((p: any) => ({
+      _id: p._id,
+      name: p.name,
+      slug: p.slug,
+      title: p.title,
+
+      image: p.repThumbSafe || p.repImage || "",
+
+      sellingPrice: p.repSellingPrice,
+      listingPrice: p.repListingPrice ?? p.repSellingPrice,
+      discountPercent: p.maxDiscountPercent ?? 0,
+
+      inStock: typeof p.repInStock !== "undefined" ? p.repInStock : !!p.inStock,
+
+      totalStock: p.totalStock ?? 0,
+
+      category: p.category?.name
+        ? { _id: p.category._id, name: p.category.name }
+        : p.category,
+
+      createdAt: p.createdAt ?? null,
+    }));
+
+    return {
+      products: dto,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+      totalItems: total,
+    };
   }
-
-  const sortOptions = this.buildSortOptions(sortBy);
-
-  const LISTING_PROJECTION = {
-    _id: 1,
-    slug: 1,
-    name: 1,
-    title: 1,
-
-    repImage: 1,
-    repThumbSafe: 1,
-
-    repSellingPrice: 1,
-    repListingPrice: 1,
-    maxDiscountPercent: 1,
-
-    repInStock: 1,
-    totalStock: 1,
-    inStock: 1,
-
-    createdAt: 1,
-    category: 1,
-  };
-
-  const finalFilter = isAdmin
-    ? mongoFilter
-    : { ...mongoFilter, isPublished: true };
-
-  const query = this.buildProductQuery(finalFilter, isAdmin, populateCreatedBy)
-    .select(LISTING_PROJECTION)
-    .sort(sortOptions);
-
-  const paginatedQuery = this.applyPagination(query, page, limit);
-
-  const [products, total] = await Promise.all([
-    paginatedQuery.lean(),
-    Product.countDocuments(finalFilter),
-  ]);
-
-  const dto = products.map((p: any) => ({
-    _id: p._id,
-    name: p.name,
-    slug: p.slug,
-    title: p.title,
-
-    image: p.repThumbSafe || p.repImage || "",
-
-    sellingPrice: p.repSellingPrice,
-    listingPrice: p.repListingPrice ?? p.repSellingPrice,
-    discountPercent: p.maxDiscountPercent ?? 0,
-
-    inStock:
-      typeof p.repInStock !== "undefined" ? p.repInStock : !!p.inStock,
-
-    totalStock: p.totalStock ?? 0,
-
-    category: p.category?.name
-      ? { _id: p.category._id, name: p.category.name }
-      : p.category,
-
-    createdAt: p.createdAt ?? null,
-  }));
-
-  return {
-    products: dto,
-    page,
-    limit,
-    totalPages: Math.max(1, Math.ceil(total / limit)),
-    totalItems: total,
-  };
-}
 
   async getLatestProducts(limit: number = 6, isAdmin: boolean = false) {
     const query = this.buildProductQuery({}, isAdmin)
@@ -514,7 +516,7 @@ private buildSortOptions(sortBy: string): { [key: string]: 1 | -1 } {
         image: product.repThumbSafe || product.repImage || "",
         listingPrice: product.repListingPrice ?? product.repSellingPrice,
         sellingPrice: product.repSellingPrice,
-      
+
         discountPercent: product.maxDiscountPercent ?? 0,
         inStock: product.inStock ?? false,
         createdAt: product.createdAt || null,
@@ -648,17 +650,63 @@ private buildSortOptions(sortBy: string): { [key: string]: 1 | -1 } {
   }
 
   // -------------------- helpers for single product --------------------
+  private PDP_PROJECTION = {
+    // product level
+    name: 1,
+    slug: 1,
+    title: 1,
+    description: 1,
+    specifications: 1,
+    measurements: 1,
+    warranty: 1,
+    disclaimer: 1,
+
+    category: 1,
+
+    reviewStats: {
+      averageRating: 1,
+      totalReviews: 1,
+    },
+
+    // variants (actual selling data)
+    variants: {
+      _id: 1,
+      sku: 1,
+      color: 1,
+      size: 1,
+      images: 1,
+
+      sellingPrice: 1,
+      listingPrice: 1,
+      savings: 1,
+      discountPercent: 1,
+      stock: 1,
+    },
+
+    // helpers
+    primaryVariantId: 1,
+  };
+
   private async getSingleProduct(
     query: FilterQuery<IProductInput>,
     isAdmin: boolean = false
   ) {
     const finalQuery = isAdmin ? query : { ...query, isPublished: true };
-    const product = await this.buildProductQuery(finalQuery, isAdmin)
-      .findOne()
-      .lean();
- 
-    if (!product) throw new AppError("Product not found", 404);
-         console.log(product);
+
+    let mongooseQuery = this.buildProductQuery(finalQuery, isAdmin).findOne();
+
+    // 🔥 IMPORTANT PART
+    if (!isAdmin) {
+      mongooseQuery = mongooseQuery.select(this.PDP_PROJECTION);
+    }
+
+    const product = await mongooseQuery.lean();
+
+    if (!product) {
+      throw new AppError("Product not found", 404);
+    }
+    console.log(product);
+
     return product;
   }
 

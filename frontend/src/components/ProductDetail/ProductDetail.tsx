@@ -7,6 +7,7 @@ import { AppDispatch, RootState } from "@/redux/store";
 import {
   setQuantity,
   resetProductState,
+  setSelectedVariant,
 } from "@/redux/slices/ProductDetailSlice";
 
 import ImageGallery from "./ImageGallery";
@@ -30,20 +31,29 @@ const ProductDetailClient: React.FC<Props> = ({ product }) => {
   const dispatch = useDispatch<AppDispatch>();
   const user = useSelector((state: RootState) => state.user.activeUser);
 
+  /**
+   * ✅ IMPORTANT FIX
+   * Product load hote hi default variant select karo
+   */
   useEffect(() => {
-    if (product) {
-      dispatch(setQuantity(1));
-    }
+    if (!product?.variants?.length) return;
+
+    const defaultVariant =
+      product.variants.find((v) => v._id === product.primaryVariantId) ||
+      product.variants[0];
+
+    dispatch(setSelectedVariant(defaultVariant));
+    dispatch(setQuantity(1));
   }, [product, dispatch]);
 
+  /**
+   * ✅ Cleanup on unmount
+   */
   useEffect(() => {
     return () => {
       dispatch(resetProductState());
     };
   }, [dispatch]);
-
-  // ❌ No loading / error here
-  // SSR already gave us data
 
   return (
     <div className="w-full min-h-screen bg-[var(--color-primary)] pt-8">
@@ -60,7 +70,11 @@ const ProductDetailClient: React.FC<Props> = ({ product }) => {
           {/* Right */}
           <div className="w-full lg:w-[60%] bg-[var(--color-card)] rounded-xl p-4">
             <ProductHeader product={product} />
-            <ProductPrice variants={product.variants} />
+
+            {/* Price depends on selectedVariant (Redux) */}
+            <ProductPrice />
+
+            {/* Variant selector (user interaction only) */}
             <VariantSelector variants={product.variants} />
 
             <div className="flex flex-col sm:flex-row gap-4 mt-4">

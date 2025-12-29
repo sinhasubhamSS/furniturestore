@@ -57,10 +57,6 @@ async function getProducts({
     throw new Error("Failed to fetch products");
   }
  const data = await res.json();
-
-
-  console.log("PRODUCTS API RESPONSE:", JSON.stringify(data, null, 2));
-
   return data;
 }
 

@@ -43,19 +43,19 @@ export type Variant = {
   gstAmount?: number; // computed GST amount (internal)
 
   // Marketing vs final:
-  listingPrice?: number; // marketing MRP (display - strike-through)
-  sellingPrice?: number; // final customer pays (includes GST)
+  listingPrice: number; // marketing MRP (display - strike-through)
+  sellingPrice: number; // final customer pays (includes GST)
   stock: number;
   reservedStock?: number;
   images: VariantImage[];
 
   // legacy/compat (kept in many places)
 
-  savings?: number; // listingPrice - sellingPrice
+  savings: number; // listingPrice - sellingPrice
 
   // discount display fields
-  hasDiscount?: boolean;
-  discountPercent?: number; // rounded integer percent for "XX% off"
+  hasDiscount: boolean;
+  discountPercent: number; // rounded integer percent for "XX% off"
   discountValidUntil?: string | Date;
 
   // audit / meta (optional)
