@@ -133,6 +133,8 @@ const CheckoutSummary = React.memo(
                     alt={product.name}
                     width={64}
                     height={64}
+                    priority={idx === 0} // 👈 ONLY first item
+                    sizes="64px"
                     style={{ objectFit: "contain" }}
                   />
                 </div>

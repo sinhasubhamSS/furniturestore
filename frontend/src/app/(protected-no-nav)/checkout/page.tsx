@@ -7,7 +7,7 @@ function assertSellingPrice(
     throw new Error(`Invariant failed: sellingPrice missing (${context})`);
   }
 }
-
+import { toast } from "react-hot-toast";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useRouter } from "next/navigation";
@@ -88,7 +88,10 @@ export default function CheckoutPage() {
     // ---------- CART PURCHASE ----------
     if (type === "cart_purchase" && cartData?.items?.length) {
       return cartData.items.reduce((sum, item) => {
-        const variant = item.product.variants[0];
+        const variant = item.product.variants.find(
+          (v) => v._id === item.variantId
+        );
+
         if (!variant) return sum;
 
         assertSellingPrice(variant.sellingPrice, "cart_purchase variant");
@@ -147,6 +150,18 @@ export default function CheckoutPage() {
 
     return [];
   }, [type, items, product, cartData]);
+  const hasOutOfStockItem = useMemo(() => {
+    return checkoutItems.some((item) => {
+      const variant = item.product.variants.find(
+        (v) => v._id === item.variantId
+      );
+
+      if (!variant) return true;
+
+      const stock = variant.stock ?? 0;
+      return stock <= 0;
+    });
+  }, [checkoutItems]);
 
   // fetch pricing when address chosen (same logic)
   useEffect(() => {
@@ -230,7 +245,6 @@ export default function CheckoutPage() {
     isRehydrated,
     getCheckoutPricing,
     dispatch,
-    subtotal,
   ]);
 
   // redirect if no checkout data
@@ -250,12 +264,23 @@ export default function CheckoutPage() {
   const handleQuantityChange = async (index: number, newQuantity: number) => {
     const item = checkoutItems[index];
     if (!item) return;
+
     const variant = item.product.variants?.find(
       (v: Variant) => v._id === item.variantId
     );
     if (!variant) return;
 
-    const clamped = Math.max(1, Math.min(newQuantity, variant.stock ?? 0));
+    const stock = variant.stock ?? 0;
+
+    // 🚫 Out of stock → stop + feedback
+    if (stock <= 0) {
+      toast.error("This item is out of stock");
+      return;
+    }
+
+    const clamped = Math.max(1, Math.min(newQuantity, stock));
+
+    // 🔒 Prevent rapid double updates
     if (quantityUpdateInProgress.current) return;
 
     try {
@@ -283,7 +308,7 @@ export default function CheckoutPage() {
     } catch (err: any) {
       console.error("[CHECKOUT] Failed to update quantity:", err);
       if (type === "cart_purchase") await refetchCart();
-      alert("Failed to update cart quantity. Please try again.");
+      toast.error("Failed to update cart quantity");
     } finally {
       quantityUpdateInProgress.current = false;
     }
@@ -291,13 +316,11 @@ export default function CheckoutPage() {
 
   const handleProceedToPayment = () => {
     if (!selectedAddress) {
-      alert("Please select a delivery address");
+      toast("Please select a delivery address");
       return;
     }
     if (!deliveryAvailable) {
-      alert(
-        "Selected address is not deliverable. Please choose a different address."
-      );
+      toast("Delivery not available for this address");
       return;
     }
     router.push("/checkout/payment");
@@ -307,7 +330,11 @@ export default function CheckoutPage() {
     deliverable: boolean,
     pricingData?: CheckoutPricingResponse
   ) => {
+    // 🔁 reset old pricing first
+    setPricingData(undefined);
+    setDeliveryInfo(null);
     setDeliveryAvailable(deliverable);
+
     if (pricingData) {
       setPricingData(pricingData);
       setDeliveryInfo(pricingData.deliveryInfo);
@@ -539,7 +566,11 @@ export default function CheckoutPage() {
               <button
                 onClick={handleProceedToPayment}
                 disabled={
-                  !selectedAddress || !deliveryAvailable || loadingPricing
+                  !selectedAddress ||
+                  !deliveryAvailable ||
+                  loadingPricing ||
+                  !pricingData ||
+                  hasOutOfStockItem
                 }
                 style={{
                   width: "100%",
@@ -547,18 +578,28 @@ export default function CheckoutPage() {
                   borderRadius: 10,
                   fontWeight: 800,
                   background:
-                    !selectedAddress || !deliveryAvailable || loadingPricing
+                    !selectedAddress ||
+                    !deliveryAvailable ||
+                    loadingPricing ||
+                    !pricingData ||
+                    hasOutOfStockItem
                       ? "var(--color-hover-card)"
                       : "var(--color-accent)",
                   color: "var(--text-light)",
                   cursor:
-                    !selectedAddress || !deliveryAvailable || loadingPricing
+                    !selectedAddress ||
+                    !deliveryAvailable ||
+                    loadingPricing ||
+                    !pricingData ||
+                    hasOutOfStockItem
                       ? "not-allowed"
                       : "pointer",
                 }}
               >
                 {!selectedAddress
                   ? "Select Address"
+                  : hasOutOfStockItem
+                  ? "Item Out of Stock"
                   : !deliveryAvailable
                   ? "Delivery Not Available"
                   : loadingPricing
