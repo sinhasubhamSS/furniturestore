@@ -61,6 +61,8 @@ const EditProductPage = () => {
     ...restProduct,
     category: typeof category === "string" ? category : category._id,
     variants: (product.variants ?? []).map((v: Variant) => ({
+      listingPrice: v.listingPrice,
+      sellingPrice:v.sellingPrice,
       color: v.color,
       size: v.size,
       basePrice: v.basePrice ?? 0,
@@ -69,7 +71,6 @@ const EditProductPage = () => {
       hasDiscount: !!v.hasDiscount,
       discountPercent: v.discountPercent ?? 0,
       discountValidUntil: normalizeDiscountValidUntil(v.discountValidUntil),
-      discountedPrice: v.discountedPrice ?? 0,
       images: (v.images ?? []).map((img: VariantImage) => ({
         url: img.url,
         public_id: img.public_id,

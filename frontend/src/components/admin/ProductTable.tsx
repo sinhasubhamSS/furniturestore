@@ -51,7 +51,9 @@ const ProductTable: React.FC = () => {
 
             // --- PRICE fallback chain ---
             const displayPrice =
-              product.repPrice ?? product.price ?? v0?.price ?? null;
+              product.sellingPrice ??
+              product.variants?.[0]?.sellingPrice ??
+              null;
 
             // --- STOCK fallback chain ---
             const displayStock =

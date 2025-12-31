@@ -38,7 +38,7 @@ export const variantSchema = z
 
     // keep optional: frontend will pass empty string or undefined
     discountValidUntil: z.string().optional(),
-    discountedPrice: z.number().optional().default(0),
+
 
     images: z
       .array(

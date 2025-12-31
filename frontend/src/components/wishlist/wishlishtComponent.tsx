@@ -22,9 +22,8 @@ const WishlistItem = ({ product, onRemove, onAddToCart, isAdding }: Props) => {
     );
   }
 
-  const finalPrice = firstVariant.hasDiscount
-    ? firstVariant.discountedPrice
-    : firstVariant.price;
+  const sellingPrice = firstVariant.sellingPrice;
+  const listingPrice = firstVariant.listingPrice;
 
   return (
     <div className="bg-[var(--color-card)] rounded-lg shadow-sm border border-[var(--color-border-custom)] hover:shadow-md transition-shadow">
@@ -52,7 +51,7 @@ const WishlistItem = ({ product, onRemove, onAddToCart, isAdding }: Props) => {
                 {product.title}
               </p>
             </div>
-            
+
             {/* Remove Button - Mobile Only */}
             <Button
               variant="outline"
@@ -77,19 +76,24 @@ const WishlistItem = ({ product, onRemove, onAddToCart, isAdding }: Props) => {
           <div className="flex items-center justify-between gap-2 mt-1">
             {/* Price */}
             <div className="flex items-center gap-1">
+              {/* FINAL PRICE */}
               <span className="text-base sm:text-lg font-medium text-[var(--color-foreground)]">
-                ₹{finalPrice?.toLocaleString()}
+                ₹{sellingPrice.toLocaleString()}
               </span>
-              {firstVariant.hasDiscount && firstVariant.price && (
-                <>
-                  <span className="text-xs line-through text-gray-500">
-                    ₹{firstVariant.price.toLocaleString()}
-                  </span>
-                  <span className="bg-green-100 text-green-700 px-1 py-0.5 rounded text-xs">
-                    {firstVariant.discountPercent}% off
-                  </span>
-                </>
-              )}
+
+              {/* MRP + Discount */}
+              {listingPrice &&
+                listingPrice > sellingPrice &&
+                firstVariant.hasDiscount && (
+                  <>
+                    <span className="text-xs line-through text-gray-500">
+                      ₹{listingPrice.toLocaleString()}
+                    </span>
+                    <span className="bg-green-100 text-green-700 px-1 py-0.5 rounded text-xs">
+                      {firstVariant.discountPercent}% off
+                    </span>
+                  </>
+                )}
             </div>
 
             {/* Bottom Actions - Desktop/Tablet */}
@@ -98,7 +102,9 @@ const WishlistItem = ({ product, onRemove, onAddToCart, isAdding }: Props) => {
               {onAddToCart && (
                 <Button
                   onClick={onAddToCart}
-                  disabled={isAdding || !firstVariant.stock || firstVariant.stock <= 0}
+                  disabled={
+                    isAdding || !firstVariant.stock || firstVariant.stock <= 0
+                  }
                   className="text-xs px-2 py-1"
                 >
                   {isAdding ? "Adding..." : "Add to Cart"}

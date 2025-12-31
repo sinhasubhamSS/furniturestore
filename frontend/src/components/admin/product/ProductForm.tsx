@@ -17,7 +17,7 @@ type ProductFormProps = {
   loading?: boolean;
 };
 
-const defaultVariant: CreateProductInput["variants"][number] = {
+const defaultVariant = {
   color: "",
   size: "",
   images: [],
@@ -27,8 +27,8 @@ const defaultVariant: CreateProductInput["variants"][number] = {
   hasDiscount: false,
   discountPercent: 0,
   discountValidUntil: "",
-  discountedPrice: 0,
   listingPrice: undefined,
+  sellingPrice: undefined,
 };
 
 const ProductForm: React.FC<ProductFormProps> = ({
