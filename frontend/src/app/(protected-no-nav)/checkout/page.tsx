@@ -3,10 +3,13 @@ function assertSellingPrice(
   value: unknown,
   context: string
 ): asserts value is number {
-  if (typeof value !== "number") {
-    throw new Error(`Invariant failed: sellingPrice missing (${context})`);
+  if (process.env.NODE_ENV !== "production") {
+    if (typeof value !== "number") {
+      throw new Error(`Invariant failed: sellingPrice missing (${context})`);
+    }
   }
 }
+
 import { toast } from "react-hot-toast";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
@@ -52,6 +55,7 @@ export default function CheckoutPage() {
   >(undefined);
   const [loadingPricing, setLoadingPricing] = useState(false);
   const quantityUpdateInProgress = useRef(false);
+  const pricingRequestKeyRef = useRef<string | null>(null);
 
   const productId =
     type === "direct_purchase" && items.length > 0 ? items[0].productId : null;
@@ -68,7 +72,10 @@ export default function CheckoutPage() {
   } = useGetCartQuery(undefined, {
     skip: type !== "cart_purchase" || !isRehydrated,
   });
-
+  // 🔁 Reset pricing cache when address changes
+  useEffect(() => {
+    pricingRequestKeyRef.current = null;
+  }, [selectedAddress?._id]);
   const [updateQty] = useUpdateQuantityMutation();
   const [getCheckoutPricing] = useGetCheckoutPricingMutation();
 
@@ -175,7 +182,25 @@ export default function CheckoutPage() {
 
     let cancelled = false;
     const fetchPricing = async () => {
+      // 🔐 Stable pricing key (duplicate + race guard)
+      const pricingKey = JSON.stringify({
+        pincode: selectedAddress.pincode,
+        items: checkoutItems
+          .map((i) => ({
+            variantId: i.variantId,
+            quantity: i.quantity,
+          }))
+          .sort((a, b) => a.variantId.localeCompare(b.variantId)),
+      });
+
+      // ⛔ Same input → no API call
+      if (pricingRequestKeyRef.current === pricingKey) {
+        return;
+      }
+      pricingRequestKeyRef.current = pricingKey;
+
       setLoadingPricing(true);
+
       try {
         const orderItems =
           type === "cart_purchase"
@@ -288,6 +313,7 @@ export default function CheckoutPage() {
 
       if (type === "direct_purchase") {
         dispatch(updateQuantity(clamped));
+        pricingRequestKeyRef.current = null;
       } else if (type === "cart_purchase") {
         dispatch(
           updateItemQuantity({
@@ -296,6 +322,7 @@ export default function CheckoutPage() {
             quantity: clamped,
           })
         );
+        pricingRequestKeyRef.current = null;
 
         await updateQty({
           productId: item.product._id,
@@ -319,10 +346,17 @@ export default function CheckoutPage() {
       toast("Please select a delivery address");
       return;
     }
+
+    if (loadingPricing || !pricingData) {
+      toast("Calculating final price, please wait…");
+      return;
+    }
+
     if (!deliveryAvailable) {
       toast("Delivery not available for this address");
       return;
     }
+
     router.push("/checkout/payment");
   };
 
