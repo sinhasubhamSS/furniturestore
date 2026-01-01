@@ -9,7 +9,7 @@ import {
 } from "@/redux/services/user/orderApi";
 import { resetCheckout } from "@/redux/slices/checkoutSlice";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { OrderCreationResponse, PaymentMethod } from "@/types/order";
 
 /* ================= CONFIG ================= */
@@ -53,6 +53,8 @@ const PaymentPage = () => {
   const [pricingData, setPricingData] = useState<any>(null);
   const [loadingPricing, setLoadingPricing] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState("");
+  const pricingKeyRef = useRef<string | null>(null);
+  const paymentInProgressRef = useRef(false);
 
   useEffect(() => {
     setIdempotencyKey(generateIdempotencyKey());
@@ -69,9 +71,20 @@ const PaymentPage = () => {
   }, [items]);
 
   /* ================= PRICING (BACKEND AUTHORITY) ================= */
+  useEffect(() => {
+    pricingKeyRef.current = null;
+    setPricingData(null);
+  }, [shippingAddress?._id]);
 
   useEffect(() => {
     if (!shippingAddress?.pincode || orderItems.length === 0) return;
+    const key = JSON.stringify({
+      pincode: shippingAddress.pincode,
+      items: orderItems,
+    });
+
+    if (pricingKeyRef.current === key) return;
+    pricingKeyRef.current = key;
 
     let cancelled = false;
 
@@ -144,9 +157,25 @@ const PaymentPage = () => {
   /* ================= PAYMENT HANDLER ================= */
 
   const handlePayment = async () => {
-    if (!selectedMethod) return alert("Please select payment method");
-    if (!shippingAddress) return alert("Please select address");
-    if (!pricingData) return alert("Pricing not ready");
+    if (paymentInProgressRef.current) return;
+    paymentInProgressRef.current = true;
+
+    if (!selectedMethod) {
+      paymentInProgressRef.current = false;
+      return alert("Please select payment method");
+    }
+    if (!shippingAddress) {
+      paymentInProgressRef.current = false;
+      return alert("Please select address");
+    }
+    if (!pricingData) {
+      paymentInProgressRef.current = false;
+      return alert("Pricing not ready");
+    }
+    if (payableNow <= 0 || Number.isNaN(payableNow)) {
+      paymentInProgressRef.current = false;
+      return alert("Invalid payment amount. Please refresh.");
+    }
 
     // COD
     if (selectedMethod === "COD") {
@@ -161,13 +190,17 @@ const PaymentPage = () => {
       }).unwrap();
 
       dispatch(resetCheckout());
+      paymentInProgressRef.current = false;
       router.push(`/order-success?orderId=${res.orderId}`);
       return;
     }
 
     // ONLINE / ADVANCE
     const ok = await loadRazorpay();
-    if (!ok) return alert("Payment system failed to load");
+    if (!ok) {
+      paymentInProgressRef.current = false;
+      return alert("Payment system failed to load");
+    }
 
     const razorpayOrder = await createRazorpayOrder(payableNow).unwrap();
 
@@ -195,7 +228,13 @@ const PaymentPage = () => {
         }).unwrap();
 
         dispatch(resetCheckout());
+        paymentInProgressRef.current = false;
         router.push(`/order-success?orderId=${res.orderId}`);
+      },
+      modal: {
+        ondismiss: () => {
+          paymentInProgressRef.current = false;
+        },
       },
     });
 
