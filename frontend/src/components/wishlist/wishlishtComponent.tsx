@@ -13,37 +13,29 @@ type Props = {
 
 const WishlistItem = ({ product, onRemove, onAddToCart, isAdding }: Props) => {
   const firstVariant = product.variants?.[0];
+  if (!firstVariant) return null;
 
-  if (!firstVariant) {
-    return (
-      <div className="bg-[var(--color-card)] p-4 rounded-lg text-center text-sm text-[var(--text-accent)]">
-        Product variant not available
-      </div>
-    );
-  }
-
-  const sellingPrice = firstVariant.sellingPrice;
-  const listingPrice = firstVariant.listingPrice;
+  const { sellingPrice, listingPrice } = firstVariant;
 
   return (
-    <div className="w-full rounded-xl border border-[var(--color-border-custom)] bg-[var(--color-card)] p-3 shadow-sm">
-      <div className="flex gap-3">
+    <div className="group relative w-full rounded-2xl border border-[var(--color-border-custom)] bg-[var(--color-card)] p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+      <div className="flex gap-4">
         {/* IMAGE */}
-        <div className="h-20 w-20 flex-shrink-0 rounded-lg border bg-[var(--color-secondary)] p-1">
+        <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-xl border bg-[var(--color-secondary)]">
           <Image
             src={firstVariant.images?.[0]?.url || "/placeholder.jpg"}
             alt={product.name}
-            width={80}
-            height={80}
-            className="h-full w-full object-contain"
+            fill
+            sizes="96px"
+            className="object-contain p-2 transition-transform duration-300 group-hover:scale-105"
           />
         </div>
 
         {/* CONTENT */}
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex min-w-0 flex-1 flex-col">
           {/* TITLE */}
           <div>
-            <h3 className="truncate text-sm font-semibold text-[var(--color-foreground)] sm:text-base">
+            <h3 className="truncate text-base font-semibold text-[var(--color-foreground)]">
               {product.name}
             </h3>
             <p className="truncate text-xs text-[var(--text-accent)]">
@@ -51,21 +43,26 @@ const WishlistItem = ({ product, onRemove, onAddToCart, isAdding }: Props) => {
             </p>
           </div>
 
-          {/* VARIANT + STOCK */}
-          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-accent)]">
-            <span>
+          {/* META */}
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-[var(--text-accent)]">
               {firstVariant.color} • {firstVariant.size}
             </span>
+
             {firstVariant.stock && firstVariant.stock > 0 ? (
-              <span className="text-green-600">In Stock</span>
+              <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700">
+                In Stock
+              </span>
             ) : (
-              <span className="text-red-500">Out of Stock</span>
+              <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-600">
+                Out of Stock
+              </span>
             )}
           </div>
 
           {/* PRICE */}
-          <div className="flex flex-wrap items-center gap-2 mt-1">
-            <span className="text-base font-semibold text-[var(--color-foreground)]">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="text-lg font-bold text-[var(--color-foreground)]">
               ₹{sellingPrice.toLocaleString()}
             </span>
 
@@ -73,34 +70,34 @@ const WishlistItem = ({ product, onRemove, onAddToCart, isAdding }: Props) => {
               listingPrice > sellingPrice &&
               firstVariant.hasDiscount && (
                 <>
-                  <span className="text-xs line-through text-gray-400">
+                  <span className="text-sm line-through text-gray-400">
                     ₹{listingPrice.toLocaleString()}
                   </span>
-                  <span className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-700">
+                  <span className="rounded-md bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
                     {firstVariant.discountPercent}% OFF
                   </span>
                 </>
               )}
           </div>
 
-          {/* ACTIONS – FULL WIDTH */}
-          <div className="mt-2 flex w-full gap-2">
+          {/* ACTIONS */}
+          <div className="mt-3 flex w-full gap-2">
             {onAddToCart && (
               <Button
                 onClick={onAddToCart}
                 disabled={
                   isAdding || !firstVariant.stock || firstVariant.stock <= 0
                 }
-                className="h-9 w-full text-xs"
+                className="h-10 w-full text-sm font-medium"
               >
-                {isAdding ? "Adding..." : "Add to Cart"}
+                {isAdding ? "Adding..." : "Move to Cart"}
               </Button>
             )}
 
             <Button
               variant="outline"
               onClick={onRemove}
-              className="h-9 w-full text-xs"
+              className="h-10 w-full text-sm"
             >
               Remove
             </Button>
