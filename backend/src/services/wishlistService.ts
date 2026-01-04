@@ -3,98 +3,120 @@ import { Wishlist } from "../models/wishlist.models";
 import { AppError } from "../utils/AppError";
 
 class WishlistService {
-  async addToWishlist(userId: string, productId: string) {
-    if (!productId) throw new AppError("product id is required", 403);
-    let wishlist = await Wishlist.findOne({ user: userId });
-    //if not wishlist then check and create new wishlist
-    if (!wishlist) {
-      wishlist = await Wishlist.create({ user: userId, products: [] });
+  /* ================= ADD ================= */
+  async addToWishlist(userId: string, productId: string, variantId: string) {
+    if (!productId || !variantId) {
+      throw new AppError("productId and variantId required", 400);
     }
-    // const alreadyExisting = wishlist.products.includes(productId as any);
 
-    const alreadyExisting = wishlist.products.some((id) =>
-      id.equals(new Types.ObjectId(productId))
+    const result = await Wishlist.findOneAndUpdate(
+      { user: userId },
+      {
+        $addToSet: {
+          items: {
+            product: new Types.ObjectId(productId),
+            variantId: new Types.ObjectId(variantId),
+          },
+        },
+      },
+      {
+        new: true,
+        upsert: true,
+      }
     );
 
-    if (alreadyExisting) throw new AppError("Product already in wishlist", 409);
-    wishlist.products.push(new Types.ObjectId(productId));
-    await wishlist.save();
-    return wishlist;
-  }
-  async removeFromWishlist(userId: string, productId: string) {
-    const wishlist = await Wishlist.findOne({ user: userId });
+    if (!result) {
+      throw new AppError("Unable to add to wishlist", 500);
+    }
 
-    if (!wishlist) {
+    return {
+      productId,
+      variantId,
+    };
+  }
+
+  /* ================= REMOVE ================= */
+  async removeFromWishlist(
+    userId: string,
+    productId: string,
+    variantId: string
+  ) {
+    const result = await Wishlist.findOneAndUpdate(
+      { user: userId },
+      {
+        $pull: {
+          items: {
+            product: new Types.ObjectId(productId),
+            variantId: new Types.ObjectId(variantId),
+          },
+        },
+      },
+      { new: true }
+    );
+
+    if (!result) {
       throw new AppError("Wishlist not found", 404);
     }
 
-    wishlist.products = wishlist.products.filter(
-      (pid) => !pid.equals(new Types.ObjectId(productId))
-    );
-
-    await wishlist.save();
-    return { message: "Product removed from wishlist" };
+    return {
+      productId,
+      variantId,
+    };
   }
 
+  /* ================= SIMPLE LIST (Navbar / Badge) ================= */
   async getWishlist(userId: string) {
-    const wishlist = await Wishlist.findOne({ user: userId });
+    const wishlist = await Wishlist.findOne({ user: userId }, { items: 1 });
 
-    // ✅ If wishlist doesn't exist yet, return empty array instead of error
-    if (!wishlist) {
-      return [];
-    }
+    if (!wishlist) return [];
 
-    // ✅ Return product IDs as strings
-    return wishlist.products.map((pid) => pid.toString());
+    return wishlist.items.map((item) => ({
+      productId: item.product.toString(),
+      variantId: item.variantId.toString(),
+    }));
   }
 
-  async isInWishlist(userId: string, productId: string) {
-    const wishlist = await Wishlist.findOne({ user: userId });
-
-    if (!wishlist) return { isWishlisted: false };
-
-    const isWishlisted = wishlist.products.some(
-      (id) => id.toString() === productId
-    );
-
-    return { isWishlisted };
-  }
-  // wishlistService.ts में enhanced getWishlistWithProducts method:
-  // wishlistService.ts में getWishlistWithProducts को update करें:
-  async getWishlistWithProducts(userId: string) {
-    
-
-    const wishlist = await Wishlist.findOne({ user: userId }).populate({
-      path: "products",
-      select: "name price images slug title variants category", // ✅ Added variants and category
-      populate: {
-        path: "variants", // ✅ Populate variants sub-documents
-        select:
-          "_id color size price discountedPrice hasDiscount discountPercent images",
+  /* ================= CHECK (Optional API) ================= */
+  async isInWishlist(userId: string, productId: string, variantId: string) {
+    const wishlist = await Wishlist.findOne({
+      user: userId,
+      items: {
+        $elemMatch: {
+          product: new Types.ObjectId(productId),
+          variantId: new Types.ObjectId(variantId),
+        },
       },
     });
 
-  
+    return { isWishlisted: !!wishlist };
+  }
 
-    // ✅ Return empty array instead of throwing error
-    if (!wishlist) {
-     
-      return [];
-    }
-
-
-    // ✅ Log variant information for debugging
-    wishlist.products.forEach((product: any, index: number) => {
-      
+  /* ================= FULL DATA (Wishlist Page) ================= */
+  async getWishlistWithProducts(userId: string) {
+    const wishlist = await Wishlist.findOne({ user: userId }).populate({
+      path: "items.product",
+      select: `
+        name
+        slug
+        title
+        category
+        image
+        sellingPrice
+        listingPrice
+        discountPercent
+        variants
+      `,
     });
 
-    // ✅ Filter out any null/undefined products (safety check)
-    const validProducts = wishlist.products.filter(
-      (product) => product != null
-    );
+    if (!wishlist) return [];
 
-    
-    return validProducts;
+    return wishlist.items
+      .filter((item) => item.product)
+      .map((item) => ({
+        product: item.product,
+        variantId: item.variantId.toString(),
+      }));
   }
 }
+
 export const wishlistService = new WishlistService();

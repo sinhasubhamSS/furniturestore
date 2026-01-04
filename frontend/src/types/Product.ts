@@ -133,6 +133,10 @@ export type DisplayProduct = BaseProduct & {
       }
     | string;
 };
+export type WishlistItemType = {
+  product: DisplayProduct;
+  variantId: string;
+};
 export type AdminProductResponse = {
   products: DisplayProduct[]; // product list
   page: number;

@@ -16,18 +16,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clearActiveUser } from "@/redux/slices/userSlice";
 import { useGetCartCountQuery } from "@/redux/services/user/cartApi";
-import { useWishlistidsQuery } from "@/redux/services/user/wishlistApi";
 import axiosClient from "../../utils/axios";
 
 const Navbar = () => {
   const activeUser = useSelector((state: RootState) => state.user.activeUser);
 
   // ✅ Wishlist API - sirf jab user login hoga
-  const { data: wishlistIds = [], isLoading: wishlistLoading } =
-    useWishlistidsQuery(undefined, {
-      skip: !activeUser,
-    });
-  const wishlistCount = wishlistIds.length;
+  
 
   // ✅ Cart API - sirf jab user login hoga
   const { data: cartCountData, isLoading: cartCountLoading } =
@@ -67,11 +62,7 @@ const Navbar = () => {
   }, []);
 
   // ✅ Debugging logs
-  useEffect(() => {
-    console.log("🔄 Navbar wishlistCount:", wishlistCount);
-    console.log("🔄 Navbar cartCount:", cartCount);
-  }, [wishlistCount, cartCount]);
-
+ 
   return (
     <nav className="fixed top-0 left-0 w-full z-[1000] bg-[var(--color-secondary)] backdrop-blur border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
       <div className="px-4 sm:px-6 lg:px-8">
@@ -208,11 +199,7 @@ const Navbar = () => {
                           onClick={() => setIsDropdownOpen(false)}
                         >
                           <span>❤️ My Wishlist</span>
-                          {wishlistCount > 0 && (
-                            <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full pointer-events-none">
-                              {wishlistCount}
-                            </span>
-                          )}
+                         
                         </Link>
                       </div>
 

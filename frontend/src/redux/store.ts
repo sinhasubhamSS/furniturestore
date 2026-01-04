@@ -1,7 +1,7 @@
 import { configureStore, combineReducers } from "@reduxjs/toolkit";
 import userReducer from "./slices/userSlice";
 import checkoutReducer from "./slices/checkoutSlice";
-import wishlistReducer from "./slices/wishlistSlice";
+
 
 import {
   persistStore,
@@ -42,7 +42,7 @@ const rootReducer = combineReducers({
   user: userReducer,
   checkout: checkoutReducer,
   productDetail: productDetailReducer,
-  wishlist: wishlistReducer,
+
 
   [adminProductApi.reducerPath]: adminProductApi.reducer,
   [adminCategoryApi.reducerPath]: adminCategoryApi.reducer,

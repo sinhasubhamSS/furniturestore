@@ -1,86 +1,127 @@
-// redux/services/user/wishlistApi.ts
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { axiosBaseQuery } from "@/redux/api/customBaseQuery";
-import { DisplayProduct } from "@/types/Product";
+import { WishlistItemType } from "@/types/Product";
+
+/* =====================================================
+   TYPES
+===================================================== */
+
+export type WishlistKeyItem = {
+  productId: string;
+  variantId: string;
+};
+
+/* =====================================================
+   API
+===================================================== */
 
 export const wishlistApi = createApi({
   reducerPath: "wishlistApi",
   baseQuery: axiosBaseQuery(),
   tagTypes: ["Wishlist"],
   endpoints: (builder) => ({
-    // Full product list (populated) for wishlist
-    getWishlistWithProducts: builder.query<DisplayProduct[], void>({
+    /* ========== LIGHT WISHLIST (SOURCE OF TRUTH) ========== */
+
+    getWishlist: builder.query<WishlistKeyItem[], void>({
+      query: () => ({
+        url: "/wishlist",
+        method: "GET",
+      }),
+      transformResponse: (res: any) =>
+        Array.isArray(res?.data?.items) ? res.data.items : [],
+      providesTags: ["Wishlist"],
+    }),
+
+    /* ========== HEAVY WISHLIST (PAGE ONLY) ========== */
+
+    getWishlistWithProducts: builder.query<WishlistItemType[], void>({
       query: () => ({
         url: "/wishlist/products",
         method: "GET",
       }),
-      transformResponse: (response: any) => {
-        // backend returns ApiResponse { status, data: DisplayProduct[], message }
-        const data = response?.data ?? [];
-        if (!Array.isArray(data)) return [];
-        return data as DisplayProduct[];
-      },
+      transformResponse: (res: any) =>
+        Array.isArray(res?.data) ? res.data : [],
       providesTags: ["Wishlist"],
     }),
 
-    // Get wishlist IDs only (normalize to string[])
-    Wishlistids: builder.query<string[], void>({
-      query: () => ({
-        url: `/wishlist`,
-        method: "GET",
-      }),
-      transformResponse: (response: any) => {
-        // Expecting ApiResponse { status, data: { items: [], productIds: [] } }
-        const data = response?.data;
+    /* ========== ADD ========== */
 
-        // If already an array returned directly -> map to strings
-        if (Array.isArray(data)) {
-          return data.map(String);
-        }
-
-        // If data.productIds exists and is array -> use it
-        if (data && Array.isArray(data.productIds)) {
-          return data.productIds.map(String);
-        }
-
-        // If data.items is array of objects -> try extract productId field
-        if (data && Array.isArray(data.items)) {
-          const ids = data.items
-            .map((it: any) => it.productId ?? it)
-            .filter(Boolean)
-            .map(String);
-          return ids;
-        }
-
-        // Fallback to empty array
-        return [];
-      },
-      providesTags: ["Wishlist"],
-    }),
-
-    addToWishlist: builder.mutation<void, { productId: string }>({
-      query: ({ productId }) => ({
+    addToWishlist: builder.mutation<
+      void,
+      { productId: string; variantId: string }
+    >({
+      query: (body) => ({
         url: "/wishlist/add",
         method: "POST",
-        data: { productId },
+        data: body,
       }),
-      invalidatesTags: ["Wishlist"],
+
+      async onQueryStarted(
+        { productId, variantId },
+        { dispatch, queryFulfilled }
+      ) {
+        const patch = dispatch(
+          wishlistApi.util.updateQueryData(
+            "getWishlist",
+            undefined,
+            (draft) => {
+              draft.push({ productId, variantId });
+            }
+          )
+        );
+
+        try {
+          await queryFulfilled;
+        } catch {
+          patch.undo();
+        }
+      },
     }),
 
-    removeFromWishlist: builder.mutation<void, { productId: string }>({
-      query: ({ productId }) => ({
+    /* ========== REMOVE ========== */
+
+    removeFromWishlist: builder.mutation<
+      void,
+      { productId: string; variantId: string }
+    >({
+      query: (body) => ({
         url: "/wishlist/remove",
         method: "DELETE",
-        data: { productId },
+        data: body,
       }),
-      invalidatesTags: ["Wishlist"],
+
+      async onQueryStarted(
+        { productId, variantId },
+        { dispatch, queryFulfilled }
+      ) {
+        const patch = dispatch(
+          wishlistApi.util.updateQueryData(
+            "getWishlist",
+            undefined,
+            (draft) =>
+              draft.filter(
+                (i) =>
+                  !(
+                    i.productId === productId &&
+                    i.variantId === variantId
+                  )
+              )
+          )
+        );
+
+        try {
+          await queryFulfilled;
+        } catch {
+          patch.undo();
+        }
+      },
     }),
   }),
 });
 
 export const {
+  useGetWishlistQuery,
   useGetWishlistWithProductsQuery,
-  useWishlistidsQuery,
   useAddToWishlistMutation,
   useRemoveFromWishlistMutation,
 } = wishlistApi;

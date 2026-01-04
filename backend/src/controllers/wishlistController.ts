@@ -7,10 +7,17 @@ import { ApiResponse } from "../utils/ApiResponse";
 
 export const addToWishlist = catchAsync(
   async (req: AuthRequest, res: Response) => {
+    console.log("reached add to wishlist controller");
     const userId = req.userId;
-    const { productId } = req.body;
+    const { productId, variantId } = req.body;
+
     if (!userId) throw new AppError("userId not found", 403);
-    const wishlist = await wishlistService.addToWishlist(userId, productId);
+    console.log("activate add to wishlist ", variantId);
+    const wishlist = await wishlistService.addToWishlist(
+      userId,
+      productId,
+      variantId
+    );
     res
       .status(200)
       .json(new ApiResponse(200, wishlist, "Product added to wishlist"));
@@ -20,10 +27,14 @@ export const addToWishlist = catchAsync(
 export const removeFromWishlist = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const userId = req.userId;
-    const { productId } = req.body;
+    const { productId, variantId } = req.body;
     if (!userId) throw new AppError("User not authenticated", 403);
 
-    const result = await wishlistService.removeFromWishlist(userId, productId);
+    const result = await wishlistService.removeFromWishlist(
+      userId,
+      productId,
+      variantId
+    );
     res
       .status(200)
       .json(new ApiResponse(200, result, "Product removed from wishlist"));
@@ -34,24 +45,17 @@ export const getWishlist = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const userId = req.userId;
 
-    // For anonymous users: return empty list (public-friendly)
     if (!userId) {
-      return res
-        .status(200)
-        .json(new ApiResponse(200, { items: [], productIds: [] }, "OK"));
+      return res.status(200).json(new ApiResponse(200, { items: [] }, "OK"));
     }
 
-    // wishlistService.getWishlist returns string[] of productIds
-    const result = await wishlistService.getWishlist(userId);
+    const items = await wishlistService.getWishlist(userId);
 
-    // Normalize & return compact shape
-    const productIds = Array.isArray(result) ? result.map(String) : [];
     return res
       .status(200)
-      .json(new ApiResponse(200, { items: [], productIds }, "Wishlist fetched successfully"));
+      .json(new ApiResponse(200, { items }, "Wishlist fetched successfully"));
   }
 );
-
 
 export const getWishlistWithProducts = catchAsync(
   async (req: AuthRequest, res: Response) => {
@@ -74,12 +78,16 @@ export const getWishlistWithProducts = catchAsync(
 export const isInWishlist = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const userId = req.userId;
-    const { productId } = req.query;
+    const { productId, variantId } = req.body;
     if (!userId) throw new AppError("User not authenticated", 403);
     if (!productId || typeof productId !== "string")
       throw new AppError("Invalid productId", 400);
 
-    const result = await wishlistService.isInWishlist(userId, productId);
+    const result = await wishlistService.isInWishlist(
+      userId,
+      productId,
+      variantId
+    );
     res.status(200).json(new ApiResponse(200, result, "Check successful"));
   }
 );
