@@ -145,6 +145,7 @@ class ProductService {
       discountPercent: p.maxDiscountPercent ?? 0,
       inStock: !!p.repInStock,
       totalStock: p.totalStock ?? 0,
+      primaryVariantId: p.primaryVariantId,
 
       createdAt: p.createdAt || null,
       //meta title/description
@@ -427,7 +428,7 @@ class ProductService {
       repSellingPrice: 1,
       repListingPrice: 1,
       maxDiscountPercent: 1,
-
+      primaryVariantId: 1,
       repInStock: 1,
       totalStock: 1,
       inStock: 1,
@@ -466,7 +467,7 @@ class ProductService {
       sellingPrice: p.repSellingPrice,
       listingPrice: p.repListingPrice ?? p.repSellingPrice,
       discountPercent: p.maxDiscountPercent ?? 0,
-
+      primaryVariantId: p.primaryVariantId,
       inStock: typeof p.repInStock !== "undefined" ? p.repInStock : !!p.inStock,
 
       totalStock: p.totalStock ?? 0,
@@ -492,18 +493,19 @@ class ProductService {
       .sort({ createdAt: -1 })
       .select(
         `
-      name
-      slug
-      category
-      repImage
-      repThumbSafe
-      lowestSellingPrice
-      maxDiscountPercent
-      repSellingPrice
-      repListingPrice
-      inStock
-      createdAt
-      `
+        name
+        slug
+        category
+        repImage
+        repThumbSafe
+        lowestSellingPrice
+        maxDiscountPercent
+        repSellingPrice
+        repListingPrice
+          primaryVariantId
+        inStock
+        createdAt
+        `
       );
 
     const products = await this.applyPagination(query, 1, limit).lean();
@@ -516,7 +518,7 @@ class ProductService {
         image: product.repThumbSafe || product.repImage || "",
         listingPrice: product.repListingPrice ?? product.repSellingPrice,
         sellingPrice: product.repSellingPrice,
-
+        primaryVariantId: product.primaryVariantId,
         discountPercent: product.maxDiscountPercent ?? 0,
         inStock: product.inStock ?? false,
         createdAt: product.createdAt || null,

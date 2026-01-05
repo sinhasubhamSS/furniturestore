@@ -26,9 +26,9 @@ export const useWishlist = () => {
     if (addState.isLoading || removeState.isLoading) return;
 
     if (isInWishlist(productId, variantId)) {
-      await removeFromWishlist({ productId, variantId });
+      await removeFromWishlist({ productId, variantId }).unwrap();
     } else {
-      await addToWishlist({ productId, variantId });
+      await addToWishlist({ productId, variantId }).unwrap();
     }
   };
 
