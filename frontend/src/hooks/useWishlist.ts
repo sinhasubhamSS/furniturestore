@@ -13,18 +13,61 @@ export const useWishlist = () => {
   const [addToWishlist, addState] = useAddToWishlistMutation();
   const [removeFromWishlist, removeState] = useRemoveFromWishlistMutation();
 
-  const wishlistSet = useMemo(
-    () => new Set(data.map((i) => `${i.productId}_${i.variantId}`)),
-    [data]
-  );
+  /* =====================================================
+     DEBUG: RAW DATA FROM API
+  ===================================================== */
 
-  const isInWishlist = (productId: string, variantId: string) =>
-    wishlistSet.has(`${productId}_${variantId}`);
+  // console.log("[useWishlist] raw wishlist data:", data);
+  // console.log("[useWishlist] isLoading:", isLoading);
+
+  /* =====================================================
+     NORMALIZED SET (SOURCE OF TRUTH)
+     🔥 industry standard: always normalize ids to string
+  ===================================================== */
+
+  const wishlistSet = useMemo(() => {
+    const set = new Set<string>();
+
+    data.forEach((i) => {
+      if (!i?.productId || !i?.variantId) return;
+
+      const key = `${String(i.productId)}_${String(i.variantId)}`;
+      set.add(key);
+    });
+
+    // console.log("[useWishlist] wishlistSet keys:", Array.from(set));
+
+    return set;
+  }, [data]);
+
+  /* =====================================================
+     CHECK
+  ===================================================== */
+
+  const isInWishlist = (productId: string, variantId: string) => {
+    const key = `${String(productId)}_${String(variantId)}`;
+    const result = wishlistSet.has(key);
+
+    console.log(" isInWishlist check:", {
+      productId,
+      variantId,
+      key,
+      result,
+    });
+
+    return result;
+  };
+
+  /* =====================================================
+     TOGGLE
+  ===================================================== */
 
   const toggleWishlist = async (productId: string, variantId: string) => {
     if (!productId || !variantId) return;
+
     if (addState.isLoading || removeState.isLoading) return;
 
+    
     if (isInWishlist(productId, variantId)) {
       await removeFromWishlist({ productId, variantId }).unwrap();
     } else {
@@ -33,10 +76,15 @@ export const useWishlist = () => {
   };
 
   return {
+    isReady: !isLoading, // 🔥 correct & required
     isLoading,
     wishlistCount: data.length,
     isInWishlist,
     toggleWishlist,
     isMutating: addState.isLoading || removeState.isLoading,
+
+    // DEBUG helpers (optional – future)
+    // __rawWishlist: data,
+    // __wishlistSet: wishlistSet,
   };
 };

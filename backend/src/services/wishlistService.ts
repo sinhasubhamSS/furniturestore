@@ -76,21 +76,6 @@ class WishlistService {
     }));
   }
 
-  /* ================= CHECK (Optional API) ================= */
-  async isInWishlist(userId: string, productId: string, variantId: string) {
-    const wishlist = await Wishlist.findOne({
-      user: userId,
-      items: {
-        $elemMatch: {
-          product: new Types.ObjectId(productId),
-          variantId: new Types.ObjectId(variantId),
-        },
-      },
-    });
-
-    return { isWishlisted: !!wishlist };
-  }
-
   /* ================= FULL DATA (Wishlist Page) ================= */
   async getWishlistWithProducts(userId: string) {
     const wishlist = await Wishlist.findOne({ user: userId }).populate({
@@ -117,6 +102,20 @@ class WishlistService {
         variantId: item.variantId.toString(),
       }));
   }
+  /* ================= CHECK (Optional API) ================= */
+  // async isInWishlist(userId: string, productId: string, variantId: string) {
+  //   const wishlist = await Wishlist.findOne({
+  //     user: userId,
+  //     items: {
+  //       $elemMatch: {
+  //         product: new Types.ObjectId(productId),
+  //         variantId: new Types.ObjectId(variantId),
+  //       },
+  //     },
+  //   });
+
+  //   return { isWishlisted: !!wishlist };
+  // }
 }
 
 export const wishlistService = new WishlistService();

@@ -1,5 +1,4 @@
-import Link from "next/link";
-import ProductCardListing from "@/components/product/ProductCardListing";
+import ProductsGridClient from "@/components/product/ProductsGridClient";
 import Pagination from "@/components/pagination/Pagination";
 import SortDropdownClient from "@/components/filter/SortDropdownClient";
 import type { DisplayProduct } from "@/types/Product";
@@ -26,7 +25,7 @@ type ProductsPayload = {
 };
 
 type Props = {
-  searchParams: Promise<SearchParams>; // ✅ Next.js 15 requirement
+  searchParams: Promise<SearchParams>; // ✅ Next.js 15
 };
 
 /* ================= API CALL ================= */
@@ -53,11 +52,9 @@ async function getProducts({
     { cache: "no-store" } // ✅ pure SSR
   );
 
-  if (!res.ok) {
-    throw new Error("Failed to fetch products");
-  }
- const data = await res.json();
-  return data;
+  if (!res.ok) throw new Error("Failed to fetch products");
+
+  return res.json();
 }
 
 /* ================= PAGE ================= */
@@ -71,7 +68,6 @@ export default async function ProductsPage({ searchParams }: Props) {
 
   const response = await getProducts({ page, sortBy, category });
 
-  // ✅ SAFE UNWRAP
   const products: DisplayProduct[] = response.data?.products ?? [];
   const totalPages: number = response.data?.totalPages ?? 1;
 
@@ -85,28 +81,15 @@ export default async function ProductsPage({ searchParams }: Props) {
         <h1 className="text-lg font-semibold truncate">
           {category ?? "All Products"}
         </h1>
-
         <SortDropdownClient currentSort={sortBy} />
       </div>
 
       {/* ================= PRODUCTS ================= */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-[1px] px-4">
-        {products.length > 0 ? (
-          products.map((product) => (
-            <Link
-              key={product._id}
-              href={`/products/${product.slug}`}
-              className="block h-full"
-            >
-              <ProductCardListing product={product} />
-            </Link>
-          ))
-        ) : (
-          <div className="col-span-full text-center py-20">
-            No products found
-          </div>
-        )}
-      </div>
+      {products.length > 0 ? (
+        <ProductsGridClient products={products} />
+      ) : (
+        <div className="text-center py-20">No products found</div>
+      )}
 
       {/* ================= PAGINATION ================= */}
       {totalPages > 1 && (
