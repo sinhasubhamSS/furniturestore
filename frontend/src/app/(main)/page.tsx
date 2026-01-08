@@ -18,8 +18,21 @@ export default async function HomePage() {
 
   return (
     <>
+      {/* 🔥 SEO STATIC SECTION (hidden for users, visible for Google) */}
+      <section className="sr-only">
+        <h1>Suvidhawood  Furniture Store in Gumla, Jharkhand</h1>
+        <p>
+           Suvidha Furniture (Suvidhawood)
+            is a trusted wooden furniture manufacturer and
+          seller in Gumla, Jharkhand. We offer beds, almirahs, sofas, tables,
+          and custom-made premium furniture at affordable prices.
+        </p>
+        <p>Gumla, Jharkhand. Phone: 09334265348</p>
+      </section>
+
+      {/* Visible UI */}
       <HeroSection products={products.slice(0, 3)} />
-      <CategorySection /> {/* ✅ NO PROPS */}
+      <CategorySection />
       <TrendingSectionClient data={products.slice(0, 6)} />
     </>
   );
