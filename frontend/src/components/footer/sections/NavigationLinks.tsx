@@ -1,7 +1,7 @@
 import React from "react";
 import { navigationData } from "../data/NavigationData";
 import type { NavigationSection, NavigationLink } from "@/types/footer/footer";
-
+import Link from "next/link";
 const NavigationLinks: React.FC = () => {
   return (
     <div className="space-y-6">
@@ -18,12 +18,12 @@ const NavigationLinks: React.FC = () => {
             <ul className="space-y-1">
               {section.links.map((link: NavigationLink, linkIndex: number) => (
                 <li key={linkIndex}>
-                  <a
+                  <Link
                     href={link.url}
                     className="text-sm text-[--text-accent] hover:text-[--color-accent] hover:underline transition-colors"
                   >
                     {link.name}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
