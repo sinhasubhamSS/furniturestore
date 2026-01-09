@@ -1,7 +1,11 @@
 // app/layout.tsx
 import "./globals.css";
 import ReduxProviders from "./ReduxProviders";
-
+export const metadata = {
+  verification: {
+    google: "Hr6ao2ZD8sWSrzjQG9OOFmuQscHJsz9xb12PUIeMsgQ", // 👈 yahan apna code paste karo
+  },
+};
 export default function RootLayout({
   children,
 }: {
