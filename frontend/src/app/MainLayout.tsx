@@ -19,7 +19,7 @@ export default function MainLayout({
       localStorage.clear();
 
       // Hard redirect
-      window.location.href = "/login";
+      window.location.href = "/auth/login";
     };
 
     window.addEventListener("force-logout", handler);

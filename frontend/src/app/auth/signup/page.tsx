@@ -20,6 +20,7 @@ type SignupFormValues = {
   confirmPassword: string;
 };
 
+
 const SignupPage = () => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
 

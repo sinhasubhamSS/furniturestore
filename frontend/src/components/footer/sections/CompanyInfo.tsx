@@ -33,13 +33,15 @@ const CompanyInfo: React.FC = () => {
         <div className="w-12 h-12 bg-[--color-accent] rounded-lg flex items-center justify-center">
           <span className="text-[--text-light] font-bold text-xl">SF</span>
         </div>
-        <h3 className="text-2xl font-bold text-[--color-accent]">Suvidha Furniture</h3>
+        <h3 className="text-2xl font-bold text-[--color-accent]">
+          Suvidhawood <span className="text-sm">(by Suvidha Furniture)</span>
+        </h3>
       </div>
 
       {/* Description */}
       <p className="text-[--text-accent] leading-relaxed">
         Premium quality products delivered to your doorstep. Your trusted
-        e-commerce partner since 2020 with over {stats.customers} satisfied
+        e-commerce partner since 1995 with over {stats.customers} satisfied
         customers.
       </p>
 
