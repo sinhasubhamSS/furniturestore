@@ -1,22 +1,18 @@
 "use client";
 import { useEffect } from "react";
-import Navbar from "@/components/Navbar";
 
-export default function MainLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function ClientAuthListener() {
   useEffect(() => {
     const handler = () => {
-      console.log("🚪 Force logout handled (MainLayout)");
+      console.log("🚪 Force logout triggered");
 
       // Clear cookies
       document.cookie = "accessToken=; Max-Age=0; path=/";
       document.cookie = "refreshToken=; Max-Age=0; path=/";
 
-      // Clear storage / redux / cache
+      // Clear storage
       localStorage.clear();
+      sessionStorage.clear();
 
       // Hard redirect
       window.location.href = "/auth/login";
@@ -26,12 +22,5 @@ export default function MainLayout({
     return () => window.removeEventListener("force-logout", handler);
   }, []);
 
-  return (
-    <main>
-      <div className="max-w-[1440px] mx-auto">
-        <Navbar />
-        {children}
-      </div>
-    </main>
-  );
+  return null;
 }
