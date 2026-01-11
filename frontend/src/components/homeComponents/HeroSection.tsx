@@ -126,8 +126,12 @@ const HeroSection: React.FC<Props> = ({ products = [], isLoading = false }) => {
         {/* LEFT TEXT — unchanged */}
         <div className="md:col-span-5 text-center md:text-left space-y-6">
           <h1 className="text-4xl sm:text-5xl xl:text-6xl font-bold text-[var(--text-accent)]">
-            Suvidha <br className="md:hidden" /> Furniture Store
+            Suvidhawood
+            <span className="block text-lg sm:text-xl font-medium opacity-80 mt-2">
+              by Suvidha Furniture 
+            </span>
           </h1>
+
           <p className="text-lg sm:text-xl max-w-md">
             Quality Furniture For Every Home – Durable. Stylish. Affordable.
           </p>
