@@ -1,100 +1,107 @@
-import ProductsGridClient from "@/components/product/ProductsGridClient";
-import Pagination from "@/components/pagination/Pagination";
-import SortDropdownClient from "@/components/filter/SortDropdownClient";
-import type { DisplayProduct } from "@/types/Product";
+import ProductDetailClient from "@/components/ProductDetail/ProductDetail";
+import { notFound } from "next/navigation";
+import { Metadata } from "next";
 
-/* ================= TYPES ================= */
+interface PageProps {
+  params: Promise<{ slug: string }>;
+}
 
-type SearchParams = {
-  page?: string;
-  sortBy?: string;
-  category?: string;
-};
-
-type ApiResponse<T> = {
-  statusCode: number;
-  success: boolean;
-  message: string;
-  data: T;
-};
-
-type ProductsPayload = {
-  products: DisplayProduct[];
-  totalPages: number;
-  totalItems: number;
-};
-
-type Props = {
-  searchParams: Promise<SearchParams>; // ✅ Next.js 15
-};
-
-/* ================= API CALL ================= */
-
-async function getProducts({
-  page,
-  sortBy,
-  category,
-}: {
-  page: number;
-  sortBy: string;
-  category?: string;
-}): Promise<ApiResponse<ProductsPayload>> {
-  const params = new URLSearchParams({
-    page: String(page),
-    limit: "12",
-    sortBy,
-  });
-
-  if (category) params.set("category", category);
+/* ================= SEO METADATA ================= */
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const { slug } = await params;
 
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/all?${params.toString()}`,
-    { cache: "no-store" } // ✅ pure SSR
+    `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/slug/${slug}`,
+    { cache: "no-store" }
   );
 
-  if (!res.ok) throw new Error("Failed to fetch products");
+  if (!res.ok) return {};
 
-  return res.json();
+  const json = await res.json();
+  const product = json.data;
+
+  if (!product) return {};
+
+  return {
+    title: `${product.name} | Suvidhawood by Suvidha Furniture`,
+    description:
+      product.shortDescription ||
+      `Buy ${product.name} online in Gumla, Jharkhand from Suvidhawood by Suvidha Furniture.`,
+
+    alternates: {
+      canonical: `https://suvidhawood.com/products/${product.slug}`,
+    },
+
+    openGraph: {
+      type: "website", // ✅ Next.js supported
+      title: product.name,
+      description:
+        product.shortDescription ||
+        "Premium wooden furniture by Suvidhawood",
+      url: `https://suvidhawood.com/products/${product.slug}`,
+      images: [
+        {
+          url: product.image,
+          width: 800,
+          height: 600,
+          alt: product.name,
+        },
+      ],
+    },
+  };
 }
 
 /* ================= PAGE ================= */
+export default async function ProductSlugPage({ params }: PageProps) {
+  const { slug } = await params;
 
-export default async function ProductsPage({ searchParams }: Props) {
-  const params = await searchParams;
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/slug/${slug}`,
+    { cache: "no-store" }
+  );
 
-  const page = Number(params.page ?? 1);
-  const sortBy = params.sortBy ?? "latest";
-  const category = params.category;
+  if (!res.ok) notFound();
 
-  const response = await getProducts({ page, sortBy, category });
+  const json = await res.json();
+  const product = json.data;
 
-  const products: DisplayProduct[] = response.data?.products ?? [];
-  const totalPages: number = response.data?.totalPages ?? 1;
+  if (!product) notFound();
 
   return (
-    <div
-      className="min-h-[calc(100vh-64px)] py-4"
-      style={{ background: "var(--color-primary)" }}
-    >
-      {/* ================= HEADER ================= */}
-      <div className="flex items-center justify-between gap-3 mb-4 px-4">
-        <h1 className="text-lg font-semibold truncate">
-          {category ?? "All Products"}
-        </h1>
-        <SortDropdownClient currentSort={sortBy} />
-      </div>
+    <>
+      {/* 🔥 PRODUCT SCHEMA FOR GOOGLE */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Product",
+            name: product.name,
+            image: product.image,
+            description:
+              product.shortDescription ||
+              "Premium wooden furniture by Suvidhawood",
+            brand: {
+              "@type": "Brand",
+              name: "Suvidhawood by Suvidha Furniture",
+            },
+            offers: {
+              "@type": "Offer",
+              url: `https://suvidhawood.com/products/${product.slug}`,
+              priceCurrency: "INR",
+              price: product.sellingPrice,
+              availability: product.inStock
+                ? "https://schema.org/InStock"
+                : "https://schema.org/OutOfStock",
+            },
+          }),
+        }}
+      />
 
-      {/* ================= PRODUCTS ================= */}
-      {products.length > 0 ? (
-        <ProductsGridClient products={products} />
-      ) : (
-        <div className="text-center py-20">No products found</div>
-      )}
-
-      {/* ================= PAGINATION ================= */}
-      {totalPages > 1 && (
-        <Pagination currentPage={page} totalPages={totalPages} />
-      )}
-    </div>
+      {/* UI – unchanged */}
+      <ProductDetailClient product={product} />
+    </>
   );
 }
