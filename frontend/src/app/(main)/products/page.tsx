@@ -39,6 +39,7 @@ async function getProducts(params: SearchParams) {
 
   if (!res.ok) throw new Error("Failed to fetch products");
   return res.json();
+  
 }
 
 export default async function ProductsPage({
