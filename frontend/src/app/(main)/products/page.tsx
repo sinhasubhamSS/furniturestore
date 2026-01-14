@@ -1,107 +1,75 @@
-import ProductDetailClient from "@/components/ProductDetail/ProductDetail";
-import { notFound } from "next/navigation";
+// app/(main)/products/page.tsx
+
+import ProductsGridClient from "@/components/product/ProductsGridClient";
+import Pagination from "@/components/pagination/Pagination";
+import SortDropdownClient from "@/components/filter/SortDropdownClient";
+import type { DisplayProduct } from "@/types/Product";
 import { Metadata } from "next";
 
-interface PageProps {
-  params: Promise<{ slug: string }>;
-}
+export const metadata: Metadata = {
+  title: "All Products | Suvidhawood by Suvidha Furniture",
+  description:
+    "Browse all wooden furniture including beds, sofas, almirahs and tables from Suvidhawood by Suvidha Furniture, Gumla Jharkhand.",
+  alternates: {
+    canonical: "https://suvidhawood.com/products",
+  },
+};
 
-/* ================= SEO METADATA ================= */
-export async function generateMetadata({
-  params,
-}: PageProps): Promise<Metadata> {
-  const { slug } = await params;
+type SearchParams = {
+  page?: string;
+  sortBy?: string;
+  category?: string;
+};
+
+async function getProducts(params: SearchParams) {
+  const query = new URLSearchParams({
+    page: params.page ?? "1",
+    limit: "12",
+    sortBy: params.sortBy ?? "latest",
+  });
+
+  if (params.category) {
+    query.set("category", params.category);
+  }
 
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/slug/${slug}`,
+    `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/all?${query}`,
     { cache: "no-store" }
   );
 
-  if (!res.ok) return {};
-
-  const json = await res.json();
-  const product = json.data;
-
-  if (!product) return {};
-
-  return {
-    title: `${product.name} | Suvidhawood by Suvidha Furniture`,
-    description:
-      product.shortDescription ||
-      `Buy ${product.name} online in Gumla, Jharkhand from Suvidhawood by Suvidha Furniture.`,
-
-    alternates: {
-      canonical: `https://suvidhawood.com/products/${product.slug}`,
-    },
-
-    openGraph: {
-      type: "website", // ✅ Next.js supported
-      title: product.name,
-      description:
-        product.shortDescription ||
-        "Premium wooden furniture by Suvidhawood",
-      url: `https://suvidhawood.com/products/${product.slug}`,
-      images: [
-        {
-          url: product.image,
-          width: 800,
-          height: 600,
-          alt: product.name,
-        },
-      ],
-    },
-  };
+  if (!res.ok) throw new Error("Failed to fetch products");
+  return res.json();
 }
 
-/* ================= PAGE ================= */
-export default async function ProductSlugPage({ params }: PageProps) {
-  const { slug } = await params;
+export default async function ProductsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const response = await getProducts(searchParams);
 
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/slug/${slug}`,
-    { cache: "no-store" }
-  );
-
-  if (!res.ok) notFound();
-
-  const json = await res.json();
-  const product = json.data;
-
-  if (!product) notFound();
+  const products: DisplayProduct[] = response.data.products;
+  const totalPages = response.data.totalPages;
 
   return (
-    <>
-      {/* 🔥 PRODUCT SCHEMA FOR GOOGLE */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Product",
-            name: product.name,
-            image: product.image,
-            description:
-              product.shortDescription ||
-              "Premium wooden furniture by Suvidhawood",
-            brand: {
-              "@type": "Brand",
-              name: "Suvidhawood by Suvidha Furniture",
-            },
-            offers: {
-              "@type": "Offer",
-              url: `https://suvidhawood.com/products/${product.slug}`,
-              priceCurrency: "INR",
-              price: product.sellingPrice,
-              availability: product.inStock
-                ? "https://schema.org/InStock"
-                : "https://schema.org/OutOfStock",
-            },
-          }),
-        }}
-      />
+    <div className="py-4 min-h-screen bg-[var(--color-primary)]">
+      <div className="flex justify-between items-center px-4 mb-4">
+        <h1 className="text-xl font-semibold">All Products</h1>
+        <SortDropdownClient currentSort={searchParams.sortBy ?? "latest"} />
+      </div>
 
-      {/* UI – unchanged */}
-      <ProductDetailClient product={product} />
-    </>
+      {products.length > 0 ? (
+        <ProductsGridClient products={products} />
+      ) : (
+        <div className="text-center py-20">No products found</div>
+      )}
+
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={Number(searchParams.page ?? 1)}
+          totalPages={totalPages}
+        />
+      )}
+    </div>
   );
 }

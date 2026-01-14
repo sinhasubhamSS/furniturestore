@@ -96,7 +96,7 @@ export default function CategorySectionClient({ categories }: Props) {
                 <CategoryCard
                   category={cat}
                   isCompact
-                  onClick={() => router.push(`/products?category=${cat.slug}`)}
+                  onClick={() => router.push(`/category/${cat.slug}`)}
                 />
               </div>
             ))}

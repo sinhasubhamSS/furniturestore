@@ -18,7 +18,12 @@ function isPublicPath(pathname: string) {
     pathname.startsWith("/api") ||
     pathname.startsWith("/static") ||
     pathname.startsWith("/auth") ||
-    pathname.startsWith("/policies")
+    pathname.startsWith("/policies") ||
+    pathname.startsWith("/products") ||
+    pathname.startsWith("/category") ||
+    pathname === "/" ||
+    pathname === "/about-us" ||
+    pathname === "/contact-us"
   );
 }
 
