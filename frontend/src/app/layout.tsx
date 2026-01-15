@@ -7,6 +7,10 @@ export const metadata = {
   verification: {
     google: "Hr6ao2ZD8sWSrzjQG9OOFmuQscHJsz9xb12PUIeMsgQ", // 👈 yahan apna code paste karo
   },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 export default function RootLayout({
   children,
@@ -35,7 +39,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-[var(--color-primary)] text-[var(--color-foreground)] transition-colors duration-300">
         <ReduxProviders>
-            <ClientAuthListener />
+          <ClientAuthListener />
           <div className="">{children}</div>
         </ReduxProviders>
       </body>

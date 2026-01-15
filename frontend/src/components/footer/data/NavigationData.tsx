@@ -4,7 +4,6 @@ export const navigationData: NavigationSection[] = [
   {
     title: "Shop",
     links: [
-      { name: "New Arrivals", url: "/new-arrivals" },
       { name: "All Products", url: "/products" },
     ],
   },

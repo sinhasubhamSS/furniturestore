@@ -1,6 +1,11 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/footer/index"; // Footer import karo
-
+export const metadata = {
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
 export default function MainLayout({
   children,
 }: {
