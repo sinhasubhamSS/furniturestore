@@ -3,17 +3,33 @@
 import Link from "next/link";
 import { useWishlist } from "@/hooks/useWishlist";
 import ProductCardListing from "./ProductCardListing";
+import ProductCardSkeleton from "./ProductCardSkeleton";
 import type { DisplayProduct } from "@/types/Product";
 
 export default function ProductsGridClient({
   products,
+  isLoading = false,
 }: {
   products: DisplayProduct[];
+  isLoading?: boolean;
 }) {
   const { isReady, isInWishlist, toggleWishlist, isMutating } = useWishlist();
 
+  const gridClass =
+    "grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 px-4";
+
+  if (isLoading) {
+    return (
+      <div className={gridClass}>
+        {Array.from({ length: 10 }).map((_, i) => (
+          <ProductCardSkeleton key={i} />
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-[1px] px-4">
+    <div className={gridClass}>
       {products.map((product) => {
         const productId = String(product._id);
         const variantId = product.primaryVariantId
@@ -32,7 +48,11 @@ export default function ProductsGridClient({
         };
 
         return (
-          <Link key={productId} href={`/products/${product.slug}`}>
+          <Link
+            key={productId}
+            href={`/products/${product.slug}`}
+            className="block h-full"
+          >
             <ProductCardListing
               product={product}
               isWishlisted={isWishlisted}

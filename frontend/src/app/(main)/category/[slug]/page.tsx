@@ -70,6 +70,7 @@ async function getCategoryProducts({
   page: number;
   sortBy: string;
 }): Promise<ApiResponse<ProductsPayload>> {
+  await new Promise((r) => setTimeout(r, 2000));
   const params = new URLSearchParams({
     page: String(page),
     limit: "12",

@@ -10,6 +10,7 @@ interface PageProps {
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
+
   const { slug } = await params;
 
   const res = await fetch(
@@ -38,8 +39,7 @@ export async function generateMetadata({
       type: "website", // ✅ Next.js supported
       title: product.name,
       description:
-        product.shortDescription ||
-        "Premium wooden furniture by Suvidhawood",
+        product.shortDescription || "Premium wooden furniture by Suvidhawood",
       url: `https://suvidhawood.com/products/${product.slug}`,
       images: [
         {
