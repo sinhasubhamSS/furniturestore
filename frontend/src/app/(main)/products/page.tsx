@@ -1,7 +1,4 @@
-// app/(main)/products/page.tsx
-
-import ProductsGridClient from "@/components/product/ProductsGridClient";
-import Pagination from "@/components/pagination/Pagination";
+import InfiniteProductsClient from "@/components/product/InfiniteProductsClient";
 import SortDropdownClient from "@/components/filter/SortDropdownClient";
 import type { DisplayProduct } from "@/types/Product";
 import type { Metadata } from "next";
@@ -21,7 +18,6 @@ export const metadata: Metadata = {
 /* ================= TYPES ================= */
 
 type SearchParams = {
-  page?: string;
   sortBy?: string;
   category?: string;
 };
@@ -31,31 +27,25 @@ type PageProps = {
 };
 
 type ApiResponse<T> = {
-  statusCode: number;
   success: boolean;
-  message: string;
   data: T;
 };
 
 type ProductsPayload = {
   products: DisplayProduct[];
   totalPages: number;
-  totalItems: number;
 };
 
-/* ================= API CALL ================= */
+/* ================= PAGE ================= */
 
-async function getProducts({
-  page,
-  sortBy,
-  category,
-}: {
-  page: number;
-  sortBy: string;
-  category?: string;
-}): Promise<ApiResponse<ProductsPayload>> {
+export default async function ProductsPage({ searchParams }: PageProps) {
+  const query = (await searchParams) ?? {};
+
+  const sortBy = query.sortBy ?? "latest";
+  const category = query.category;
+
   const params = new URLSearchParams({
-    page: String(page),
+    page: "1",
     limit: "12",
     sortBy,
   });
@@ -71,23 +61,10 @@ async function getProducts({
     throw new Error("Failed to fetch products");
   }
 
-  return res.json();
-}
+  const json: ApiResponse<ProductsPayload> = await res.json();
 
-/* ================= PAGE ================= */
-
-export default async function ProductsPage({ searchParams }: PageProps) {
-  // 🔥 NEXT.JS 15 FIX — MUST AWAIT searchParams
-  const query = (await searchParams) ?? {};
-
-  const page = Number(query.page ?? 1);
-  const sortBy = query.sortBy ?? "latest";
-  const category = query.category;
-
-  const response = await getProducts({ page, sortBy, category });
-
-  const products = response.data?.products ?? [];
-  const totalPages = response.data?.totalPages ?? 1;
+  const products = json.data?.products ?? [];
+  const totalPages = json.data?.totalPages ?? 1;
 
   return (
     <div className="min-h-[calc(100vh-64px)] py-4">
@@ -100,18 +77,17 @@ export default async function ProductsPage({ searchParams }: PageProps) {
         <SortDropdownClient currentSort={sortBy} />
       </div>
 
-      {/* PRODUCTS GRID */}
       {products.length > 0 ? (
-        <ProductsGridClient products={products} />
+        <InfiniteProductsClient
+          initialProducts={products}
+          totalPages={totalPages}
+          sortBy={sortBy}
+          category={category}
+        />
       ) : (
         <div className="text-center py-20 text-muted-foreground">
           No products found
         </div>
-      )}
-
-      {/* PAGINATION */}
-      {totalPages > 1 && (
-        <Pagination currentPage={page} totalPages={totalPages} />
       )}
     </div>
   );
