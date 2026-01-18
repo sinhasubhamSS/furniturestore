@@ -48,13 +48,6 @@ export const useWishlist = () => {
     const key = `${String(productId)}_${String(variantId)}`;
     const result = wishlistSet.has(key);
 
-    console.log(" isInWishlist check:", {
-      productId,
-      variantId,
-      key,
-      result,
-    });
-
     return result;
   };
 

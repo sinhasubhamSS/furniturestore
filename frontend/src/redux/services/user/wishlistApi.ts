@@ -20,7 +20,7 @@ export const wishlistApi = createApi({
   baseQuery: axiosBaseQuery(),
   tagTypes: ["Wishlist"],
 
-  endpoints: (builder) =>({
+  endpoints: (builder) => ({
     /* ================= LIGHT WISHLIST =================
        SOURCE OF TRUTH FOR HEART ICON
     =================================================== */
@@ -32,14 +32,11 @@ export const wishlistApi = createApi({
       }),
 
       transformResponse: (res: any) => {
-        console.log("[wishlistApi] RAW /wishlist response:", res);
-
         const items =
           res?.data?.items ??
           res?.data?.data?.items ?? // 🔥 fallback safety
           [];
 
-        console.log("[wishlistApi] FINAL wishlist items:", items);
         return items;
       },
 
@@ -57,11 +54,7 @@ export const wishlistApi = createApi({
       }),
 
       transformResponse: (res: any) => {
-       
-
         const data = Array.isArray(res?.data) ? res.data : [];
-
-       
 
         return data;
       },
@@ -98,7 +91,7 @@ export const wishlistApi = createApi({
               console.log("[wishlistApi] BEFORE ADD cache:");
 
               const exists = draft.some(
-                (i) => i.productId === productId && i.variantId === variantId
+                (i) => i.productId === productId && i.variantId === variantId,
               );
 
               if (!exists) {
@@ -107,8 +100,8 @@ export const wishlistApi = createApi({
               } else {
                 console.log("[wishlistApi] ADD skipped (already exists)");
               }
-            }
-          )
+            },
+          ),
         );
 
         queryFulfilled.catch((err) => {
@@ -134,8 +127,6 @@ export const wishlistApi = createApi({
       },
 
       onQueryStarted({ productId, variantId }, { dispatch, queryFulfilled }) {
-       
-
         const patch = dispatch(
           wishlistApi.util.updateQueryData(
             "getWishlist",
@@ -144,7 +135,7 @@ export const wishlistApi = createApi({
               console.log("[wishlistApi] BEFORE REMOVE cache:");
 
               const index = draft.findIndex(
-                (i) => i.productId === productId && i.variantId === variantId
+                (i) => i.productId === productId && i.variantId === variantId,
               );
 
               if (index !== -1) {
@@ -153,8 +144,8 @@ export const wishlistApi = createApi({
               } else {
                 console.log("[wishlistApi] REMOVE skipped (not found)");
               }
-            }
-          )
+            },
+          ),
         );
 
         queryFulfilled.catch((err) => {
