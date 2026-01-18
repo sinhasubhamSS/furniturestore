@@ -41,7 +41,7 @@ export default function InfiniteProductsClient({
       ([entry]) => {
         if (entry.isIntersecting) fetchNext();
       },
-      { rootMargin: "200px" }
+      { rootMargin: "400px" },
     );
 
     observer.observe(loadMoreRef.current);
@@ -66,7 +66,7 @@ export default function InfiniteProductsClient({
     const res = await fetch(
       `${
         process.env.NEXT_PUBLIC_API_BASE_URL
-      }/products/all?${params.toString()}`
+      }/products/all?${params.toString()}`,
     );
 
     const json = await res.json();
@@ -74,7 +74,8 @@ export default function InfiniteProductsClient({
 
     setItems((prev) => [...prev, ...newProducts]);
     setPage(nextPage);
-    setHasMore(nextPage < totalPages);
+    setHasMore(newProducts.length === 12);
+
     setLoading(false);
   };
 
@@ -84,7 +85,7 @@ export default function InfiniteProductsClient({
 
       {/* LOADER / TRIGGER */}
       {hasMore && (
-        <div ref={loadMoreRef}>
+        <div ref={loadMoreRef} className="h-8">
           {loading && (
             <>
               <InfiniteLoader />
