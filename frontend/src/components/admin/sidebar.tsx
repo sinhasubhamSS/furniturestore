@@ -8,6 +8,7 @@ import { navItems } from "@/app/config/nav.config";
 import Link from "next/link";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/redux/store";
+
 type SidebarProps = {
   isOpen: boolean;
   toggle: () => void;
@@ -21,29 +22,20 @@ type ExpandedMenus = {
 export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-
-  const isActive = (href: string) => pathname === href;
+  const user = useSelector((state: RootState) => state.user.activeUser);
 
   const [expandedMenus, setExpandedMenus] = useState<ExpandedMenus>({});
-  const user = useSelector((state: RootState) => state.user.activeUser);
-  // Set activeMenu & expand corresponding parent on mount
-  useEffect(() => {
-    let found = false;
 
+  useEffect(() => {
     for (const item of navItems) {
       if (item.children) {
         for (const child of item.children) {
           if (pathname === child.href) {
-            setExpandedMenus((prev) => ({ ...prev, [item.name]: true }));
-            found = true;
-            break;
+            setExpandedMenus({ [item.name]: true });
+            return;
           }
         }
-      } else if (pathname === item.href) {
-        found = true;
       }
-
-      if (found) break;
     }
   }, [pathname]);
 
@@ -56,39 +48,36 @@ export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
 
   return (
     <>
-      {isOpen && isMobile && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-20 z-40 md:hidden"
-          onClick={toggle}
-        />
-      )}
-
-      {!isOpen && (
+      {/* Mobile open button */}
+      {!isOpen && isMobile && (
         <button
           onClick={toggle}
-          className="fixed left-0 top-1/2 z-40 p-2 bg-[var(--color-accent)] text-white rounded-r-lg shadow-lg transform -translate-y-1/2 hover:scale-[1.05] transition-transform duration-200 ease-in-out"
+          className="fixed left-0 top-1/2 z-40 p-2 bg-[var(--color-accent)] text-white rounded-r-lg shadow-lg -translate-y-1/2 cursor-pointer"
         >
           <MdChevronOpen size={24} />
         </button>
       )}
 
+      {/* Sidebar */}
       <aside
-        className={`fixed top-0 bottom-0 z-50 w-64 bg-[var(--color-secondary)] text-[var(--foreground)] transition-all duration-300 ${
-          isOpen ? "left-0" : "-left-full"
-        }`}
+        className={`
+          fixed top-0 bottom-0 z-50
+          bg-[var(--color-secondary)] text-[var(--foreground)]
+          transform transition-transform duration-300 ease-in-out
+          pointer-events-auto cursor-default
+          ${isMobile ? "w-screen" : "w-64"}
+          ${isOpen ? "translate-x-0" : "-translate-x-full"}
+        `}
       >
         <div className="flex flex-col h-full p-4">
           {/* Header */}
-          <div className="flex justify-between items-center mb-8 p-2">
-            <Link href="/">
-              <h2 className="text-xl font-bold text-[var(--color-accent)] cursor-pointer">
+          <div className="flex justify-between items-center mb-6">
+            <Link href="/" className="cursor-pointer">
+              <h2 className="text-xl font-bold text-[var(--color-accent)]">
                 Suvidha
               </h2>
             </Link>
-            <button
-              onClick={toggle}
-              className="text-[var(--foreground)] hover:text-[var(--color-accent)]"
-            >
+            <button onClick={toggle} className="cursor-pointer">
               <MdChevronLeft size={24} />
             </button>
           </div>
@@ -97,23 +86,20 @@ export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
           <nav className="flex-1 overflow-y-auto">
             <ul className="space-y-2">
               {navItems.map((item) => {
-                const isExpanded = expandedMenus[item.name];
                 const Icon = item.icon;
+                const isExpanded = expandedMenus[item.name];
 
                 if (item.children) {
                   return (
                     <li key={item.name}>
                       <button
                         onClick={() => toggleMenu(item.name)}
-                        className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
-                          isExpanded
-                            ? "bg-[var(--color-accent-light)] text-[var(--color-accent)]"
-                            : "hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)]"
-                        }`}
+                        className="w-full flex justify-between items-center p-3 rounded-lg
+                                   cursor-pointer hover:bg-[var(--color-accent-light)]"
                       >
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center gap-3">
                           <Icon size={20} />
-                          <span>{item.label}</span>
+                          {item.label}
                         </div>
                         <FiChevronRight
                           className={`transition-transform ${
@@ -123,19 +109,24 @@ export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
                       </button>
 
                       <ul
-                        className={`ml-6 mt-1 space-y-1 transition-all duration-300 ease-in-out overflow-hidden ${
+                        className={`ml-6 mt-1 overflow-hidden transition-all duration-300 ${
                           isExpanded ? "max-h-96" : "max-h-0"
                         }`}
                       >
                         {item.children.map((child) => (
                           <li key={child.name}>
                             <button
-                              onClick={() => router.push(child.href)}
-                              className={`w-full text-left p-2 rounded transition-colors ${
-                                pathname === child.href
-                                  ? "bg-[var(--color-accent)] text-white"
-                                  : "hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)]"
-                              }`}
+                              onClick={() => {
+                                router.push(child.href);
+                                if (isMobile) toggle();
+                              }}
+                              className={`w-full text-left p-2 rounded
+                                          cursor-pointer
+                                          ${
+                                            pathname === child.href
+                                              ? "bg-[var(--color-accent)] text-white"
+                                              : "hover:bg-[var(--color-accent-light)]"
+                                          }`}
                             >
                               {child.label}
                             </button>
@@ -149,15 +140,20 @@ export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
                 return (
                   <li key={item.name}>
                     <button
-                      onClick={() => router.push(item.href!)}
-                      className={`w-full flex items-center space-x-3 p-3 rounded-lg transition-colors ${
-                        pathname === item.href
-                          ? "bg-[var(--color-accent)] text-white"
-                          : "hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)]"
-                      }`}
+                      onClick={() => {
+                        router.push(item.href!);
+                        if (isMobile) toggle();
+                      }}
+                      className={`w-full flex items-center gap-3 p-3 rounded-lg
+                                  cursor-pointer
+                                  ${
+                                    pathname === item.href
+                                      ? "bg-[var(--color-accent)] text-white"
+                                      : "hover:bg-[var(--color-accent-light)]"
+                                  }`}
                     >
                       <Icon size={20} />
-                      <span>{item.label}</span>
+                      {item.label}
                     </button>
                   </li>
                 );
@@ -166,18 +162,16 @@ export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
           </nav>
 
           {/* Footer */}
-          <div className="border-t border-[var(--color-accent)] pt-3 mt-4">
-            <div className="flex items-center space-x-3 p-3">
+          <div className="border-t pt-4">
+            <div className="flex items-center gap-3 mb-3">
               <div className="w-8 h-8 rounded-full bg-[var(--color-accent)] flex items-center justify-center text-white text-sm">
                 {user?.name ? user.name.slice(0, 2).toUpperCase() : "AD"}
               </div>
-
-              <span className="font-medium">{user?.name || "Admin"}</span>
+              <span>{user?.name || "Admin"}</span>
             </div>
 
-            <button className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] transition-colors">
-              <FiChevronRight size={20} />
-              <span>Logout</span>
+            <button className="w-full text-left p-3 rounded-lg cursor-pointer hover:bg-[var(--color-accent-light)]">
+              Logout
             </button>
           </div>
         </div>
