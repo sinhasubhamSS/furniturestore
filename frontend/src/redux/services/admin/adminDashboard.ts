@@ -6,6 +6,7 @@ export interface DashboardStats {
   totalUsers: number;
   totalProducts: number;
   pendingOrdersCount: number;
+  totalOrders: number;
   recentOrders: Order[]; // ✅ Use proper Order interface
 }
 

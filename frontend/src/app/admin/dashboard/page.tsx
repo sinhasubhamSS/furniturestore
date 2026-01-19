@@ -2,10 +2,9 @@
 import { useState } from "react";
 import { useGetDashboardStatsQuery } from "../../../redux/services/admin/adminDashboard";
 
-
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
-  
+
   // ✅ Real API data fetch karna
   const { data: dashboardData, error, isLoading } = useGetDashboardStatsQuery();
 
@@ -25,7 +24,9 @@ export default function AdminDashboard() {
     return (
       <div className="p-4 md:p-6 space-y-6">
         <div className="flex items-center justify-center h-64">
-          <div className="text-lg text-red-500">Error loading dashboard data</div>
+          <div className="text-lg text-red-500">
+            Error loading dashboard data
+          </div>
         </div>
       </div>
     );
@@ -41,11 +42,11 @@ export default function AdminDashboard() {
       icon: "👥",
     },
     {
-      title: "Total Products", 
+      title: "Total Products",
       value: dashboardData?.totalProducts || 0,
       change: "+12%",
-      trend: "up", 
-      icon: "📦"
+      trend: "up",
+      icon: "📦",
     },
     {
       title: "Pending Orders",
@@ -56,7 +57,7 @@ export default function AdminDashboard() {
     },
     {
       title: "Total Orders",
-      value: dashboardData?.recentOrders?.length || 0,
+      value: dashboardData?.totalOrders || 0, // ✅ YAHAN UPDATE
       change: "+15%",
       trend: "up",
       icon: "🛒",
@@ -140,16 +141,28 @@ export default function AdminDashboard() {
           <h2 className="text-lg font-semibold mb-4">Quick Stats</h2>
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-[var(--text-accent)]">Total Users</span>
-              <span className="font-semibold">{dashboardData?.totalUsers || 0}</span>
+              <span className="text-sm text-[var(--text-accent)]">
+                Total Users
+              </span>
+              <span className="font-semibold">
+                {dashboardData?.totalUsers || 0}
+              </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-[var(--text-accent)]">Total Products</span>
-              <span className="font-semibold">{dashboardData?.totalProducts || 0}</span>
+              <span className="text-sm text-[var(--text-accent)]">
+                Total Products
+              </span>
+              <span className="font-semibold">
+                {dashboardData?.totalProducts || 0}
+              </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-[var(--text-accent)]">Pending Orders</span>
-              <span className="font-semibold">{dashboardData?.pendingOrdersCount || 0}</span>
+              <span className="text-sm text-[var(--text-accent)]">
+                Pending Orders
+              </span>
+              <span className="font-semibold">
+                {dashboardData?.pendingOrdersCount || 0}
+              </span>
             </div>
           </div>
         </div>
@@ -163,7 +176,7 @@ export default function AdminDashboard() {
             View all orders →
           </button>
         </div>
-        
+
         {recentOrders.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -186,20 +199,24 @@ export default function AdminDashboard() {
                     key={index}
                     className="border-b border-[var(--color-secondary)] hover:bg-[var(--background)] transition-colors cursor-pointer"
                   >
-                    <td className="py-3 px-4 font-medium">{order._id?.slice(-8) || 'N/A'}</td>
+                    <td className="py-3 px-4 font-medium">
+                      {order.orderId || "N/A"}
+                    </td>
+
                     <td className="py-3 px-4">
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-medium ${
                           order.status === "delivered"
                             ? "bg-green-100 text-green-800"
                             : order.status === "shipped"
-                            ? "bg-blue-100 text-blue-800"
-                            : order.status === "pending"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-gray-100 text-gray-800"
+                              ? "bg-blue-100 text-blue-800"
+                              : order.status === "pending"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-gray-100 text-gray-800"
                         }`}
                       >
-                        {order.status?.charAt(0).toUpperCase() + order.status?.slice(1)}
+                        {order.status?.charAt(0).toUpperCase() +
+                          order.status?.slice(1)}
                       </span>
                     </td>
                     <td className="py-3 px-4">
@@ -230,14 +247,18 @@ export default function AdminDashboard() {
           <h3 className="text-sm font-medium text-[var(--text-accent)] mb-2">
             Products Available
           </h3>
-          <p className="text-2xl font-bold">{dashboardData?.totalProducts || 0}</p>
+          <p className="text-2xl font-bold">
+            {dashboardData?.totalProducts || 0}
+          </p>
           <p className="text-sm text-blue-500 mt-1">↑ In inventory</p>
         </div>
         <div className="bg-[var(--card-bg)] p-4 rounded-xl border border-[var(--color-secondary)]">
           <h3 className="text-sm font-medium text-[var(--text-accent)] mb-2">
             Pending Orders
           </h3>
-          <p className="text-2xl font-bold">{dashboardData?.pendingOrdersCount || 0}</p>
+          <p className="text-2xl font-bold">
+            {dashboardData?.pendingOrdersCount || 0}
+          </p>
           <p className="text-sm text-[var(--text-accent)] mt-1">
             Need attention
           </p>
