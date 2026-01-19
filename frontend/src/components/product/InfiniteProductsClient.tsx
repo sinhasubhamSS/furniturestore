@@ -7,31 +7,34 @@ import type { DisplayProduct } from "@/types/Product";
 
 interface Props {
   initialProducts: DisplayProduct[];
-  totalPages: number; // ab sirf initial ke liye
   sortBy: string;
   category?: string;
 }
 
+/* 🔧 CONFIG */
+const PAGE_LIMIT = 12;
+
 export default function InfiniteProductsClient({
   initialProducts,
-  totalPages,
   sortBy,
   category,
 }: Props) {
   const [items, setItems] = useState<DisplayProduct[]>(initialProducts);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
-
-  // ❗ IMPORTANT: hasMore ab response length se control hoga
-  const [hasMore, setHasMore] = useState(initialProducts.length === 12);
+  const [hasMore, setHasMore] = useState(initialProducts.length === PAGE_LIMIT);
+  const [error, setError] = useState<string | null>(null);
 
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   /* 🔁 RESET on sort / category change */
   useEffect(() => {
+    abortRef.current?.abort();
     setItems(initialProducts);
     setPage(1);
-    setHasMore(initialProducts.length === 12);
+    setHasMore(initialProducts.length === PAGE_LIMIT);
+    setError(null);
   }, [initialProducts, sortBy, category]);
 
   /* 👀 INTERSECTION OBSERVER */
@@ -40,12 +43,12 @@ export default function InfiniteProductsClient({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && !loading) {
+        if (entry.isIntersecting && !loading && hasMore) {
           fetchNext();
         }
       },
       {
-        rootMargin: "500px", // production-safe
+        rootMargin: "400px",
       },
     );
 
@@ -58,33 +61,47 @@ export default function InfiniteProductsClient({
     if (loading || !hasMore) return;
 
     setLoading(true);
+    setError(null);
+
     const nextPage = page + 1;
 
     const params = new URLSearchParams({
       page: String(nextPage),
-      limit: "12",
+      limit: String(PAGE_LIMIT),
       sortBy,
     });
 
     if (category) params.set("category", category);
 
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/all?${params.toString()}`,
-      { cache: "no-store" }, // 🔥 IMPORTANT
-    );
+    try {
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
 
-    const json = await res.json();
-    const newProducts: DisplayProduct[] = json.data?.products ?? [];
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/all?${params.toString()}`,
+        {
+          cache: "no-store",
+          signal: abortRef.current.signal,
+        },
+      );
 
-    console.log("Fetched page:", nextPage, newProducts.length); // ✅ debug
+      if (!res.ok) {
+        throw new Error("Failed to load products");
+      }
 
-    setItems((prev) => [...prev, ...newProducts]);
-    setPage(nextPage);
+      const json = await res.json();
+      const newProducts: DisplayProduct[] = json.data?.products ?? [];
 
-    // 🔥 FINAL hasMore LOGIC
-    setHasMore(newProducts.length === 12);
-
-    setLoading(false);
+      setItems((prev) => [...prev, ...newProducts]);
+      setPage(nextPage);
+      setHasMore(newProducts.length === PAGE_LIMIT);
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        setError("Failed to load more products. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -92,20 +109,28 @@ export default function InfiniteProductsClient({
       {/* PRODUCTS */}
       <ProductsGridClient products={items} />
 
-      {/* LOADER (visual only) */}
+      {/* ERROR */}
+      {error && (
+        <p className="text-center text-xs text-red-500 mt-3">{error}</p>
+      )}
+
+      {/* LOADER */}
       {loading && (
         <>
           <InfiniteLoader />
-          <p className="text-center text-xs text-muted-foreground mt-2">
+          <p
+            className="text-center text-xs text-muted-foreground mt-2"
+            aria-live="polite"
+          >
             Loading more products…
           </p>
         </>
       )}
 
-      {/* OBSERVER TRIGGER (ALWAYS PRESENT, INVISIBLE) */}
+      {/* OBSERVER TRIGGER */}
       {hasMore && <div ref={loadMoreRef} className="h-24" />}
 
-      {/* END MESSAGE */}
+      {/* END */}
       {!hasMore && (
         <p className="text-center text-sm text-muted-foreground py-6">
           No more products

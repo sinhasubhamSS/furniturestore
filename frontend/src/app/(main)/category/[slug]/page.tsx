@@ -2,15 +2,13 @@
 
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
-import ProductsGridClient from "@/components/product/ProductsGridClient";
-import Pagination from "@/components/pagination/Pagination";
+import InfiniteProductsClient from "@/components/product/InfiniteProductsClient";
 import SortDropdownClient from "@/components/filter/SortDropdownClient";
 import type { DisplayProduct } from "@/types/Product";
 
 /* ================= TYPES ================= */
 
 type SearchParams = {
-  page?: string;
   sortBy?: string;
 };
 
@@ -26,8 +24,6 @@ type ApiResponse<T> = {
 
 type ProductsPayload = {
   products: DisplayProduct[];
-  totalPages: number;
-  totalItems: number;
 };
 
 /* ================= SEO ================= */
@@ -39,53 +35,15 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
 
-  const title = `${slug
-    .replace(/-/g, " ")
-    .replace(/\b\w/g, (l) =>
-      l.toUpperCase()
-    )} Furniture in Gumla | Suvidhawood`;
-
-  const description = `Buy ${slug.replace(
-    /-/g,
-    " "
-  )} furniture in Gumla, Jharkhand from Suvidhawood by Suvidha Furniture. Premium wooden furniture at best prices.`;
+  const readable = slug.replace(/-/g, " ");
 
   return {
-    title,
-    description,
+    title: `${readable} Furniture in Gumla | Suvidhawood`,
+    description: `Buy ${readable} furniture in Gumla, Jharkhand from Suvidhawood. Premium wooden furniture at best prices.`,
     alternates: {
       canonical: `https://suvidhawood.com/category/${slug}`,
     },
   };
-}
-
-/* ================= API ================= */
-
-async function getCategoryProducts({
-  category,
-  page,
-  sortBy,
-}: {
-  category: string;
-  page: number;
-  sortBy: string;
-}): Promise<ApiResponse<ProductsPayload>> {
-
-  const params = new URLSearchParams({
-    page: String(page),
-    limit: "12",
-    sortBy,
-    category,
-  });
-
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/all?${params.toString()}`,
-    { cache: "no-store" }
-  );
-
-  if (!res.ok) throw new Error("Failed to fetch category products");
-
-  return res.json();
 }
 
 /* ================= PAGE ================= */
@@ -97,19 +55,29 @@ export default async function CategoryPage({
   const { slug } = await params;
   const query = await searchParams;
 
-  const page = Number(query.page ?? 1);
   const sortBy = query.sortBy ?? "latest";
 
-  const response = await getCategoryProducts({
-    category: slug,
-    page,
+  // ✅ ALWAYS FIRST PAGE (SEO SAFE)
+  const paramsQuery = new URLSearchParams({
+    page: "1",
+    limit: "12",
     sortBy,
+    category: slug,
   });
 
-  const products = response.data?.products ?? [];
-  const totalPages = response.data?.totalPages ?? 1;
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/all?${paramsQuery.toString()}`,
+    { cache: "no-store" },
+  );
 
-  if (products.length === 0 && page === 1) {
+  if (!res.ok) {
+    throw new Error("Failed to fetch category products");
+  }
+
+  const json: ApiResponse<ProductsPayload> = await res.json();
+  const products = json.data?.products ?? [];
+
+  if (products.length === 0) {
     notFound();
   }
 
@@ -118,25 +86,21 @@ export default async function CategoryPage({
       className="min-h-[calc(100vh-64px)] py-6"
       style={{ background: "var(--color-primary)" }}
     >
-      {/* ===== HEADER ===== */}
+      {/* HEADER */}
       <div className="flex items-center justify-between mb-5 px-4">
         <h1 className="text-xl font-bold capitalize">
           {slug.replace(/-/g, " ")} Furniture
         </h1>
+
         <SortDropdownClient currentSort={sortBy} />
       </div>
 
-      {/* ===== PRODUCTS ===== */}
-      {products.length > 0 ? (
-        <ProductsGridClient products={products} />
-      ) : (
-        <div className="text-center py-20">No products found</div>
-      )}
-
-      {/* ===== PAGINATION ===== */}
-      {totalPages > 1 && (
-        <Pagination currentPage={page} totalPages={totalPages} />
-      )}
+      {/* INFINITE PRODUCTS */}
+      <InfiniteProductsClient
+        initialProducts={products}
+        sortBy={sortBy}
+        category={slug}
+      />
     </div>
   );
 }

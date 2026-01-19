@@ -19,7 +19,6 @@ export const metadata: Metadata = {
 
 type SearchParams = {
   sortBy?: string;
-  category?: string;
 };
 
 type PageProps = {
@@ -42,7 +41,6 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   const query = (await searchParams) ?? {};
 
   const sortBy = query.sortBy ?? "latest";
-  const category = query.category;
 
   const params = new URLSearchParams({
     page: "1",
@@ -50,11 +48,9 @@ export default async function ProductsPage({ searchParams }: PageProps) {
     sortBy,
   });
 
-  if (category) params.set("category", category);
-
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/all?${params.toString()}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
 
   if (!res.ok) {
@@ -70,9 +66,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
     <div className="min-h-[calc(100vh-64px)] py-4">
       {/* HEADER */}
       <div className="flex items-center justify-between gap-3 mb-4 px-4">
-        <h1 className="text-lg font-semibold truncate">
-          {category ? `${category} Products` : "All Products"}
-        </h1>
+        <h1 className="text-lg font-semibold">All Products</h1>
 
         <SortDropdownClient currentSort={sortBy} />
       </div>
@@ -80,9 +74,8 @@ export default async function ProductsPage({ searchParams }: PageProps) {
       {products.length > 0 ? (
         <InfiniteProductsClient
           initialProducts={products}
-          totalPages={totalPages}
+  
           sortBy={sortBy}
-          category={category}
         />
       ) : (
         <div className="text-center py-20 text-muted-foreground">
