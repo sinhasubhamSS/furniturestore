@@ -6,7 +6,8 @@ import { FiChevronRight } from "react-icons/fi";
 import { MdChevronLeft, MdChevronRight as MdChevronOpen } from "react-icons/md";
 import { navItems } from "@/app/config/nav.config";
 import Link from "next/link";
-
+import { useSelector } from "react-redux";
+import type { RootState } from "@/redux/store";
 type SidebarProps = {
   isOpen: boolean;
   toggle: () => void;
@@ -24,7 +25,7 @@ export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
   const isActive = (href: string) => pathname === href;
 
   const [expandedMenus, setExpandedMenus] = useState<ExpandedMenus>({});
-
+  const user = useSelector((state: RootState) => state.user.activeUser);
   // Set activeMenu & expand corresponding parent on mount
   useEffect(() => {
     let found = false;
@@ -57,7 +58,7 @@ export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
     <>
       {isOpen && isMobile && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-40 z-40 md:hidden"
+          className="fixed inset-0 bg-black bg-opacity-20 z-40 md:hidden"
           onClick={toggle}
         />
       )}
@@ -168,10 +169,12 @@ export default function Sidebar({ isOpen, toggle, isMobile }: SidebarProps) {
           <div className="border-t border-[var(--color-accent)] pt-3 mt-4">
             <div className="flex items-center space-x-3 p-3">
               <div className="w-8 h-8 rounded-full bg-[var(--color-accent)] flex items-center justify-center text-white text-sm">
-                JD
+                {user?.name ? user.name.slice(0, 2).toUpperCase() : "AD"}
               </div>
-              <span className="font-medium">John Doe</span>
+
+              <span className="font-medium">{user?.name || "Admin"}</span>
             </div>
+
             <button className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)] transition-colors">
               <FiChevronRight size={20} />
               <span>Logout</span>
