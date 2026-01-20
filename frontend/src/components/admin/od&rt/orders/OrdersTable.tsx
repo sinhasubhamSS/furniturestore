@@ -1,16 +1,15 @@
-// components/admin/orders/OrdersTable.tsx
 import React from "react";
 import { AdminOrder } from "@/types/adminorder";
 import { OrderStatus } from "@/types/order";
 import StatusBadge from "@/components/admin/od&rt/common/StatusBadge";
 
-interface OrdersTableProps {
+interface Props {
   orders: AdminOrder[];
   onStatusUpdate: (orderId: string, status: OrderStatus) => void;
   isUpdating: boolean;
 }
 
-const OrdersTable: React.FC<OrdersTableProps> = ({
+const OrdersTable: React.FC<Props> = ({
   orders,
   onStatusUpdate,
   isUpdating,
@@ -25,120 +24,121 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
     "cancelled",
   ];
 
-  const handleStatusChange = (orderId: string, newStatus: string) => {
-    if (window.confirm(`Update order status to ${newStatus}?`)) {
-      onStatusUpdate(orderId, newStatus as OrderStatus);
+  const handleChange = (id: string, status: string) => {
+    if (confirm(`Update status to ${status}?`)) {
+      onStatusUpdate(id, status as OrderStatus);
     }
   };
 
-  if (orders.length === 0) {
-    return (
-      <div className="p-12 text-center">
-        <div className="text-gray-400 text-xl mb-2">📦</div>
-        <h3 className="text-lg font-medium text-gray-900 mb-1">
-          No orders found
-        </h3>
-        <p className="text-gray-500">No orders match your current filters.</p>
-      </div>
-    );
-  }
-
+  /* ================= MOBILE VIEW ================= */
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Order Details
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Customer
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Amount
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Status
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Date
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {orders.map((order) => (
-            <tr key={order._id} className="hover:bg-gray-50 transition-colors">
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div>
-                  <div className="text-sm font-medium text-gray-900">
-                    {order.orderId}
-                  </div>
-                  {order.hasActiveReturn && (
-                    <div className="text-xs text-orange-600 font-medium">
-                      🔄 Return: {order.returnInfo?.returnStatus}
-                    </div>
-                  )}
-                </div>
-              </td>
+    <>
+      <div className="block md:hidden space-y-4 p-4">
+        {orders.map((order) => (
+          <div
+            key={order._id}
+            className="border rounded-xl p-4 shadow-sm bg-white space-y-3"
+          >
+            <div className="flex justify-between items-center">
+              <span className="font-semibold text-sm">#{order.orderId}</span>
+              <StatusBadge status={order.status} type="order" />
+            </div>
 
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div>
-                  <div className="text-sm font-medium text-gray-900">
-                    {order.user?.name || "N/A"}
-                  </div>
+            <div className="text-sm">
+              <p className="font-medium">{order.user?.name}</p>
+              <p className="text-xs text-gray-500">{order.user?.email}</p>
+              {order.user?.mobile && (
+                <p className="text-xs">📞 {order.user.mobile}</p>
+              )}
+            </div>
+
+            <div className="flex justify-between text-sm">
+              <span className="font-semibold">
+                ₹{order.totalAmount.toLocaleString("en-IN")}
+              </span>
+              <span className="text-gray-500">
+                {new Date(order.placedAt!).toLocaleDateString()}
+              </span>
+            </div>
+
+            <select
+              value={order.status}
+              disabled={isUpdating}
+              onChange={(e) => handleChange(order._id, e.target.value)}
+              className="w-full border rounded-md px-3 py-2 text-sm cursor-pointer"
+            >
+              {statusOptions.map((s) => (
+                <option key={s} value={s}>
+                  {s.replace(/_/g, " ").toUpperCase()}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+
+      {/* ================= DESKTOP TABLE ================= */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="min-w-full divide-y">
+          <thead className="bg-gray-50">
+            <tr>
+              {["Order", "Customer", "Amount", "Status", "Date", "Action"].map(
+                (h) => (
+                  <th
+                    key={h}
+                    className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase"
+                  >
+                    {h}
+                  </th>
+                ),
+              )}
+            </tr>
+          </thead>
+
+          <tbody className="divide-y">
+            {orders.map((order) => (
+              <tr key={order._id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 font-medium">{order.orderId}</td>
+
+                <td className="px-6 py-4">
+                  <div className="text-sm font-medium">{order.user?.name}</div>
                   <div className="text-xs text-gray-500">
                     {order.user?.email}
                   </div>
-                  {order.user?.mobile && (
-                    <div className="text-xs text-gray-500">
-                      📞 {order.user.mobile}
-                    </div>
-                  )}
-                </div>
-              </td>
+                </td>
 
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm font-medium text-gray-900">
-                  ₹{order.totalAmount?.toLocaleString("en-IN")}
-                </div>
-              </td>
+                <td className="px-6 py-4 font-medium">
+                  ₹{order.totalAmount.toLocaleString("en-IN")}
+                </td>
 
-              <td className="px-6 py-4 whitespace-nowrap">
-                <StatusBadge status={order.status} type="order" />
-              </td>
+                <td className="px-6 py-4">
+                  <StatusBadge status={order.status} type="order" />
+                </td>
 
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {new Date(order.placedAt!).toLocaleDateString("en-IN", {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {new Date(order.placedAt!).toLocaleDateString()}
+                </td>
 
-              <td className="px-6 py-4 whitespace-nowrap">
-                <select
-                  value={order.status}
-                  onChange={(e) =>
-                    handleStatusChange(order._id, e.target.value)
-                  }
-                  disabled={isUpdating}
-                  className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
-                >
-                  {statusOptions.map((status) => (
-                    <option key={status} value={status}>
-                      {status.charAt(0).toUpperCase() + status.slice(1)}
-                    </option>
-                  ))}
-                </select>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+                <td className="px-6 py-4">
+                  <select
+                    value={order.status}
+                    disabled={isUpdating}
+                    onChange={(e) => handleChange(order._id, e.target.value)}
+                    className="text-xs border rounded px-2 py-1 cursor-pointer"
+                  >
+                    {statusOptions.map((s) => (
+                      <option key={s} value={s}>
+                        {s.replace(/_/g, " ").toUpperCase()}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 };
 
