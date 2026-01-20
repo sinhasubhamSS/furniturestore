@@ -32,10 +32,7 @@ const ProductDetailClient: React.FC<Props> = ({ product }) => {
   const dispatch = useDispatch<AppDispatch>();
   const user = useSelector((state: RootState) => state.user.activeUser);
 
-  /**
-   * ✅ IMPORTANT FIX
-   * Product load hote hi default variant select karo
-   */
+  // ✅ Default variant select
   useEffect(() => {
     if (!product?.variants?.length) return;
 
@@ -47,9 +44,7 @@ const ProductDetailClient: React.FC<Props> = ({ product }) => {
     dispatch(setQuantity(1));
   }, [product, dispatch]);
 
-  /**
-   * ✅ Cleanup on unmount
-   */
+  // ✅ Cleanup
   useEffect(() => {
     return () => {
       dispatch(resetProductState());
@@ -58,43 +53,50 @@ const ProductDetailClient: React.FC<Props> = ({ product }) => {
 
   return (
     <>
+      {/* ================= MAIN PDP ================= */}
       <div className="w-full min-h-screen bg-[var(--color-primary)] pt-8 pb-24 lg:pb-0">
         <div className="container mx-auto px-4 lg:px-6">
-          <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-            {/* Left */}
+          <div className="flex flex-col lg:flex-row gap-6 lg:gap-10">
+            {/* ================= LEFT: IMAGES ================= */}
             <div className="w-full lg:w-[40%]">
               <ImageGallery />
-              <div className="mt-4 hidden lg:block">
+
+              {/* Desktop CTA */}
+              <div className="mt-6 hidden lg:block">
                 <ActionButtons productId={product._id} />
               </div>
             </div>
 
-            {/* Right */}
-            <div className="w-full lg:w-[60%] bg-[var(--color-card)] rounded-xl p-4">
+            {/* ================= RIGHT: DETAILS ================= */}
+            <div className="w-full lg:w-[60%] bg-[var(--color-card)] rounded-2xl p-6 shadow-sm">
               <ProductHeader product={product} />
-              <ProductPrice />
-              <VariantSelector variants={product.variants} />
 
-              <div className="flex flex-col sm:flex-row gap-4 mt-4">
+              <ProductPrice />
+
+              <div className="mt-4">
+                <VariantSelector variants={product.variants} />
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 mt-5">
                 <QuantitySelector />
                 <StockStatus />
               </div>
 
-              <div className="mt-4">
+              <div className="mt-5">
                 <PincodeChecker />
               </div>
             </div>
           </div>
 
-          {/* Info + Reviews */}
-          <div className="mt-8 space-y-6">
+          {/* ================= INFO + REVIEWS ================= */}
+          <div className="mt-10 space-y-8">
             <ProductInfo product={product} />
             <ReviewsSection productId={product._id} currentUserId={user?._id} />
           </div>
         </div>
       </div>
 
-      {/* 🔥 MOBILE STICKY CTA */}
+      {/* ================= MOBILE STICKY CTA ================= */}
       <MobileStickyCTA productId={product._id} />
     </>
   );
