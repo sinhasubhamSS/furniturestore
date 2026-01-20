@@ -1,5 +1,3 @@
-// app/(main)/category/[slug]/page.tsx
-
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import InfiniteProductsClient from "@/components/product/InfiniteProductsClient";
@@ -34,14 +32,17 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-
   const readable = slug.replace(/-/g, " ");
 
   return {
-    title: `${readable} Furniture in Gumla | Suvidhawood`,
-    description: `Buy ${readable} furniture in Gumla, Jharkhand from Suvidhawood. Premium wooden furniture at best prices.`,
+    title: `${readable} Furniture Manufacturer in Gumla, Jharkhand | SuvidhaWood`,
+    description: `Buy premium ${readable} wooden furniture in Gumla, Jharkhand. Factory-direct pricing, custom sizes, and durable solid wood furniture. Delivery available across Jharkhand.`,
     alternates: {
       canonical: `https://suvidhawood.com/category/${slug}`,
+    },
+    robots: {
+      index: true,
+      follow: true,
     },
   };
 }
@@ -55,9 +56,10 @@ export default async function CategoryPage({
   const { slug } = await params;
   const query = await searchParams;
 
+  const readable = slug.replace(/-/g, " ");
   const sortBy = query.sortBy ?? "latest";
 
-  // ✅ ALWAYS FIRST PAGE (SEO SAFE)
+  // ✅ SEO SAFE: Always first page
   const paramsQuery = new URLSearchParams({
     page: "1",
     limit: "12",
@@ -86,16 +88,41 @@ export default async function CategoryPage({
       className="min-h-[calc(100vh-64px)] py-6"
       style={{ background: "var(--color-primary)" }}
     >
-      {/* HEADER */}
-      <div className="flex items-center justify-between mb-5 px-4">
-        <h1 className="text-xl font-bold capitalize">
-          {slug.replace(/-/g, " ")} Furniture
-        </h1>
+      {/* ================= SEO SCHEMA ================= */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            name: `${readable} Furniture`,
+            url: `https://suvidhawood.com/category/${slug}`,
+            areaServed: {
+              "@type": "AdministrativeArea",
+              name: "Gumla, Jharkhand",
+            },
+          }),
+        }}
+      />
 
-        <SortDropdownClient currentSort={sortBy} />
+      {/* ================= HEADER ================= */}
+      <div className="px-4 mb-5">
+        <h1 className="text-xl font-bold capitalize">{readable} Furniture</h1>
+
+        {/* SEO DESCRIPTION BLOCK */}
+        <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
+          Buy premium {readable} wooden furniture in Gumla, Jharkhand from
+          SuvidhaWood. We manufacture high-quality solid wood furniture with
+          custom sizes, durable materials, and factory-direct pricing. Delivery
+          available across Jharkhand including Ranchi, Lohardaga, and Simdega.
+        </p>
+
+        <div className="flex justify-end mt-4">
+          <SortDropdownClient currentSort={sortBy} />
+        </div>
       </div>
 
-      {/* INFINITE PRODUCTS */}
+      {/* ================= PRODUCTS ================= */}
       <InfiniteProductsClient
         initialProducts={products}
         sortBy={sortBy}
