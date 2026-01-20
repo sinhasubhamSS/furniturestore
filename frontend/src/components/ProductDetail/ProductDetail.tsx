@@ -20,6 +20,7 @@ import ActionButtons from "./ActionButtons";
 import ProductInfo from "./ProductInfo";
 import ReviewsSection from "../reviews/ReviewSection";
 import PincodeChecker from "./PincodeChecker";
+import MobileStickyCTA from "./MobileStickyCTA";
 
 import { DisplayProduct } from "@/types/Product";
 
@@ -56,45 +57,46 @@ const ProductDetailClient: React.FC<Props> = ({ product }) => {
   }, [dispatch]);
 
   return (
-    <div className="w-full min-h-screen bg-[var(--color-primary)] pt-8">
-      <div className="container mx-auto px-4 lg:px-6">
-        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-          {/* Left */}
-          <div className="w-full lg:w-[40%]">
-            <ImageGallery />
-            <div className="mt-4">
-              <ActionButtons productId={product._id} />
+    <>
+      <div className="w-full min-h-screen bg-[var(--color-primary)] pt-8 pb-24 lg:pb-0">
+        <div className="container mx-auto px-4 lg:px-6">
+          <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+            {/* Left */}
+            <div className="w-full lg:w-[40%]">
+              <ImageGallery />
+              <div className="mt-4 hidden lg:block">
+                <ActionButtons productId={product._id} />
+              </div>
+            </div>
+
+            {/* Right */}
+            <div className="w-full lg:w-[60%] bg-[var(--color-card)] rounded-xl p-4">
+              <ProductHeader product={product} />
+              <ProductPrice />
+              <VariantSelector variants={product.variants} />
+
+              <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                <QuantitySelector />
+                <StockStatus />
+              </div>
+
+              <div className="mt-4">
+                <PincodeChecker />
+              </div>
             </div>
           </div>
 
-          {/* Right */}
-          <div className="w-full lg:w-[60%] bg-[var(--color-card)] rounded-xl p-4">
-            <ProductHeader product={product} />
-
-            {/* Price depends on selectedVariant (Redux) */}
-            <ProductPrice />
-
-            {/* Variant selector (user interaction only) */}
-            <VariantSelector variants={product.variants} />
-
-            <div className="flex flex-col sm:flex-row gap-4 mt-4">
-              <QuantitySelector />
-              <StockStatus />
-            </div>
-
-            <div className="mt-4">
-              <PincodeChecker />
-            </div>
+          {/* Info + Reviews */}
+          <div className="mt-8 space-y-6">
+            <ProductInfo product={product} />
+            <ReviewsSection productId={product._id} currentUserId={user?._id} />
           </div>
-        </div>
-
-        {/* Info + Reviews */}
-        <div className="mt-8 space-y-6">
-          <ProductInfo product={product} />
-          <ReviewsSection productId={product._id} currentUserId={user?._id} />
         </div>
       </div>
-    </div>
+
+      {/* 🔥 MOBILE STICKY CTA */}
+      <MobileStickyCTA productId={product._id} />
+    </>
   );
 };
 

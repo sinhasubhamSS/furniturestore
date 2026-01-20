@@ -16,7 +16,7 @@ const ActionButtons: React.FC<Props> = ({ productId }) => {
   const router = useRouter();
   const dispatch = useDispatch(); // ✅ Add dispatch
   const { selectedVariant, quantity } = useSelector(
-    (state: RootState) => state.productDetail
+    (state: RootState) => state.productDetail,
   );
   const [addToCart, { isLoading: isAdding }] = useAddToCartMutation();
 
@@ -29,7 +29,7 @@ const ActionButtons: React.FC<Props> = ({ productId }) => {
           productId: productId,
           variantId: selectedVariant._id,
           quantity: quantity,
-        })
+        }),
       );
 
       // ✅ Navigate to checkout (no URL params needed)
@@ -63,11 +63,11 @@ const ActionButtons: React.FC<Props> = ({ productId }) => {
   const isVariantSelected = !!selectedVariant?._id;
 
   return (
-    <div className="flex flex-col sm:flex-row gap-2 w-full">
+    <div className="flex w-full gap-3 items-center flex-nowrap">
       <Button
         onClick={handleAddToCart}
         disabled={isAdding || isOutOfStock || !isVariantSelected}
-        className="flex-1 bg-gray-900 text-white hover:bg-gray-800 py-2.5 rounded-lg transition font-medium flex items-center justify-center gap-2"
+        className="flex-1 min-w-0 bg-gray-900 text-white hover:bg-gray-800 py-3 rounded-lg transition font-medium text-center"
       >
         {isAdding ? "Adding..." : "Add to Cart"}
       </Button>
@@ -75,7 +75,7 @@ const ActionButtons: React.FC<Props> = ({ productId }) => {
       <Button
         onClick={handleBuyNow}
         disabled={isOutOfStock || !isVariantSelected}
-        className="flex-1 bg-[--color-accent] text-white hover:bg-[--color-accent-dark] py-2.5 rounded-lg transition font-medium"
+        className="flex-1 min-w-0 bg-[--color-accent] text-white hover:bg-[--color-accent-dark] py-3 rounded-lg transition font-medium text-center"
       >
         Buy Now
       </Button>
