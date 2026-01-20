@@ -6,7 +6,7 @@ import { RootState } from "@/redux/store";
 
 const ImageGallery = () => {
   const { selectedVariant } = useSelector(
-    (state: RootState) => state.productDetail
+    (state: RootState) => state.productDetail,
   );
 
   const [activeImage, setActiveImage] = useState<string | null>(null);
@@ -25,6 +25,7 @@ const ImageGallery = () => {
     return null;
   }
 
+  const images = selectedVariant.images;
   const mainImage = activeImage;
 
   return (
@@ -32,7 +33,7 @@ const ImageGallery = () => {
       {/* 🔍 Lightbox */}
       {isLightboxOpen && mainImage && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
           onClick={() => setIsLightboxOpen(false)}
         >
           <img
@@ -44,11 +45,11 @@ const ImageGallery = () => {
       )}
 
       {/* Gallery Container */}
-      <div className="w-full relative p-4 lg:p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border border-gray-200 shadow-md">
-        <div className="flex gap-3 lg:gap-4">
-          {/* 🔹 Thumbnails */}
-          <div className="w-14 lg:w-16 flex flex-col gap-2 max-h-80 lg:max-h-96 overflow-y-auto bg-white rounded-lg p-1 shadow-inner">
-            {selectedVariant.images.map((img, idx) => (
+      <div className="w-full p-4 lg:p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border border-gray-200 shadow-md">
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* ================= Thumbnails – LEFT (Desktop) ================= */}
+          <div className="hidden lg:flex w-16 flex-col gap-2 max-h-96 overflow-y-auto bg-white rounded-lg p-1 shadow-inner">
+            {images.map((img, idx) => (
               <button
                 key={idx}
                 onClick={() => setActiveImage(img.url)}
@@ -61,26 +62,45 @@ const ImageGallery = () => {
                 <img
                   src={img.url}
                   alt={`Thumbnail ${idx + 1}`}
-                  className="w-full h-12 lg:h-14 object-cover"
+                  className="w-full h-14 object-cover"
                 />
               </button>
             ))}
           </div>
 
-          {/* 🔹 Main Image */}
-          <div className="flex-1">
-            <div
-              className="w-full h-64 sm:h-80 lg:h-96 bg-white rounded-xl border border-gray-300 shadow-inner p-2 lg:p-4 flex items-center justify-center overflow-hidden cursor-zoom-in"
-              onClick={() => setIsLightboxOpen(true)}
-            >
-              {mainImage && (
+          {/* ================= Main Image ================= */}
+          <div
+            className="w-full h-64 sm:h-80 lg:h-96 bg-white rounded-xl border border-gray-300 shadow-inner p-2 lg:p-4 flex items-center justify-center overflow-hidden cursor-zoom-in"
+            onClick={() => setIsLightboxOpen(true)}
+          >
+            {mainImage && (
+              <img
+                src={mainImage}
+                alt="Product Image"
+                className="max-w-full max-h-full object-contain"
+              />
+            )}
+          </div>
+
+          {/* ================= Thumbnails – BOTTOM (Mobile / Tablet) ================= */}
+          <div className="flex lg:hidden gap-3 overflow-x-auto pt-2">
+            {images.map((img, idx) => (
+              <button
+                key={idx}
+                onClick={() => setActiveImage(img.url)}
+                className={`min-w-[72px] border-2 rounded-lg overflow-hidden transition-all ${
+                  mainImage === img.url
+                    ? "border-[var(--color-accent)]"
+                    : "border-gray-300"
+                }`}
+              >
                 <img
-                  src={mainImage}
-                  alt="Product Image"
-                  className="max-w-full max-h-full object-contain"
+                  src={img.url}
+                  alt={`Thumbnail ${idx + 1}`}
+                  className="w-full h-16 object-cover"
                 />
-              )}
-            </div>
+              </button>
+            ))}
           </div>
         </div>
       </div>
