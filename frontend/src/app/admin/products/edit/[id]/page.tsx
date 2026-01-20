@@ -6,65 +6,46 @@ import type { CreateProductInput } from "@/lib/validations/product.schema";
 import toast from "react-hot-toast";
 import {
   useEditProductMutation,
-  useGetAdminProductsQuery,
+  useGetAdminProductByIdQuery,
 } from "@/redux/services/admin/adminProductapi";
-import type { Variant, VariantImage } from "@/types/Product";
-import type { DisplayProduct } from "@/types/Product";
+import type { Variant, VariantImage, DisplayProduct } from "@/types/Product";
 
 const EditProductPage = () => {
   const { id } = useParams();
 
-  if (!id) return <p className="p-4 text-red-500">Invalid product ID</p>;
-  if (Array.isArray(id))
-    return <p className="p-4 text-red-500">Invalid product ID (multiple values)</p>;
+  if (!id || Array.isArray(id)) {
+    return <p className="p-4 text-red-500">Invalid product ID</p>;
+  }
 
-  const { data: productList, isLoading } = useGetAdminProductsQuery({
-    page: 1,
-    limit: 10,
-  });
+  // ✅ CORRECT: fetch single product by ID
+  const { data: product, isLoading } = useGetAdminProductByIdQuery(id);
 
   const [editProduct, { isLoading: isUpdating }] = useEditProductMutation();
-
-  // annotate the callback param so TS doesn't infer `any`
-  const product = productList?.products?.find((p: DisplayProduct) => p._id === id);
 
   if (isLoading) return <p className="p-4">Loading...</p>;
   if (!product) return <p className="p-4 text-red-500">Product not found</p>;
 
-  // Explicitly exclude slug when destructuring
-  // Use type assertion since slug exists in product but not in CreateProductInput
-  const { category, slug, ...restProduct } = product as {
+  // Remove slug (not part of CreateProductInput)
+  const { category, slug, ...restProduct } = product as DisplayProduct & {
     slug: string;
-    category: { _id: string } | string;
-    [key: string]: any;
   };
 
-  // Helper to normalize discountValidUntil to string | undefined
-  const normalizeDiscountValidUntil = (d?: string | Date): string | undefined => {
+  const normalizeDiscountValidUntil = (
+    d?: string | Date,
+  ): string | undefined => {
     if (!d) return undefined;
-    if (typeof d === "string") {
-      if (d.trim() === "") return undefined;
-      return d;
-    }
-    if (d instanceof Date) return d.toISOString();
-    // fallback
-    try {
-      const s = String(d);
-      return s.trim() === "" ? undefined : s;
-    } catch {
-      return undefined;
-    }
+    if (typeof d === "string") return d || undefined;
+    return d instanceof Date ? d.toISOString() : undefined;
   };
 
-  // Build default values without slug for the form
   const transformedProduct: Partial<CreateProductInput> = {
     ...restProduct,
-    category: typeof category === "string" ? category : category._id,
+    category: typeof category === "string" ? category : category?._id,
     variants: (product.variants ?? []).map((v: Variant) => ({
-      listingPrice: v.listingPrice,
-      sellingPrice:v.sellingPrice,
       color: v.color,
       size: v.size,
+      listingPrice: v.listingPrice,
+      sellingPrice: v.sellingPrice,
       basePrice: v.basePrice ?? 0,
       gstRate: v.gstRate ?? 0,
       stock: v.stock ?? 0,
@@ -77,20 +58,12 @@ const EditProductPage = () => {
         thumbSafe: img.thumbSafe,
         isPrimary: img.isPrimary,
       })),
-      // populate listingPrice if present on variant
-      ...(typeof (v as any).listingPrice !== "undefined"
-        ? { listingPrice: (v as any).listingPrice }
-        : {}),
     })),
   };
 
   const handleUpdate = async (data: CreateProductInput) => {
     try {
-      console.log("Submitting product update:", data);
-
-      // No slug removal needed here because form data never has slug
       await editProduct({ id, data }).unwrap();
-
       toast.success("Product updated successfully");
     } catch (error: any) {
       toast.error(error?.data?.message || "Failed to update product");

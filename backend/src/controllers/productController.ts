@@ -31,7 +31,7 @@ export const createProduct = catchAsync(
     return res
       .status(201)
       .json(new ApiResponse(201, product, "Product created successfully"));
-  }
+  },
 );
 
 export const editProduct = catchAsync(
@@ -44,15 +44,15 @@ export const editProduct = catchAsync(
     const updatedProduct = await productService.editProduct(
       req.params.productId,
       req.userId,
-      updateData
+      updateData,
     );
 
     return res
       .status(200)
       .json(
-        new ApiResponse(200, updatedProduct, "Product updated successfully")
+        new ApiResponse(200, updatedProduct, "Product updated successfully"),
       );
-  }
+  },
 );
 
 export const deleteProduct = catchAsync(
@@ -61,13 +61,13 @@ export const deleteProduct = catchAsync(
 
     const deleted = await productService.deleteProduct(
       req.params.productId,
-      req.userId
+      req.userId,
     );
 
     return res
       .status(200)
       .json(new ApiResponse(200, deleted, "Product deleted successfully"));
-  }
+  },
 );
 
 // Admin get all products (admin-only)
@@ -82,7 +82,7 @@ export const getAllProductsAdmin = catchAsync(
     return res
       .status(200)
       .json(new ApiResponse(200, products, "All products fetched (Admin)"));
-  }
+  },
 );
 
 // ==================== PUBLIC CONTROLLERS ====================
@@ -115,7 +115,7 @@ export const getAllProducts = catchAsync(
       limit,
       isAdmin,
       false,
-      sortBy
+      sortBy,
     );
 
     // Add caching headers for CDN/SSR (public only)
@@ -123,14 +123,14 @@ export const getAllProducts = catchAsync(
       // short TTL so admin edits appear quickly; s-maxage used by CDNs
       res.setHeader(
         "Cache-Control",
-        "public, s-maxage=20, stale-while-revalidate=60"
+        "public, s-maxage=20, stale-while-revalidate=60",
       );
     }
 
     return res
       .status(200)
       .json(new ApiResponse(200, products, "Products fetched successfully"));
-  }
+  },
 );
 
 // GET /products/latest
@@ -138,7 +138,7 @@ export const getLatestProducts = catchAsync(
   async (req: AuthRequest, res: Response) => {
     const limit = Math.min(
       Math.max(1, parseInt((req.query.limit as string) || "8")),
-      50
+      50,
     );
     const isAdmin = req.user?.role === "admin";
 
@@ -147,14 +147,14 @@ export const getLatestProducts = catchAsync(
     if (!isAdmin) {
       res.setHeader(
         "Cache-Control",
-        "public, s-maxage=20, stale-while-revalidate=60"
+        "public, s-maxage=20, stale-while-revalidate=60",
       );
     }
 
     return res
       .status(200)
       .json(new ApiResponse(200, products, "Latest products fetched"));
-  }
+  },
 );
 
 // GET /products/:slug
@@ -164,21 +164,21 @@ export const getProductBySlug = catchAsync(
 
     const product = await productService.getProductBySlug(
       req.params.slug,
-      isAdmin
+      isAdmin,
     );
 
     if (!isAdmin) {
       // product pages change less frequently; still short TTL to allow updates
       res.setHeader(
         "Cache-Control",
-        "public, s-maxage=10, stale-while-revalidate=30"
+        "public, s-maxage=10, stale-while-revalidate=30",
       );
     }
 
     return res
       .status(200)
       .json(new ApiResponse(200, product, "Product fetched successfully"));
-  }
+  },
 );
 
 // GET /products/id/:productId
@@ -188,20 +188,20 @@ export const getProductById = catchAsync(
 
     const product = await productService.getProductById(
       req.params.productId,
-      isAdmin
+      isAdmin,
     );
 
     if (!isAdmin) {
       res.setHeader(
         "Cache-Control",
-        "public, s-maxage=10, stale-while-revalidate=30"
+        "public, s-maxage=10, stale-while-revalidate=30",
       );
     }
 
     return res
       .status(200)
       .json(new ApiResponse(200, product, "Product fetched successfully"));
-  }
+  },
 );
 
 // GET /products/search?q=...
@@ -223,20 +223,20 @@ export const searchProducts = catchAsync(
       keyword,
       page,
       limit,
-      isAdmin /* optionally pass sortBy */
+      isAdmin /* optionally pass sortBy */,
     );
 
     if (!isAdmin) {
       res.setHeader(
         "Cache-Control",
-        "public, s-maxage=10, stale-while-revalidate=30"
+        "public, s-maxage=10, stale-while-revalidate=30",
       );
     }
 
     return res
       .status(200)
       .json(new ApiResponse(200, products, "Search results fetched"));
-  }
+  },
 );
 
 // GET /products/category/:slug
@@ -255,18 +255,31 @@ export const getProductsByCategory = catchAsync(
       slug,
       page,
       limit,
-      isAdmin
+      isAdmin,
     );
 
     if (!isAdmin) {
       res.setHeader(
         "Cache-Control",
-        "public, s-maxage=20, stale-while-revalidate=60"
+        "public, s-maxage=20, stale-while-revalidate=60",
       );
     }
 
     return res
       .status(200)
       .json(new ApiResponse(200, products, "Category products fetched"));
-  }
+  },
+);
+export const getProductByIdAdmin = catchAsync(
+  async (req: AuthRequest, res: Response) => {
+    if (!req.userId) throw new AppError("Unauthorized", 401);
+
+    const product = await productService.getProductByIdAdmin(
+      req.params.productId,
+    );
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, product, "Product fetched (Admin)"));
+  },
 );

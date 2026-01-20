@@ -10,6 +10,7 @@ import {
   getProductsByCategory,
   getLatestProducts,
   editProduct,
+  getProductByIdAdmin,
 } from "../controllers/productController";
 import { authVerify } from "../middlewares/authVerify";
 import { isAdmin } from "../middlewares/isAdmin";
@@ -21,7 +22,7 @@ router.post("/admin/create", authVerify, isAdmin, createProduct);
 router.put("/admin/edit/:productId", authVerify, isAdmin, editProduct);
 router.delete("/admin/delete/:productId", authVerify, isAdmin, deleteProduct);
 router.get("/admin/all", authVerify, isAdmin, getAllProductsAdmin);
-
+router.get("/admin/id/:productId", authVerify, isAdmin, getProductByIdAdmin);
 // ==================== PUBLIC ROUTES ====================
 router.get("/all", getAllProducts); // Public + Admin both can access
 router.get("/search", searchProducts);

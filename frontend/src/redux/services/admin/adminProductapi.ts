@@ -26,6 +26,14 @@ export const adminProductApi = createApi({
       providesTags: ["AdminProducts"],
     }),
 
+    getAdminProductById: builder.query<any, string>({
+      query: (id) => ({
+        url: `/products/admin/id/${id}`,
+        method: "GET",
+      }),
+      transformResponse: (response: { data: any }) => response.data,
+    }),
+
     // ✅ Create product
     createProduct: builder.mutation<any, CreateProductInput>({
       query: (body) => ({
@@ -62,6 +70,7 @@ export const adminProductApi = createApi({
 
 export const {
   useGetAdminProductsQuery,
+  useGetAdminProductByIdQuery,
   useCreateProductMutation,
   useEditProductMutation,
   useDeleteProductMutation,
