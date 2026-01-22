@@ -13,6 +13,9 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  alternates: {
+    canonical: "https://suvidhawood.com/products",
+  },
 };
 
 /* ================= TYPES ================= */
@@ -72,11 +75,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
       </div>
 
       {products.length > 0 ? (
-        <InfiniteProductsClient
-          initialProducts={products}
-  
-          sortBy={sortBy}
-        />
+        <InfiniteProductsClient initialProducts={products} sortBy={sortBy} />
       ) : (
         <div className="text-center py-20 text-muted-foreground">
           No products found
