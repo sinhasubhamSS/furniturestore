@@ -32,8 +32,12 @@ export interface OrderItemSnapshot {
   price: number;
   hasDiscount: boolean;
   discountPercent?: number;
-  color?: string;
-  size?: string;
+  attributes: {
+    finish?: string;
+    size?: string;
+    seating?: string;
+    configuration?: string;
+  };
   sku?: string;
   weight: number;
 }
@@ -135,8 +139,12 @@ const orderSchema = new Schema<OrderDocument>(
         price: { type: Number, required: true },
         hasDiscount: { type: Boolean, default: false },
         discountPercent: { type: Number, default: 0 },
-        color: String,
-        size: String,
+        aattributes: {
+          finish: String,
+          size: String,
+          seating: String,
+          configuration: String,
+        },
         sku: String,
         weight: { type: Number, required: true },
       },
@@ -214,7 +222,7 @@ const orderSchema = new Schema<OrderDocument>(
     advancePaymentAmount: { type: Number, default: 0 },
     remainingAmount: { type: Number, default: 0 },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // ✅ Updated PRE-SAVE HOOK with new ID generator
@@ -228,6 +236,5 @@ orderSchema.pre("save", async function (next) {
 // Indexes
 orderSchema.index({ user: 1, placedAt: -1 });
 orderSchema.index({ status: 1, placedAt: -1 });
-
 
 export const Order = model<OrderDocument>("Order", orderSchema);

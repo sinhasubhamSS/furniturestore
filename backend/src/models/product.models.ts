@@ -14,8 +14,12 @@ export interface IVariantImage {
 /* ---------- Variant interface ---------- */
 export interface IVariant extends Document {
   sku: string;
-  color: string;
-  size?: string;
+  attributes: {
+    finish?: string;
+    size?: string;
+    seating?: string;
+    configuration?: string;
+  };
 
   // SOURCE OF TRUTH
   basePrice: number; // taxable value
@@ -33,7 +37,13 @@ export interface IVariant extends Document {
   stock: number;
   reservedStock: number;
   images: IVariantImage[];
-
+  measurements?: {
+    length?: number; // cm
+    width?: number;
+    height?: number;
+    depth?: number;
+    weight?: number; // kg
+  };
   priceUpdatedAt?: Date;
   priceUpdatedBy?: Types.ObjectId;
 }
@@ -48,12 +58,7 @@ export interface IProduct extends Document {
   variants: Types.DocumentArray<IVariant>;
   category: Types.ObjectId;
 
-  measurements?: {
-    width?: number;
-    height?: number;
-    depth?: number;
-    weight?: number;
-  };
+ 
 
   // denormalized
   lowestSellingPrice?: number;
@@ -117,7 +122,7 @@ interface IProductModel extends Model<IProduct> {
       };
       verifiedReviews: number;
       reviewsWithImages: number;
-    }
+    },
   ): Promise<IProduct | null>;
 }
 
@@ -129,15 +134,18 @@ const variantImageSchema = new Schema<IVariantImage>(
     thumbSafe: String,
     isPrimary: { type: Boolean, default: false },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const variantSchema = new Schema<IVariant>(
   {
     sku: { type: String, required: true },
-    color: { type: String, required: true },
-    size: String,
-
+    attributes: {
+      finish: { type: String },
+      size: { type: String },
+      seating: { type: String },
+      configuration: { type: String },
+    },
     basePrice: { type: Number, required: true },
     gstRate: { type: Number, required: true, min: 0, max: 100 },
 
@@ -154,11 +162,18 @@ const variantSchema = new Schema<IVariant>(
     reservedStock: { type: Number, default: 0 },
 
     images: { type: [variantImageSchema], default: [] },
+    measurements: {
+      length: Number,
+      width: Number,
+      height: Number,
+      depth: Number,
+      weight: Number,
+    },
 
     priceUpdatedAt: Date,
     priceUpdatedBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
-  { _id: true }
+  { _id: true },
 );
 
 /* ---------- Variant pre-save ---------- */
@@ -167,7 +182,7 @@ variantSchema.pre("save", function (this: any, next) {
     const pricing: PricingResult = computeVariantFromBase(
       this.basePrice,
       this.gstRate,
-      this.listingPrice
+      this.listingPrice,
     );
 
     this.basePrice = pricing.base;
@@ -248,7 +263,7 @@ const productSchema = new Schema<IProduct, IProductModel>(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 /* ---------- Product pre-save ---------- */
@@ -259,13 +274,13 @@ productSchema.pre("save", function (this: any, next) {
 
   if (this.variants?.length) {
     const sellingPrices = this.variants.map(
-      (v: any) => v.sellingPrice || Infinity
+      (v: any) => v.sellingPrice || Infinity,
     );
     this.lowestSellingPrice = Math.min(...sellingPrices);
 
     this.maxSavings = Math.max(
       ...this.variants.map((v: any) => v.savings || 0),
-      0
+      0,
     );
   }
 
@@ -276,7 +291,7 @@ productSchema.pre("save", function (this: any, next) {
 
 productSchema.statics.updateReviewStats = async function (
   productId: string,
-  stats: any
+  stats: any,
 ) {
   return await this.findByIdAndUpdate(
     productId,
@@ -294,12 +309,12 @@ productSchema.statics.updateReviewStats = async function (
       "reviewStats.reviewsWithImages": stats.reviewsWithImages || 0,
       "reviewStats.lastUpdated": new Date(),
     },
-    { new: true }
+    { new: true },
   );
 };
 productSchema.statics.getByRatingRange = function (
   minRating: number,
-  maxRating: number = 5
+  maxRating: number = 5,
 ) {
   return this.find({
     "reviewStats.averageRating": { $gte: minRating, $lte: maxRating },
@@ -346,11 +361,11 @@ productSchema.statics.recomputeDenorm = async function (productDoc: any) {
 
   const totalStock = doc.variants.reduce(
     (s: number, v: any) => s + Math.max(0, v.stock - v.reservedStock),
-    0
+    0,
   );
   const maxDiscountPercent = Math.max(
     ...doc.variants.map((v: any) => v.discountPercent || 0),
-    0
+    0,
   );
 
   const rep = Product.pickRepresentative(doc);
@@ -369,7 +384,7 @@ productSchema.statics.recomputeDenorm = async function (productDoc: any) {
       repThumbSafe: rep?.img?.thumbSafe,
       maxDiscountPercent,
     },
-    { new: true }
+    { new: true },
   );
 };
 

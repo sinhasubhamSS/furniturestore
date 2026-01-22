@@ -39,27 +39,37 @@ const EditProductPage = () => {
   };
 
   const transformedProduct: Partial<CreateProductInput> = {
-    ...restProduct,
-    category: typeof category === "string" ? category : category?._id,
-    variants: (product.variants ?? []).map((v: Variant) => ({
-      color: v.color,
-      size: v.size,
-      listingPrice: v.listingPrice,
-      sellingPrice: v.sellingPrice,
-      basePrice: v.basePrice ?? 0,
-      gstRate: v.gstRate ?? 0,
-      stock: v.stock ?? 0,
-      hasDiscount: !!v.hasDiscount,
-      discountPercent: v.discountPercent ?? 0,
-      discountValidUntil: normalizeDiscountValidUntil(v.discountValidUntil),
-      images: (v.images ?? []).map((img: VariantImage) => ({
-        url: img.url,
-        public_id: img.public_id,
-        thumbSafe: img.thumbSafe,
-        isPrimary: img.isPrimary,
-      })),
+  ...restProduct,
+  category: typeof category === "string" ? category : category?._id,
+
+  variants: (product.variants ?? []).map((v: Variant) => ({
+    attributes: {
+      finish: v.attributes?.finish ?? "",
+      size: v.attributes?.size ?? "",
+      seating: v.attributes?.seating ?? "",
+      configuration: v.attributes?.configuration ?? "",
+    },
+
+    basePrice: v.basePrice ?? 0,
+    gstRate: v.gstRate ?? 0,
+    listingPrice: v.listingPrice,
+    sellingPrice: v.sellingPrice,
+
+    stock: v.stock ?? 0,
+
+    hasDiscount: !!v.hasDiscount,
+    discountPercent: v.discountPercent ?? 0,
+    discountValidUntil: normalizeDiscountValidUntil(v.discountValidUntil),
+
+    images: (v.images ?? []).map((img: VariantImage) => ({
+      url: img.url,
+      public_id: img.public_id,
+      thumbSafe: img.thumbSafe,
+      isPrimary: img.isPrimary,
     })),
-  };
+  })),
+};
+
 
   const handleUpdate = async (data: CreateProductInput) => {
     try {

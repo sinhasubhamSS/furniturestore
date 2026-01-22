@@ -31,11 +31,23 @@ export type VariantImage = {
 /**
  * Variant shape used in frontend forms & API
  */
+export type VariantAttributes = {
+  finish?: string; // Walnut / Teak / Natural
+  size?: string; // King / Queen (bed)
+  seating?: string; // 3 Seater / 5 Seater (sofa)
+  configuration?: string; // 3+1+1
+};
+export type VariantMeasurements = {
+  length?: number; // cm
+  width?: number;
+  height?: number;
+  depth?: number;
+  weight?: number; // kg
+};
 export type Variant = {
   _id?: string;
   sku?: string;
-  color: string;
-  size?: string;
+  attributes: VariantAttributes;
 
   // SOURCE OF TRUTH (backend persists these)
   basePrice?: number; // taxable value (before GST) — canonical internal
@@ -48,7 +60,7 @@ export type Variant = {
   stock: number;
   reservedStock?: number;
   images: VariantImage[];
-
+  measurements?: VariantMeasurements;
   // legacy/compat (kept in many places)
 
   savings: number; // listingPrice - sellingPrice
@@ -59,8 +71,7 @@ export type Variant = {
   discountValidUntil?: string | Date;
 
   // audit / meta (optional)
-  priceMode?: "base" | "selling";
-  priceUpdatedAt?: string | Date;
+    priceUpdatedAt?: string | Date;
   priceUpdatedBy?: string;
 };
 
@@ -82,12 +93,6 @@ export type BaseProduct = {
   description: string;
   variants: Variant[];
   specifications?: Specification[];
-  measurements?: {
-    width?: number;
-    height?: number;
-    depth?: number;
-    weight?: number;
-  };
   isPublished: boolean;
   warranty?: string;
   disclaimer?: string;

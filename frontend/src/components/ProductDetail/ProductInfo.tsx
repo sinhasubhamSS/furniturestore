@@ -2,12 +2,18 @@
 
 import React from "react";
 import { DisplayProduct } from "@/types/Product";
+import { useSelector } from "react-redux";
+import { RootState } from "@/redux/store";
 
 type Props = {
   product: DisplayProduct;
 };
 
 const ProductInfo: React.FC<Props> = ({ product }) => {
+  const selectedVariant = useSelector(
+    (state: RootState) => state.productDetail.selectedVariant,
+  );
+
   return (
     <div className="bg-[var(--color-card)]  shadow-lg border border-[var(--color-border-custom)] p-4">
       <h2 className="text-xl font-bold text-[var(--color-foreground)] mb-3">
@@ -49,41 +55,45 @@ const ProductInfo: React.FC<Props> = ({ product }) => {
       )}
 
       {/* Measurements - Compact Cards */}
-      {product.measurements && (
+      {selectedVariant?.measurements && (
         <div className="mb-4">
           <h3 className="text-lg font-semibold text-[var(--color-foreground)] mb-3">
             Measurements
           </h3>
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {product.measurements.width && (
+            {selectedVariant.measurements.width && (
               <div className="bg-[var(--color-secondary)] p-3 rounded-lg border border-[var(--color-border-custom)]">
                 <p className="text-[var(--text-accent)] text-xs">Width</p>
                 <p className="font-semibold text-[var(--color-foreground)]">
-                  {product.measurements.width} cm
+                  {selectedVariant.measurements.width} cm
                 </p>
               </div>
             )}
-            {product.measurements.height && (
+
+            {selectedVariant.measurements.height && (
               <div className="bg-[var(--color-secondary)] p-3 rounded-lg border border-[var(--color-border-custom)]">
                 <p className="text-[var(--text-accent)] text-xs">Height</p>
                 <p className="font-semibold text-[var(--color-foreground)]">
-                  {product.measurements.height} cm
+                  {selectedVariant.measurements.height} cm
                 </p>
               </div>
             )}
-            {product.measurements.depth && (
+
+            {selectedVariant.measurements.depth && (
               <div className="bg-[var(--color-secondary)] p-3 rounded-lg border border-[var(--color-border-custom)]">
                 <p className="text-[var(--text-accent)] text-xs">Depth</p>
                 <p className="font-semibold text-[var(--color-foreground)]">
-                  {product.measurements.depth} cm
+                  {selectedVariant.measurements.depth} cm
                 </p>
               </div>
             )}
-            {product.measurements.weight && (
+
+            {selectedVariant.measurements.weight && (
               <div className="bg-[var(--color-secondary)] p-3 rounded-lg border border-[var(--color-border-custom)]">
                 <p className="text-[var(--text-accent)] text-xs">Weight</p>
                 <p className="font-semibold text-[var(--color-foreground)]">
-                  {product.measurements.weight} kg
+                  {selectedVariant.measurements.weight} kg
                 </p>
               </div>
             )}

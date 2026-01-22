@@ -57,7 +57,7 @@ const CheckoutSummary = React.memo(
         deliveryCharge: pricingData?.deliveryCharge ?? 0,
         grandTotal: pricingData?.checkoutTotal ?? subtotal ?? 0,
       }),
-      [pricingData, subtotal]
+      [pricingData, subtotal],
     );
 
     if (!items || items.length === 0) {
@@ -145,15 +145,15 @@ const CheckoutSummary = React.memo(
                     {product.name}
                   </div>
 
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "var(--text-accent)",
-                      marginTop: 4,
-                    }}
-                  >
-                    {variant.color}
-                    {variant.size ? ` • ${variant.size}` : ""}
+                  <div className="text-sm text-[var(--text-accent)]">
+                    {[
+                      variant.attributes?.finish,
+                      variant.attributes?.size,
+                      variant.attributes?.seating,
+                      variant.attributes?.configuration,
+                    ]
+                      .filter(Boolean)
+                      .join(" • ")}
                   </div>
 
                   {/* Price Row */}
@@ -237,7 +237,7 @@ const CheckoutSummary = React.memo(
         )}
       </aside>
     );
-  }
+  },
 );
 
 CheckoutSummary.displayName = "CheckoutSummary";

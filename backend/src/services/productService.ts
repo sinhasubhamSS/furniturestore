@@ -21,7 +21,7 @@ class ProductService {
     const readPublicId = (img: any) =>
       img?.public_id || img?.publicId || img?.publicIdStr || null;
     const allHaveUrl = images.every(
-      (img) => img && typeof img.url === "string" && img.url.length > 0
+      (img) => img && typeof img.url === "string" && img.url.length > 0,
     );
     if (!allHaveUrl) return false;
     const anyWithPublicId = images.some((img) => {
@@ -61,11 +61,11 @@ class ProductService {
 
   private async deleteRemovedImages(
     oldImages: { public_id: string }[] = [],
-    newImages: { public_id: string }[] = []
+    newImages: { public_id: string }[] = [],
   ) {
     const newIds = new Set((newImages || []).map((img) => img.public_id));
     const toDelete = (oldImages || []).filter(
-      (img) => !newIds.has(img.public_id)
+      (img) => !newIds.has(img.public_id),
     );
     if (toDelete.length === 0) return;
     await Promise.all(
@@ -75,7 +75,7 @@ class ProductService {
         } catch (e) {
           console.error("cloudinary delete error", img.public_id, e);
         }
-      })
+      }),
     );
   }
 
@@ -88,7 +88,7 @@ class ProductService {
         } catch (e) {
           console.error("cloudinary delete error", id, e);
         }
-      })
+      }),
     );
   }
 
@@ -100,7 +100,7 @@ class ProductService {
   private buildProductQuery(
     filter: FilterQuery<IProductInput> = {},
     isAdmin: boolean = false,
-    populateCreatedBy: boolean = false
+    populateCreatedBy: boolean = false,
   ) {
     const finalFilter = isAdmin ? filter : { ...filter, isPublished: true };
     let query = Product.find(finalFilter).populate("category", "name");
@@ -154,91 +154,119 @@ class ProductService {
 
   // -------------------- admin ops --------------------
   async createProduct(productData: IProductInput, userId: string) {
+    // 1️⃣ basic validation
     if (!productData.variants || productData.variants.length === 0) {
       throw new AppError("At least one variant is required", 400);
     }
 
-    const processedVariants = productData.variants.map((variant) => {
-      if (!this.validateImages(variant.images)) {
-        throw new AppError(
-          "Each variant must have at least one valid uploaded image (url + public_id).",
-          400
+    // 2️⃣ process variants
+    const processedVariants: IVariant[] = productData.variants.map(
+      (variant) => {
+        // images validation
+        if (!this.validateImages(variant.images)) {
+          throw new AppError(
+            "Each variant must have at least one valid uploaded image (url + public_id).",
+            400,
+          );
+        }
+
+        // base validations
+        if (typeof variant.basePrice !== "number" || variant.basePrice <= 0) {
+          throw new AppError("variant.basePrice must be > 0", 400);
+        }
+
+        if (typeof variant.gstRate !== "number" || variant.gstRate < 0) {
+          throw new AppError("variant.gstRate must be >= 0", 400);
+        }
+
+        // normalize images
+        const images = this.normalizeImages(variant.images);
+
+        // SKU (attributes based – FINAL)
+        const sku = generateSKU(productData.name, variant.attributes);
+
+        // pricing (SOURCE OF TRUTH)
+        const pricing = computeVariantFromBase(
+          Math.round(variant.basePrice * 100) / 100,
+          variant.gstRate,
+          variant.listingPrice ?? undefined,
         );
-      }
 
-      const images = this.normalizeImages(variant.images);
-      const sku = generateSKU(productData.name, variant.color, variant.size);
+        return {
+          sku,
+          attributes: variant.attributes, // ✅ finish / size / seating / configuration
+          basePrice: pricing.base,
+          gstRate: variant.gstRate,
+          gstAmount: pricing.gstAmount,
+          sellingPrice: pricing.sellingPrice,
+          listingPrice: pricing.listingPrice,
 
-      // Validate required basePrice & gstRate (base-first approach)
-      if (typeof variant.basePrice !== "number" || variant.basePrice <= 0) {
-        throw new AppError(
-          "variant.basePrice is required and must be > 0",
-          400
-        );
-      }
-      if (typeof variant.gstRate !== "number" || variant.gstRate < 0) {
-        throw new AppError("variant.gstRate is required and must be >= 0", 400);
-      }
+          savings: pricing.savings,
+          discountPercent: pricing.discountPercent,
+          hasDiscount: pricing.savings > 0,
 
-      // compute pricing using base-first computeVariantFromBase(base, gstRate, listing?)
-      const pricing = computeVariantFromBase(
-        Math.round(variant.basePrice * 100) / 100,
-        variant.gstRate,
-        variant.listingPrice ?? undefined
-      );
+          stock: variant.stock ?? 0,
+          reservedStock: 0,
 
-      return {
-        ...variant,
-        images,
-        sku,
-        basePrice: Math.round(variant.basePrice * 100) / 100,
-        gstRate: variant.gstRate,
-        gstAmount: pricing.gstAmount,
-        sellingPrice: pricing.sellingPrice,
-        price: pricing.listingPrice, // legacy listing price
-        discountedPrice: pricing.sellingPrice, // legacy discounted
-        savings: pricing.savings,
-        discountPercent: pricing.discountPercent ?? 0,
-        stock: variant.stock ?? 0,
-      } as IVariant;
-    });
+          images,
+          measurements: variant.measurements, // ✅ variant-level only
 
-    const minPrice = Math.min(
-      ...processedVariants.map((v: any) => v.price ?? Infinity)
+          priceUpdatedAt: new Date(),
+        };
+      },
     );
-    const minDiscountedPrice = Math.min(
-      ...processedVariants.map((v: any) => v.discountedPrice ?? Infinity)
+
+    // 3️⃣ product-level aggregates (legacy support only)
+    const minListingPrice = Math.min(
+      ...processedVariants.map((v) => v.listingPrice ?? Infinity),
     );
+
+    const minSellingPrice = Math.min(
+      ...processedVariants.map((v) => v.sellingPrice ?? Infinity),
+    );
+
     const maxSavings = Math.max(
-      ...processedVariants.map((v: any) => v.savings ?? 0)
+      ...processedVariants.map((v) => v.savings ?? 0),
+      0,
     );
 
+    // 4️⃣ build product document
     const productDocument: IProductInput = {
-      ...productData,
+      name: productData.name,
+      title: productData.title,
+      description: productData.description,
+      category: productData.category,
+
       slug: this.buildSlug(productData.name),
-      variants: processedVariants as any,
-      price: Math.round(minPrice * 100) / 100,
-      lowestDiscountedPrice: Math.round(minDiscountedPrice * 100) / 100,
+
+      variants: processedVariants,
+
+      // legacy / denorm helpers
+      price: Math.round(minListingPrice * 100) / 100,
+      lowestDiscountedPrice: Math.round(minSellingPrice * 100) / 100,
       maxSavings: Math.round(maxSavings * 100) / 100,
+
       createdBy: new Types.ObjectId(userId),
-      isPublished: productData.isPublished || false,
+      isPublished: productData.isPublished ?? false,
     };
 
+    // 5️⃣ create product
     const product = await Product.create(productDocument);
 
+    // 6️⃣ recompute denormalized fields
     try {
       await Product.recomputeDenorm(product._id);
-    } catch (e) {
-      console.error("recomputeDenorm error after create", e);
+    } catch (err) {
+      console.error("recomputeDenorm error after create", err);
     }
 
-    return product;
+    return product.toObject();
   }
 
   async editProduct(
     productId: string,
     userId: string,
-    updateData: Partial<IProductInput>
+    updateData: Partial<IProductInput>,
   ) {
     const product = await Product.findOne({
       _id: productId,
@@ -273,7 +301,7 @@ class ProductService {
       });
 
       const toDeleteIds = [...oldPublicIds].filter(
-        (id) => !newPublicIds.has(id)
+        (id) => !newPublicIds.has(id),
       );
       await this.deletePublicIds(toDeleteIds);
 
@@ -283,7 +311,7 @@ class ProductService {
           if (!this.validateImages(variant.images)) {
             throw new AppError(
               "Each variant must have at least one valid image (url + public_id)",
-              400
+              400,
             );
           }
 
@@ -298,14 +326,13 @@ class ProductService {
           const images = this.normalizeImages(variant.images);
           const sku = generateSKU(
             updateData.name || product.name,
-            variant.color,
-            variant.size
+            variant.attributes,
           );
 
           const pricing = computeVariantFromBase(
             Math.round(variant.basePrice * 100) / 100,
             variant.gstRate,
-            variant.listingPrice ?? undefined
+            variant.listingPrice ?? undefined,
           );
 
           return {
@@ -322,24 +349,24 @@ class ProductService {
             hasDiscount: pricing.savings > 0,
             stock: variant.stock ?? 0,
           } as IVariant;
-        }
+        },
       );
 
       /* ----- replace variants atomically ----- */
       product.variants.splice(
         0,
         product.variants.length,
-        ...(processedVariants as any)
+        ...(processedVariants as any),
       );
 
       /* ----- product-level aggregates ----- */
       product.lowestSellingPrice = Math.min(
-        ...processedVariants.map((v) => v.sellingPrice ?? Infinity)
+        ...processedVariants.map((v) => v.sellingPrice ?? Infinity),
       );
 
       product.maxSavings = Math.max(
         ...processedVariants.map((v) => v.savings ?? Infinity),
-        0
+        0,
       );
     }
 
@@ -349,7 +376,6 @@ class ProductService {
       "title",
       "description",
       "specifications",
-      "measurements",
       "warranty",
       "disclaimer",
       "category",
@@ -402,7 +428,7 @@ class ProductService {
     limit = 10,
     isAdmin: boolean = false,
     populateCreatedBy: boolean = false,
-    sortBy: string = "latest"
+    sortBy: string = "latest",
   ) {
     const mongoFilter: any = {};
 
@@ -444,7 +470,7 @@ class ProductService {
     const query = this.buildProductQuery(
       finalFilter,
       isAdmin,
-      populateCreatedBy
+      populateCreatedBy,
     )
       .select(LISTING_PROJECTION)
       .sort(sortOptions);
@@ -505,7 +531,7 @@ class ProductService {
           primaryVariantId
         inStock
         createdAt
-        `
+        `,
       );
 
     const products = await this.applyPagination(query, 1, limit).lean();
@@ -585,7 +611,7 @@ class ProductService {
     searchQuery: string,
     page = 1,
     limit = 10,
-    isAdmin: boolean = false
+    isAdmin: boolean = false,
   ) {
     const textSearchFilter = { $text: { $search: searchQuery } };
 
@@ -621,7 +647,7 @@ class ProductService {
     slug: string,
     page = 1,
     limit = 10,
-    isAdmin: boolean = false
+    isAdmin: boolean = false,
   ) {
     const category = await Category.findOne({ slug });
     if (!category) throw new AppError("Category not found", 404);
@@ -659,7 +685,6 @@ class ProductService {
     title: 1,
     description: 1,
     specifications: 1,
-    measurements: 1,
     warranty: 1,
     disclaimer: 1,
 
@@ -677,12 +702,13 @@ class ProductService {
       color: 1,
       size: 1,
       images: 1,
-
+      attributes: 1,
       sellingPrice: 1,
       listingPrice: 1,
       savings: 1,
       discountPercent: 1,
       stock: 1,
+      measurements: 1,
     },
 
     // helpers
@@ -691,7 +717,7 @@ class ProductService {
 
   private async getSingleProduct(
     query: FilterQuery<IProductInput>,
-    isAdmin: boolean = false
+    isAdmin: boolean = false,
   ) {
     const finalQuery = isAdmin ? query : { ...query, isPublished: true };
 

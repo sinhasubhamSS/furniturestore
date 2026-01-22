@@ -46,9 +46,7 @@ const ProductCartItem = React.memo(
                 }
                 disabled={item.quantity <= 1}
               />
-              <span className="px-2 text-sm font-medium">
-                {item.quantity}
-              </span>
+              <span className="px-2 text-sm font-medium">{item.quantity}</span>
               <ActionButton
                 icon={Plus}
                 size="sm"
@@ -59,13 +57,17 @@ const ProductCartItem = React.memo(
 
           {/* INFO */}
           <div className="flex-1">
-            <h3 className="font-semibold truncate">
-              {item.product.name}
-            </h3>
+            <h3 className="font-semibold truncate">{item.product.name}</h3>
 
             <p className="text-sm text-[var(--text-accent)]">
-              {variant.color}
-              {variant.size ? ` • ${variant.size}` : ""}
+              {[
+                variant.attributes?.finish,
+                variant.attributes?.size,
+                variant.attributes?.seating,
+                variant.attributes?.configuration,
+              ]
+                .filter(Boolean)
+                .join(" • ")}
             </p>
 
             {/* PRICE */}
@@ -96,7 +98,7 @@ const ProductCartItem = React.memo(
         </div>
       </div>
     );
-  }
+  },
 );
 
 ProductCartItem.displayName = "ProductCartItem";

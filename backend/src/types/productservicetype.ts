@@ -1,30 +1,36 @@
 import { Types } from "mongoose";
 
-/* ---------- Variant ---------- */
+/* ---------- Variant (SERVICE INPUT) ---------- */
 export interface IVariant {
   sku?: string;
-  color: string;
-  size?: string;
+
+  // ✅ NEW: unified attributes (NO hardcoding)
+  attributes?: {
+    finish?: string; // walnut / teak / natural / fabric color
+    size?: string; // king / queen / single
+    seating?: string; // 3 seater / 5 seater
+    configuration?: string; // 3+1+1 / L-shape
+  };
 
   // SOURCE-OF-TRUTH (admin must provide)
-  basePrice: number; // taxable value (before GST) - required
-  gstRate: number; // percent, e.g. 18
+  basePrice: number; // taxable value (before GST)
+  gstRate: number; // percent (0–100)
 
-  // Optional marketing/display
-  listingPrice?: number; // optional MRP shown to users
+  // optional display
+  listingPrice?: number;
 
-  // Computed / persisted (may be absent on input but stored on DB)
-  gstAmount?: number; // computed = basePrice * gstRate/100
-  sellingPrice?: number; // computed = basePrice + gstAmount
+  // computed (filled by service / model)
+  gstAmount?: number;
+  sellingPrice?: number;
 
-  // legacy compatibility (optional)
-  price?: number; // legacy listingPrice
-  discountedPrice?: number; // legacy sellingPrice
+  // legacy compatibility (optional – safe to keep)
+  price?: number;
+  discountedPrice?: number;
   savings?: number;
 
-  // discounts (for display/UX only)
+  // discount UX
   hasDiscount?: boolean;
-  discountPercent?: number; // 0-100
+  discountPercent?: number;
   discountValidUntil?: Date | null;
 
   // stock
@@ -39,8 +45,16 @@ export interface IVariant {
     isPrimary?: boolean;
   }[];
 
-  // audit (optional)
-  priceMode?: "base" | "selling"; // we set "base" by default
+  // per-variant measurement (IMPORTANT for furniture)
+  measurements?: {
+    length?: number;
+    width?: number;
+    height?: number;
+    depth?: number;
+    weight?: number;
+  };
+
+  // audit
   priceUpdatedAt?: Date;
   priceUpdatedBy?: Types.ObjectId | null;
 }
@@ -48,7 +62,7 @@ export interface IVariant {
 /* ---------- Product input ---------- */
 export interface IProductInput {
   name: string;
-  slug?: string; // auto-generated if absent
+  slug?: string;
   title?: string;
   description: string;
 
@@ -60,32 +74,24 @@ export interface IProductInput {
     specs: { key: string; value: string }[];
   }[];
 
-  measurements?: {
-    width?: number;
-    height?: number;
-    depth?: number;
-    weight?: number;
-  };
+  // ❌ product-level measurements removed (variant-level only)
+  // measurements?: ❌ (INTENTIONALLY REMOVED)
 
   warranty?: string;
   disclaimer?: string;
 
   category: Types.ObjectId;
 
-  // denorm/derived (optional on input, maintained by service)
-  price?: number; // lowest listingPrice (for product listing)
-  lowestDiscountedPrice?: number; // lowest sellingPrice across variants
+  // denormalized / derived
+  price?: number;
+  lowestDiscountedPrice?: number;
   maxSavings?: number;
-
-  // helpful arrays (computed)
-  colors?: string[];
-  sizes?: string[];
 
   createdBy: Types.ObjectId;
   createdAt?: Date;
   isPublished?: boolean;
 
-  // review fields (optional)
+  // reviews
   reviewStats?: {
     averageRating?: number;
     totalReviews?: number;
@@ -108,11 +114,11 @@ export interface IProductInput {
   };
 }
 
-/* ---------- Other helpers ---------- */
+/* ---------- Helpers ---------- */
 export type SortByOptions = "latest" | "price_low" | "price_high" | "discount";
 
 export interface IProductFilter {
-  category?: string; // slug
+  category?: string;
   minPrice?: number;
   maxPrice?: number;
   inStock?: boolean;

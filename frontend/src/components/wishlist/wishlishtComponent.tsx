@@ -47,9 +47,16 @@ const WishlistItem = ({
           </p>
 
           {/* META */}
-          <div className="mt-1 flex flex-wrap gap-2 text-xs">
-            <span>
-              {selectedVariant.color} • {selectedVariant.size}
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-[var(--text-accent)]">
+              {[
+                selectedVariant.attributes?.finish,
+                selectedVariant.attributes?.size,
+                selectedVariant.attributes?.seating,
+                selectedVariant.attributes?.configuration,
+              ]
+                .filter(Boolean)
+                .join(" • ")}
             </span>
 
             {selectedVariant.stock > 0 ? (

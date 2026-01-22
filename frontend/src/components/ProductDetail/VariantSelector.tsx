@@ -12,67 +12,67 @@ type Props = {
 const VariantSelector: React.FC<Props> = ({ variants }) => {
   const dispatch = useDispatch();
 
-  const [selectedColor, setSelectedColor] = useState<string | null>(null);
-  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [finish, setFinish] = useState<string | null>(null);
+  const [size, setSize] = useState<string | null>(null);
 
-  /* ================= DERIVED ================= */
+  /* ========= DERIVED ========= */
 
-  const colors = useMemo(
+  const finishes = useMemo(
     () =>
       Array.from(
         new Set(
-          variants.map((v) => v.color).filter((c): c is string => Boolean(c)),
+          variants
+            .map((v) => v.attributes?.finish)
+            .filter((v): v is string => Boolean(v)),
         ),
       ),
     [variants],
   );
 
-  const sizesForColor = useMemo(() => {
-    if (!selectedColor) return [];
+  const sizesForFinish = useMemo(() => {
+    if (!finish) return [];
     return Array.from(
       new Set(
         variants
-          .filter((v) => v.color === selectedColor)
-          .map((v) => v.size)
-          .filter((s): s is string => Boolean(s)),
+          .filter((v) => v.attributes?.finish === finish)
+          .map((v) => v.attributes?.size)
+          .filter((v): v is string => Boolean(v)),
       ),
     );
-  }, [variants, selectedColor]);
+  }, [variants, finish]);
 
-  /* ================= INIT ================= */
+  /* ========= INIT ========= */
 
   useEffect(() => {
     if (!variants.length) return;
 
-    const first = variants.find((v) => v.color && v.size);
+    const primary = variants.find((v) => v.stock > 0) || variants[0];
 
-    if (!first) return;
-
-    setSelectedColor(first.color ?? null);
-    setSelectedSize(first.size ?? null);
-    dispatch(setSelectedVariant(first));
+    setFinish(primary.attributes?.finish ?? null);
+    setSize(primary.attributes?.size ?? null);
+    dispatch(setSelectedVariant(primary));
   }, [variants, dispatch]);
 
-  /* ================= HANDLERS ================= */
+  /* ========= HANDLERS ========= */
 
-  const handleColorSelect = (color: string) => {
-    setSelectedColor(color);
+  const handleFinishSelect = (f: string) => {
+    setFinish(f);
 
-    const colorVariant = variants.find((v) => v.color === color && v.size);
+    const match =
+      variants.find((v) => v.attributes?.finish === f && v.stock > 0) ||
+      variants.find((v) => v.attributes?.finish === f);
 
-    if (!colorVariant) return;
+    if (!match) return;
 
-    setSelectedSize(colorVariant.size ?? null);
-    dispatch(setSelectedVariant(colorVariant));
+    setSize(match.attributes?.size ?? null);
+    dispatch(setSelectedVariant(match));
   };
 
-  const handleSizeSelect = (size: string) => {
-    setSelectedSize(size);
-
-    if (!selectedColor) return;
+  const handleSizeSelect = (s: string) => {
+    setSize(s);
 
     const match = variants.find(
-      (v) => v.color === selectedColor && v.size === size,
+      (v) => v.attributes?.finish === finish && v.attributes?.size === s,
     );
 
     if (!match) return;
@@ -80,67 +80,69 @@ const VariantSelector: React.FC<Props> = ({ variants }) => {
     dispatch(setSelectedVariant(match));
   };
 
-  const isSizeAvailable = (size: string) => {
-    if (!selectedColor) return false;
-
-    return variants.some(
-      (v) => v.color === selectedColor && v.size === size && v.stock > 0,
+  const isSizeAvailable = (s: string) =>
+    variants.some(
+      (v) =>
+        v.attributes?.finish === finish &&
+        v.attributes?.size === s &&
+        v.stock > 0,
     );
-  };
 
-  /* ================= UI ================= */
+  /* ========= UI ========= */
 
   return (
     <div className="space-y-4">
-      {/* COLOR */}
+      {/* FINISH */}
       <div>
-        <h3 className="font-medium mb-2">Color</h3>
+        <h3 className="font-medium mb-2">Finish</h3>
         <div className="flex flex-wrap gap-2">
-          {colors.map((color) => (
+          {finishes.map((f) => (
             <button
-              key={color}
-              onClick={() => handleColorSelect(color)}
-              className={`px-4 py-2 rounded-full border text-sm transition
+              key={f}
+              onClick={() => handleFinishSelect(f)}
+              className={`px-4 py-2 rounded-full border text-sm
                 ${
-                  selectedColor === color
-                    ? "bg-black text-white border-black"
-                    : "bg-white border-gray-300 hover:border-black"
+                  finish === f
+                    ? "bg-black text-white"
+                    : "bg-white border-gray-300"
                 }`}
             >
-              {color}
+              {f}
             </button>
           ))}
         </div>
       </div>
 
       {/* SIZE */}
-      <div>
-        <h3 className="font-medium mb-2">Size</h3>
-        <div className="flex flex-wrap gap-2">
-          {sizesForColor.map((size) => {
-            const available = isSizeAvailable(size);
-            const active = selectedSize === size;
+      {sizesForFinish.length > 0 && (
+        <div>
+          <h3 className="font-medium mb-2">Size</h3>
+          <div className="flex flex-wrap gap-2">
+            {sizesForFinish.map((s) => {
+              const available = isSizeAvailable(s);
+              const active = size === s;
 
-            return (
-              <button
-                key={size}
-                disabled={!available}
-                onClick={() => handleSizeSelect(size)}
-                className={`px-4 py-2 rounded-md border text-sm transition
-                  ${
-                    active
-                      ? "bg-black text-white border-black"
-                      : "bg-white border-gray-300 hover:border-black"
-                  }
-                  ${!available ? "opacity-50 cursor-not-allowed" : ""}
-                `}
-              >
-                {size}
-              </button>
-            );
-          })}
+              return (
+                <button
+                  key={s}
+                  disabled={!available}
+                  onClick={() => handleSizeSelect(s)}
+                  className={`px-4 py-2 rounded-md border text-sm
+                    ${
+                      active
+                        ? "bg-black text-white"
+                        : "bg-white border-gray-300"
+                    }
+                    ${!available ? "opacity-50" : ""}
+                  `}
+                >
+                  {s}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

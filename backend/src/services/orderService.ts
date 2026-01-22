@@ -66,7 +66,7 @@ class OrderService {
    */
   private async buildOrderItems(
     items: { productId: string; quantity: number; variantId?: string }[],
-    session: mongoose.ClientSession
+    session: mongoose.ClientSession,
   ) {
     ValidationUtils.validateOrderItems(items);
 
@@ -84,7 +84,7 @@ class OrderService {
       let selectedVariant: IVariant | undefined;
       if (item.variantId) {
         selectedVariant = product.variants.find(
-          (v: any) => v._id?.toString() === item.variantId
+          (v: any) => v._id?.toString() === item.variantId,
         );
       } else {
         selectedVariant = product.variants[0] as any;
@@ -93,7 +93,7 @@ class OrderService {
       if (!selectedVariant) {
         throw new AppError(
           `Variant not found for product: ${product.name}`,
-          400
+          400,
         );
       }
 
@@ -103,8 +103,12 @@ class OrderService {
 
       if (availableStock < item.quantity) {
         throw new AppError(
-          `Insufficient stock for ${product.name} (${selectedVariant.color}, ${selectedVariant.size}). Available: ${availableStock}`,
-          400
+          `Insufficient stock for ${product.name} (${selectedVariant.attributes.finish ?? "N/A"}${
+            selectedVariant.attributes.size
+              ? ", " + selectedVariant.attributes.size
+              : ""
+          }). Available: ${availableStock}`,
+          400,
         );
       }
 
@@ -140,7 +144,9 @@ class OrderService {
       totalAmount += itemTotal;
 
       const productWeight =
-        product.measurements?.weight ?? BUSINESS_RULES.DEFAULT_PRODUCT_WEIGHT;
+        selectedVariant.measurements?.weight ??
+        BUSINESS_RULES.DEFAULT_PRODUCT_WEIGHT;
+
       totalWeight += productWeight * item.quantity;
 
       orderItemsSnapshot.push({
@@ -156,8 +162,13 @@ class OrderService {
         gstAmount,
         hasDiscount: !!selectedVariant.hasDiscount,
         discountPercent,
-        color: selectedVariant.color,
-        size: selectedVariant.size,
+        attributes: {
+          finish: selectedVariant.attributes.finish,
+          size: selectedVariant.attributes.size,
+          seating: selectedVariant.attributes.seating,
+          configuration: selectedVariant.attributes.configuration,
+        },
+
         sku: selectedVariant.sku,
         weight: productWeight,
       });
@@ -177,7 +188,7 @@ class OrderService {
     filter: any,
     page: number = 1,
     limit: number = 10,
-    populateFields?: string
+    populateFields?: string,
   ) {
     const { page: validPage, limit: validLimit } =
       ValidationUtils.validatePagination(page, limit);
@@ -190,7 +201,7 @@ class OrderService {
       {
         populate: populateFields || "",
         sort: { placedAt: -1 },
-      }
+      },
     );
 
     const orderIds = result.data.map((order: any) => order.orderId);
@@ -227,23 +238,22 @@ class OrderService {
   private async calculateDeliveryCharges(
     pincode: string,
     weight: number,
-    orderValue: number
+    orderValue: number,
   ) {
-    const deliveryInfo = await HybridDeliveryService.checkDeliverability(
-      pincode
-    );
+    const deliveryInfo =
+      await HybridDeliveryService.checkDeliverability(pincode);
 
     if (!deliveryInfo.isServiceable) {
       throw new AppError(
         `Delivery not available for pincode ${pincode}. ${deliveryInfo.message}`,
-        400
+        400,
       );
     }
 
     const charges = DeliveryCalculator.calculateCharges(
       deliveryInfo,
       weight,
-      orderValue
+      orderValue,
     );
 
     return {
@@ -260,7 +270,7 @@ class OrderService {
    */
   private async confirmReservation(
     orderId: string,
-    session?: mongoose.ClientSession
+    session?: mongoose.ClientSession,
   ) {
     // fetch order by DB _id (not orderId string)
     const order = await Order.findById(orderId).session(session || null);
@@ -268,11 +278,11 @@ class OrderService {
 
     for (const item of order.orderItemsSnapshot) {
       const product = await Product.findById(item.productId).session(
-        session || null
+        session || null,
       );
       if (product && item.variantId) {
         const variant = product.variants.find(
-          (v: any) => v._id?.toString() === item.variantId?.toString()
+          (v: any) => v._id?.toString() === item.variantId?.toString(),
         );
 
         if (variant) {
@@ -280,7 +290,7 @@ class OrderService {
           variant.stock = Math.max(0, (variant.stock || 0) - item.quantity);
           variant.reservedStock = Math.max(
             0,
-            (variant.reservedStock || 0) - item.quantity
+            (variant.reservedStock || 0) - item.quantity,
           );
 
           await product.save({ session: session || undefined });
@@ -291,7 +301,7 @@ class OrderService {
 
   private async releaseReservation(
     orderId: string,
-    session?: mongoose.ClientSession
+    session?: mongoose.ClientSession,
   ) {
     // fetch order by DB _id
     const order = await Order.findById(orderId).session(session || null);
@@ -299,17 +309,17 @@ class OrderService {
 
     for (const item of order.orderItemsSnapshot) {
       const product = await Product.findById(item.productId).session(
-        session || null
+        session || null,
       );
       if (product && item.variantId) {
         const variant = product.variants.find(
-          (v: any) => v._id?.toString() === item.variantId?.toString()
+          (v: any) => v._id?.toString() === item.variantId?.toString(),
         );
 
         if (variant) {
           variant.reservedStock = Math.max(
             0,
-            (variant.reservedStock || 0) - item.quantity
+            (variant.reservedStock || 0) - item.quantity,
           );
 
           await product.save({ session: session || undefined });
@@ -321,7 +331,7 @@ class OrderService {
   private calculateSecureOrderFees(
     orderValue: number,
     deliveryCharges: any,
-    payment: PlaceOrderPayment
+    payment: PlaceOrderPayment,
   ) {
     const packagingFee = BUSINESS_RULES.PACKAGING_FEE;
     const isEligibleForAdvance =
@@ -331,7 +341,7 @@ class OrderService {
     if (isAdvancePayment && !isEligibleForAdvance) {
       throw new AppError(
         `Advance payment requires minimum order of ₹${BUSINESS_RULES.ADVANCE_PAYMENT_THRESHOLD}. Current: ₹${orderValue}`,
-        400
+        400,
       );
     }
 
@@ -369,7 +379,7 @@ class OrderService {
   async placeOrder(
     userId: string,
     orderData: PlaceOrderRequest,
-    idempotencyKey?: string
+    idempotencyKey?: string,
   ) {
     if (idempotencyKey) {
       const existingOrder = await Order.findOne({
@@ -408,13 +418,13 @@ class OrderService {
 
         // STEP 1: Validate delivery availability
         const deliveryCheck = await HybridDeliveryService.checkDeliverability(
-          shippingAddress.pincode
+          shippingAddress.pincode,
         );
 
         if (!deliveryCheck.isServiceable) {
           throw new AppError(
             `Delivery not available for pincode ${shippingAddress.pincode}. ${deliveryCheck.message}`,
-            400
+            400,
           );
         }
 
@@ -426,14 +436,14 @@ class OrderService {
         const deliveryCharges = await this.calculateDeliveryCharges(
           shippingAddress.pincode,
           totalWeight,
-          totalAmount
+          totalAmount,
         );
 
         // STEP 4: Calculate fees with advance payment logic
         const feeBreakdown = this.calculateSecureOrderFees(
           totalAmount,
           deliveryCharges,
-          payment
+          payment,
         );
 
         // STEP 5: Enhanced payment processing
@@ -446,14 +456,14 @@ class OrderService {
         if (payment.method === "COD" && !deliveryCharges.codAvailable) {
           throw new AppError(
             "COD is not available for this delivery location. Please use online payment.",
-            400
+            400,
           );
         }
 
         if (feeBreakdown.isAdvancePayment && payment.method === "COD") {
           throw new AppError(
             "Advance payment cannot be COD. Please use online payment.",
-            400
+            400,
           );
         }
 
@@ -533,7 +543,7 @@ class OrderService {
               status: OrderStatus.Pending,
             },
           ],
-          { session }
+          { session },
         );
 
         createdOrder = newOrder;
@@ -546,7 +556,7 @@ class OrderService {
         ) {
           await this.confirmReservation(
             (newOrder._id as mongoose.Types.ObjectId).toString(),
-            session
+            session,
           );
           newOrder.status = OrderStatus.Confirmed;
           await newOrder.save({ session });
@@ -567,7 +577,7 @@ class OrderService {
                 cartTotal: 0,
               },
             },
-            { session }
+            { session },
           );
         }
       });
@@ -607,14 +617,14 @@ class OrderService {
       (order: Partial<OrderDocument> & any) => {
         // normalize items array (may be undefined)
         const items: OrderItemSnapshot[] = Array.isArray(
-          order.orderItemsSnapshot
+          order.orderItemsSnapshot,
         )
           ? order.orderItemsSnapshot
           : [];
 
         // helper to get a canonical productId string from an OrderItemSnapshot (if present)
         const getPidFromItem = (
-          item?: Partial<OrderItemSnapshot> | null
+          item?: Partial<OrderItemSnapshot> | null,
         ): string | null => {
           if (!item) return null;
           // item.productId is defined in your schema as Types.ObjectId
@@ -695,7 +705,7 @@ class OrderService {
 
           paymentStatus: order.paymentSnapshot?.status ?? "unpaid",
         };
-      }
+      },
     );
 
     return {
@@ -710,7 +720,7 @@ class OrderService {
     status?: string,
     startDate?: string,
     endDate?: string,
-    search?: string
+    search?: string,
   ) {
     const filter: any = {};
 
@@ -758,7 +768,7 @@ class OrderService {
     if (hoursSinceOrder > BUSINESS_RULES.ORDER_CANCELLATION_WINDOW_HOURS) {
       throw new AppError(
         `Order cannot be cancelled after ${BUSINESS_RULES.ORDER_CANCELLATION_WINDOW_HOURS} hours`,
-        400
+        400,
       );
     }
 
@@ -789,7 +799,7 @@ class OrderService {
       trackingId?: string;
       courierPartner?: string;
       estimatedDelivery?: Date;
-    }
+    },
   ) {
     const order = await Order.findById(orderId);
     if (!order) throw new AppError("Order not found", 404);
@@ -800,7 +810,7 @@ class OrderService {
       currentStatus,
       newStatus,
       this.allowedTransitions,
-      "Order"
+      "Order",
     );
 
     const session = await mongoose.startSession();
@@ -845,7 +855,7 @@ class OrderService {
 
   async calculateDisplayPricing(
     items: { productId: string; quantity: number; variantId?: string }[],
-    pincode: string
+    pincode: string,
   ) {
     ValidationUtils.validatePincode(pincode);
     ValidationUtils.validateOrderItems(items);
@@ -861,7 +871,7 @@ class OrderService {
       let selectedVariant;
       if (item.variantId) {
         selectedVariant = product.variants.find(
-          (v: any) => v._id?.toString() === item.variantId
+          (v: any) => v._id?.toString() === item.variantId,
         );
       } else {
         selectedVariant = product.variants[0];
@@ -870,7 +880,7 @@ class OrderService {
       if (!selectedVariant) {
         throw new AppError(
           `Variant not found for product: ${product.name}`,
-          404
+          404,
         );
       }
 
@@ -892,7 +902,7 @@ class OrderService {
       deliveryCharges = await this.calculateDeliveryCharges(
         pincode,
         fixedWeight,
-        subtotal
+        subtotal,
       );
     } catch (error) {
       isServiceable = false;
@@ -916,7 +926,7 @@ class OrderService {
 
     if (isAdvanceEligible) {
       advanceAmount = Math.round(
-        subtotal * BUSINESS_RULES.ADVANCE_PAYMENT_PERCENTAGE
+        subtotal * BUSINESS_RULES.ADVANCE_PAYMENT_PERCENTAGE,
       );
       remainingAmount = subtotal - advanceAmount;
     }

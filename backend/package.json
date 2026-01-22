@@ -7,8 +7,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "seed:interactive-faq": "ts-node scripts/seedInteractiveFAQ.ts",
-    "seed": "ts-node scripts/seed-delivery-zones.ts"
-  },
+    "seed": "ts-node scripts/seed-delivery-zones.ts" },
   "keywords": [],
   "author": "",
   "license": "ISC",

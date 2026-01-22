@@ -1,10 +1,16 @@
 // lib/validations/product.schema.ts
 import { z } from "zod";
 
+/* ---------------- Variant Schema ---------------- */
+
 export const variantSchema = z
   .object({
-    color: z.string().min(1, "Color is required"),
-    size: z.string().optional(),
+    attributes: z.object({
+      finish: z.string().min(1, "Finish is required"), // Walnut / Teak / Natural
+      size: z.string().optional(), // King / Queen
+      seating: z.string().optional(), // 3 Seater / 5 Seater
+      configuration: z.string().optional(), // 3+1+1
+    }),
 
     basePrice: z
       .number({
@@ -21,11 +27,18 @@ export const variantSchema = z
       .min(0, "GST rate must be 0 or more"),
 
     listingPrice: z.number().min(0).optional(),
-    finalSellingPrice: z.number().min(0).optional(),
 
-    stock: z.number().int().min(0, "Stock must be 0 or more"),
+    stock: z
+      .number({
+        required_error: "Stock is required",
+        invalid_type_error: "Stock must be a number",
+      })
+      .int()
+      .min(0, "Stock must be 0 or more"),
+
     reservedStock: z.number().int().min(0).optional(),
 
+    // computed / optional (backend sets these)
     gstAmount: z.number().optional(),
     sellingPrice: z.number().optional(),
 
@@ -36,9 +49,7 @@ export const variantSchema = z
       .max(99, "Discount must be between 0-99%")
       .default(0),
 
-    // keep optional: frontend will pass empty string or undefined
     discountValidUntil: z.string().optional(),
-
 
     images: z
       .array(
@@ -47,25 +58,38 @@ export const variantSchema = z
           public_id: z.string().min(1, "Public ID is required"),
           thumbSafe: z.string().optional(),
           isPrimary: z.boolean().optional(),
-        })
+        }),
       )
       .min(1, "At least one image is required"),
+
+    measurements: z
+      .object({
+        length: z.number().optional(),
+        width: z.number().optional(),
+        height: z.number().optional(),
+        depth: z.number().optional(),
+        weight: z.number().optional(),
+      })
+      .optional(),
   })
   .refine(
     (data) => {
       if (
         data.hasDiscount &&
         (!data.discountPercent || data.discountPercent <= 0)
-      )
+      ) {
         return false;
+      }
       return true;
     },
     {
       message:
         "Discount percentage must be greater than 0 when discount is enabled",
       path: ["discountPercent"],
-    }
+    },
   );
+
+/* ---------------- Product Schema ---------------- */
 
 export const createProductSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -74,23 +98,18 @@ export const createProductSchema = z.object({
   category: z.string().min(1, "Category is required"),
   isPublished: z.boolean().optional(),
 
-  image: z.string().url("Invalid image URL").optional(),
-
-  repImage: z.string().optional(),
-  repThumbSafe: z.string().optional(),
-  repPrice: z.number().optional(),
-  repDiscountedPrice: z.number().optional(),
-  repInStock: z.boolean().optional(),
-
   variants: z
     .array(variantSchema)
     .min(1, "At least one variant is required")
     .refine(
       (variants) => {
-        const combos = variants.map((v) => `${v.color}-${v.size ?? ""}`);
+        const combos = variants.map(
+          (v) =>
+            `${v.attributes.finish}-${v.attributes.size ?? ""}-${v.attributes.configuration ?? ""}`,
+        );
         return combos.length === new Set(combos).size;
       },
-      { message: "Each color-size combination must be unique" }
+      { message: "Each variant combination must be unique" },
     ),
 
   specifications: z
@@ -102,20 +121,11 @@ export const createProductSchema = z.object({
             z.object({
               key: z.string().min(1),
               value: z.string().min(1),
-            })
+            }),
           )
           .min(1),
-      })
+      }),
     )
-    .optional(),
-
-  measurements: z
-    .object({
-      width: z.number().optional(),
-      height: z.number().optional(),
-      depth: z.number().optional(),
-      weight: z.number().optional(),
-    })
     .optional(),
 
   warranty: z.string().optional(),
