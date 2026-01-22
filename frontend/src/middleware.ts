@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+/* ---------------- PROTECTED ROUTES ---------------- */
 const PROTECTED_PATHS = [
   "/cart",
   "/wishlist",
@@ -12,6 +13,7 @@ const PROTECTED_PATHS = [
   "/ordersuccess",
 ];
 
+/* ---------------- PUBLIC PATH CHECK ---------------- */
 function isPublicPath(pathname: string) {
   return (
     pathname.startsWith("/_next") ||
@@ -19,7 +21,8 @@ function isPublicPath(pathname: string) {
     pathname.startsWith("/static") ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/policies") ||
-    pathname.startsWith("/products") ||
+    pathname.startsWith("/products") || // ✅ product listing
+    pathname.startsWith("/product") || // ✅ product detail
     pathname.startsWith("/category") ||
     pathname === "/" ||
     pathname === "/about" ||
@@ -27,15 +30,15 @@ function isPublicPath(pathname: string) {
   );
 }
 
-const REFRESH_ENDPOINT_REL = "/api/user/refresh-token";
-
-/* ---------------- BOT DETECTION (SEO FIX) ---------------- */
+/* ---------------- BOT DETECTION ---------------- */
 function isBot(req: NextRequest) {
   const ua = req.headers.get("user-agent") || "";
   return /googlebot|bingbot|yandex|duckduckbot|baiduspider/i.test(ua);
 }
 
-/* ---------------- REFRESH HANDLER (UNCHANGED) ---------------- */
+/* ---------------- REFRESH TOKEN HANDLER ---------------- */
+const REFRESH_ENDPOINT_REL = "/api/user/refresh-token";
+
 async function tryServerRefresh(req: NextRequest) {
   try {
     const refreshUrl = new URL(REFRESH_ENDPOINT_REL, req.url).toString();
@@ -54,7 +57,8 @@ async function tryServerRefresh(req: NextRequest) {
     const setCookie = refreshRes.headers.get("set-cookie");
     if (setCookie) res.headers.append("set-cookie", setCookie);
 
-    // @ts-ignore (edge compatibility)
+    // Edge compatibility
+    // @ts-ignore
     if (typeof refreshRes.headers.getAll === "function") {
       // @ts-ignore
       refreshRes.headers.getAll("set-cookie").forEach((c: string) => {
@@ -64,7 +68,7 @@ async function tryServerRefresh(req: NextRequest) {
 
     return res;
   } catch (err) {
-    console.error("🔴 middleware: refresh FAILED", err);
+    console.error("🔴 middleware refresh failed", err);
     return null;
   }
 }
@@ -73,13 +77,20 @@ async function tryServerRefresh(req: NextRequest) {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Public paths → allow
+  // ✅ Normalize trailing slash (SEO safety)
+  if (pathname.endsWith("/") && pathname !== "/") {
+    const url = req.nextUrl.clone();
+    url.pathname = pathname.slice(0, -1);
+    return NextResponse.redirect(url, 301);
+  }
+
+  // ✅ Public paths allowed
   if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
   const isProtected = PROTECTED_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`)
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
 
   if (!isProtected) {
@@ -88,33 +99,30 @@ export async function middleware(req: NextRequest) {
 
   const accessToken = req.cookies.get("accessToken")?.value;
 
-  // 🔐 ACCESS TOKEN MISSING
+  // 🔐 No access token
   if (!accessToken) {
-    // 🚫 SEO FIX: Bots should NOT see login redirects
+    // ✅ Bots should NEVER be redirected or blocked
     if (isBot(req)) {
-       return NextResponse.next();
+      return NextResponse.next();
     }
 
     const refreshToken = req.cookies.get("refreshToken")?.value;
-
     if (refreshToken) {
       const refreshed = await tryServerRefresh(req);
-      if (refreshed) {
-        return refreshed;
-      }
+      if (refreshed) return refreshed;
     }
 
-    // 👤 Real user → redirect to login
+    // 👤 Real user → login redirect
     const loginUrl = new URL("/auth/login", req.url);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // ✅ Authenticated → allow
+  // ✅ Authenticated user
   return NextResponse.next();
 }
 
-/* ---------------- MATCHER (UNCHANGED) ---------------- */
+/* ---------------- MATCHER ---------------- */
 export const config = {
   matcher: [
     "/cart/:path*",
