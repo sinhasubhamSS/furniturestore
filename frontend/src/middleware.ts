@@ -22,7 +22,7 @@ function isPublicPath(pathname: string) {
     pathname.startsWith("/products") ||
     pathname.startsWith("/category") ||
     pathname === "/" ||
-    pathname === "/about-us" ||
+    pathname === "/about" ||
     pathname === "/contact-us"
   );
 }
@@ -92,8 +92,7 @@ export async function middleware(req: NextRequest) {
   if (!accessToken) {
     // 🚫 SEO FIX: Bots should NOT see login redirects
     if (isBot(req)) {
-      // Tell Google: "This page does not exist for indexing"
-      return new NextResponse(null, { status: 410 });
+       return NextResponse.next();
     }
 
     const refreshToken = req.cookies.get("refreshToken")?.value;
