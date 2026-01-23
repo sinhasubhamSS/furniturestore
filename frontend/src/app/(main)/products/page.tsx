@@ -57,7 +57,11 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   );
 
   if (!res.ok) {
-    throw new Error("Failed to fetch products");
+    return (
+      <div className="text-center py-20 text-muted-foreground">
+        Products temporarily unavailable
+      </div>
+    );
   }
 
   const json: ApiResponse<ProductsPayload> = await res.json();
