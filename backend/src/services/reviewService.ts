@@ -37,7 +37,7 @@ export class ReviewService {
   // ---------------------------------------
   static async createReview(reviewData: CreateReviewInput): Promise<IReview> {
     try {
-      console.debug("createReview called with:", JSON.stringify(reviewData));
+     
       const { productId, userId, rating, content, images, videos, orderId } =
         reviewData;
 

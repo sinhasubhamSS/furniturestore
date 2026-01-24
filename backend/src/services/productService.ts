@@ -733,7 +733,6 @@ class ProductService {
     if (!product) {
       throw new AppError("Product not found", 404);
     }
-    console.log(product);
 
     return product;
   }
