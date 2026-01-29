@@ -17,26 +17,21 @@ const WishlistPage = () => {
   const { toggleWishlist } = useWishlist();
   const [addToCart, { isLoading: isAdding }] = useAddToCartMutation();
 
-  /* ---------------- Loading State ---------------- */
-  if (isLoading) {
+  if (isLoading)
     return (
       <div className="min-h-screen flex items-center justify-center text-lg animate-pulse">
         Loading your wishlist...
       </div>
     );
-  }
 
-  /* ---------------- Error State ---------------- */
-  if (isError) {
+  if (isError)
     return (
       <div className="min-h-screen flex items-center justify-center text-red-500">
         Something went wrong. Please try again.
       </div>
     );
-  }
 
-  /* ---------------- Empty State ---------------- */
-  if (!wishlistItems.length) {
+  if (!wishlistItems.length)
     return (
       <div className="min-h-screen flex flex-col items-center justify-center text-center gap-3 px-4">
         <h2 className="text-2xl font-semibold">Your wishlist is empty 💔</h2>
@@ -45,12 +40,11 @@ const WishlistPage = () => {
         </p>
       </div>
     );
-  }
 
-  /* ---------------- Main UI ---------------- */
   return (
     <div className="min-h-screen bg-[var(--color-primary)] pb-6">
-      <div className="max-w-7xl mx-auto px-4">
+      {/* 🔥 Wider container for large screens */}
+      <div className="max-w-[1440px] mx-auto px-4">
         {/* Header */}
         <div className="py-4 flex items-center justify-between border-b">
           <h1 className="text-xl md:text-2xl font-bold">My Wishlist</h1>
@@ -59,18 +53,8 @@ const WishlistPage = () => {
           </span>
         </div>
 
-        {/* Wishlist Grid */}
-        <div
-          className="
-            grid
-            grid-cols-1
-            sm:grid-cols-2
-            lg:grid-cols-3
-            xl:grid-cols-4
-            gap-4
-            py-4
-          "
-        >
+        {/* Grid tuned for UX */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-5 py-5">
           {wishlistItems.map((item: WishlistItemType) => (
             <WishlistItem
               key={`${item.product._id}-${item.variantId}`}
@@ -78,7 +62,7 @@ const WishlistPage = () => {
               variantId={item.variantId}
               onRemove={async () => {
                 await toggleWishlist(item.product._id, item.variantId);
-                refetch(); // keep list in sync
+                refetch();
               }}
               onAddToCart={() =>
                 addToCart({

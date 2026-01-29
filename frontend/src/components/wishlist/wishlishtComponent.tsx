@@ -20,7 +20,6 @@ const WishlistItem = ({
   isAdding,
 }: Props) => {
   const selectedVariant = product.variants.find((v) => v._id === variantId);
-
   if (!selectedVariant) return null;
 
   const { sellingPrice, listingPrice } = selectedVariant;
@@ -28,25 +27,22 @@ const WishlistItem = ({
 
   return (
     <div className="group relative w-full rounded-2xl border border-[var(--color-border-custom)] bg-[var(--color-card)] p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
-      <div className="flex gap-4">
+      {/* 🔥 Responsive Layout */}
+      <div className="flex flex-col gap-4 sm:flex-row xl:flex-col">
         {/* IMAGE */}
-        <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-xl border bg-[var(--color-secondary)]">
+        <div className="relative mx-auto h-28 w-28 sm:mx-0 sm:h-24 sm:w-24 xl:h-40 xl:w-full overflow-hidden rounded-xl border bg-[var(--color-secondary)]">
           <Image
             src={selectedVariant.images?.[0]?.url || "/placeholder.jpg"}
             alt={product.name}
             fill
-            sizes="96px"
-            className="object-contain p-2 transition-transform group-hover:scale-105"
+            sizes="(max-width: 640px) 112px, (max-width: 1280px) 96px, 320px"
+            className="object-contain p-3 transition-transform group-hover:scale-105"
           />
         </div>
 
         {/* CONTENT */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          {/* Product Name */}
-          <h3
-            title={product.name} // 🔥 tooltip for long names
-            className="truncate text-base font-semibold"
-          >
+        <div className="flex min-w-0 flex-1 flex-col text-center sm:text-left xl:text-left">
+          <h3 title={product.name} className="truncate text-base font-semibold">
             {product.name}
           </h3>
 
@@ -55,7 +51,7 @@ const WishlistItem = ({
           </p>
 
           {/* META */}
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+          <div className="mt-2 flex flex-wrap justify-center sm:justify-start gap-2 text-xs">
             <span className="text-[var(--text-accent)]">
               {[
                 selectedVariant.attributes?.finish,
@@ -79,7 +75,7 @@ const WishlistItem = ({
           </div>
 
           {/* PRICE */}
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-3 flex items-center justify-center sm:justify-start gap-2">
             <span className="text-lg font-bold">
               ₹{sellingPrice.toLocaleString()}
             </span>
@@ -97,7 +93,7 @@ const WishlistItem = ({
           </div>
 
           {/* ACTIONS */}
-          <div className="mt-3 flex gap-2">
+          <div className="mt-4 flex gap-2">
             {onAddToCart && (
               <Button
                 onClick={onAddToCart}
@@ -115,7 +111,7 @@ const WishlistItem = ({
             <Button
               variant="outline"
               onClick={onRemove}
-              disabled={isAdding} // 🔥 prevent double actions
+              disabled={isAdding}
               className="h-10 w-full"
             >
               Remove
