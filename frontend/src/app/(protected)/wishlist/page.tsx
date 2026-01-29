@@ -4,7 +4,7 @@ import WishlistItem from "@/components/wishlist/wishlishtComponent";
 import { useGetWishlistWithProductsQuery } from "@/redux/services/user/wishlistApi";
 import { useAddToCartMutation } from "@/redux/services/user/cartApi";
 import { WishlistItemType } from "@/types/Product";
-import { useWishlist } from "@/hooks/useWishlist"; // 🔥 USE HOOK
+import { useWishlist } from "@/hooks/useWishlist";
 
 const WishlistPage = () => {
   const {
@@ -14,29 +14,63 @@ const WishlistPage = () => {
     refetch,
   } = useGetWishlistWithProductsQuery();
 
-  const { toggleWishlist } = useWishlist(); // 🔥 CONSISTENT LOGIC
+  const { toggleWishlist } = useWishlist();
   const [addToCart, { isLoading: isAdding }] = useAddToCartMutation();
 
-  if (isLoading) return <p>Loading...</p>;
-  if (isError) return <p>Error loading wishlist</p>;
-
-  if (!wishlistItems.length) {
+  /* ---------------- Loading State ---------------- */
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        Wishlist empty
+      <div className="min-h-screen flex items-center justify-center text-lg animate-pulse">
+        Loading your wishlist...
       </div>
     );
   }
 
+  /* ---------------- Error State ---------------- */
+  if (isError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-red-500">
+        Something went wrong. Please try again.
+      </div>
+    );
+  }
+
+  /* ---------------- Empty State ---------------- */
+  if (!wishlistItems.length) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center text-center gap-3 px-4">
+        <h2 className="text-2xl font-semibold">Your wishlist is empty 💔</h2>
+        <p className="text-sm text-gray-500">
+          Save products you like and they’ll appear here
+        </p>
+      </div>
+    );
+  }
+
+  /* ---------------- Main UI ---------------- */
   return (
-    <div className="min-h-screen bg-[var(--color-primary)] pb-4">
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="py-3 flex items-center justify-between">
-          <h1 className="text-xl font-bold">My Wishlist</h1>
-          <span>{wishlistItems.length}</span>
+    <div className="min-h-screen bg-[var(--color-primary)] pb-6">
+      <div className="max-w-7xl mx-auto px-4">
+        {/* Header */}
+        <div className="py-4 flex items-center justify-between border-b">
+          <h1 className="text-xl md:text-2xl font-bold">My Wishlist</h1>
+          <span className="text-sm bg-black text-white px-3 py-1 rounded-full">
+            {wishlistItems.length}
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+        {/* Wishlist Grid */}
+        <div
+          className="
+            grid
+            grid-cols-1
+            sm:grid-cols-2
+            lg:grid-cols-3
+            xl:grid-cols-4
+            gap-4
+            py-4
+          "
+        >
           {wishlistItems.map((item: WishlistItemType) => (
             <WishlistItem
               key={`${item.product._id}-${item.variantId}`}
@@ -44,8 +78,7 @@ const WishlistPage = () => {
               variantId={item.variantId}
               onRemove={async () => {
                 await toggleWishlist(item.product._id, item.variantId);
-
-                refetch(); // 🔥 sync heavy list
+                refetch(); // keep list in sync
               }}
               onAddToCart={() =>
                 addToCart({

@@ -6,7 +6,7 @@ import Button from "@/components/ui/Button";
 
 type Props = {
   product: DisplayProduct;
-  variantId: string; // 🔥 IMPORTANT
+  variantId: string;
   onRemove: () => void;
   onAddToCart?: () => void;
   isAdding?: boolean;
@@ -24,6 +24,7 @@ const WishlistItem = ({
   if (!selectedVariant) return null;
 
   const { sellingPrice, listingPrice } = selectedVariant;
+  const isOutOfStock = selectedVariant.stock <= 0;
 
   return (
     <div className="group relative w-full rounded-2xl border border-[var(--color-border-custom)] bg-[var(--color-card)] p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
@@ -41,7 +42,14 @@ const WishlistItem = ({
 
         {/* CONTENT */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <h3 className="truncate text-base font-semibold">{product.name}</h3>
+          {/* Product Name */}
+          <h3
+            title={product.name} // 🔥 tooltip for long names
+            className="truncate text-base font-semibold"
+          >
+            {product.name}
+          </h3>
+
           <p className="truncate text-xs text-[var(--text-accent)]">
             {product.title}
           </p>
@@ -59,7 +67,7 @@ const WishlistItem = ({
                 .join(" • ")}
             </span>
 
-            {selectedVariant.stock > 0 ? (
+            {!isOutOfStock ? (
               <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700">
                 In Stock
               </span>
@@ -93,16 +101,21 @@ const WishlistItem = ({
             {onAddToCart && (
               <Button
                 onClick={onAddToCart}
-                disabled={isAdding || selectedVariant.stock <= 0}
+                disabled={isAdding || isOutOfStock}
                 className="h-10 w-full"
               >
-                {isAdding ? "Adding..." : "Move to Cart"}
+                {isOutOfStock
+                  ? "Out of Stock"
+                  : isAdding
+                    ? "Adding..."
+                    : "Move to Cart"}
               </Button>
             )}
 
             <Button
               variant="outline"
               onClick={onRemove}
+              disabled={isAdding} // 🔥 prevent double actions
               className="h-10 w-full"
             >
               Remove
