@@ -19,42 +19,43 @@ const WishlistPage = () => {
 
   if (isLoading)
     return (
-      <div className="min-h-screen flex items-center justify-center text-lg animate-pulse">
-        Loading your wishlist...
+      <div className="min-h-screen flex items-center justify-center">
+        Loading your wishlist…
       </div>
     );
 
   if (isError)
     return (
       <div className="min-h-screen flex items-center justify-center text-red-500">
-        Something went wrong. Please try again.
+        Something went wrong.
       </div>
     );
 
   if (!wishlistItems.length)
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center text-center gap-3 px-4">
-        <h2 className="text-2xl font-semibold">Your wishlist is empty 💔</h2>
+      <div className="min-h-screen flex flex-col items-center justify-center text-center gap-2">
+        <h2 className="text-xl font-semibold">Your wishlist is empty 💔</h2>
         <p className="text-sm text-gray-500">
-          Save products you like and they’ll appear here
+          Products you save will appear here
         </p>
       </div>
     );
 
   return (
-    <div className="min-h-screen bg-[var(--color-primary)] pb-6">
-      {/* 🔥 Wider container for large screens */}
-      <div className="max-w-[1440px] mx-auto px-4">
-        {/* Header */}
-        <div className="py-4 flex items-center justify-between border-b">
-          <h1 className="text-xl md:text-2xl font-bold">My Wishlist</h1>
-          <span className="text-sm bg-black text-white px-3 py-1 rounded-full">
+    <div className="min-h-screen bg-[var(--color-primary)] pb-10">
+      <div className="max-w-[1600px] mx-auto px-4">
+        {/* HEADER */}
+        <div className="py-5 flex items-center justify-between border-b">
+          <h1 className="text-xl md:text-2xl font-semibold">
+            My Wishlist
+          </h1>
+          <span className="text-xs bg-black text-white px-3 py-1 rounded-full">
             {wishlistItems.length}
           </span>
         </div>
 
-        {/* Grid tuned for UX */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-5 py-5">
+        {/* FLIPKART STYLE GRID */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pt-6">
           {wishlistItems.map((item: WishlistItemType) => (
             <WishlistItem
               key={`${item.product._id}-${item.variantId}`}

@@ -19,104 +19,79 @@ const WishlistItem = ({
   onAddToCart,
   isAdding,
 }: Props) => {
-  const selectedVariant = product.variants.find((v) => v._id === variantId);
-  if (!selectedVariant) return null;
+  const variant = product.variants.find(v => v._id === variantId);
+  if (!variant) return null;
 
-  const { sellingPrice, listingPrice } = selectedVariant;
-  const isOutOfStock = selectedVariant.stock <= 0;
+  const isOutOfStock = variant.stock <= 0;
+
+  const imageUrl =
+    variant.images?.find(img => img.isPrimary)?.url ||
+    variant.images?.[0]?.url ||
+    product.repImage ||
+    product.image ||
+    "/placeholder.jpg";
 
   return (
-    <div className="group relative w-full rounded-2xl border border-[var(--color-border-custom)] bg-[var(--color-card)] p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
-      {/* 🔥 Responsive Layout */}
-      <div className="flex flex-col gap-4 sm:flex-row xl:flex-col">
-        {/* IMAGE */}
-        <div className="relative mx-auto h-28 w-28 sm:mx-0 sm:h-24 sm:w-24 xl:h-40 xl:w-full overflow-hidden rounded-xl border bg-[var(--color-secondary)]">
-          <Image
-            src={selectedVariant.images?.[0]?.url || "/placeholder.jpg"}
-            alt={product.name}
-            fill
-            sizes="(max-width: 640px) 112px, (max-width: 1280px) 96px, 320px"
-            className="object-contain p-3 transition-transform group-hover:scale-105"
-          />
+    <div className="rounded-lg border bg-[var(--color-card)] overflow-hidden hover:shadow-md transition">
+      {/* IMAGE – WHITE BACKGROUND ONLY */}
+      <div className="bg-white p-4 flex items-center justify-center">
+        <Image
+          src={imageUrl}
+          alt={product.name}
+          width={180}
+          height={180}
+          className="object-contain"
+        />
+      </div>
+
+      {/* CONTENT */}
+      <div className="p-3 flex flex-col gap-1">
+        <h3 className="text-sm font-medium line-clamp-2">
+          {product.name}
+        </h3>
+
+        <div className="text-xs text-gray-500 line-clamp-1">
+          {[
+            variant.attributes?.finish,
+            variant.attributes?.size,
+            variant.attributes?.seating,
+          ]
+            .filter(Boolean)
+            .join(" • ")}
         </div>
 
-        {/* CONTENT */}
-        <div className="flex min-w-0 flex-1 flex-col text-center sm:text-left xl:text-left">
-          <h3 title={product.name} className="truncate text-base font-semibold">
-            {product.name}
-          </h3>
+        {/* PRICE */}
+        <div className="mt-1 flex items-center gap-2">
+          <span className="font-semibold text-sm">
+            ₹{variant.sellingPrice.toLocaleString()}
+          </span>
 
-          <p className="truncate text-xs text-[var(--text-accent)]">
-            {product.title}
-          </p>
-
-          {/* META */}
-          <div className="mt-2 flex flex-wrap justify-center sm:justify-start gap-2 text-xs">
-            <span className="text-[var(--text-accent)]">
-              {[
-                selectedVariant.attributes?.finish,
-                selectedVariant.attributes?.size,
-                selectedVariant.attributes?.seating,
-                selectedVariant.attributes?.configuration,
-              ]
-                .filter(Boolean)
-                .join(" • ")}
+          {variant.listingPrice > variant.sellingPrice && (
+            <span className="text-xs line-through text-gray-400">
+              ₹{variant.listingPrice.toLocaleString()}
             </span>
+          )}
+        </div>
 
-            {!isOutOfStock ? (
-              <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700">
-                In Stock
-              </span>
-            ) : (
-              <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-600">
-                Out of Stock
-              </span>
-            )}
-          </div>
-
-          {/* PRICE */}
-          <div className="mt-3 flex items-center justify-center sm:justify-start gap-2">
-            <span className="text-lg font-bold">
-              ₹{sellingPrice.toLocaleString()}
-            </span>
-
-            {listingPrice > sellingPrice && (
-              <>
-                <span className="text-sm line-through text-gray-400">
-                  ₹{listingPrice.toLocaleString()}
-                </span>
-                <span className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-700">
-                  {selectedVariant.discountPercent}% OFF
-                </span>
-              </>
-            )}
-          </div>
-
-          {/* ACTIONS */}
-          <div className="mt-4 flex gap-2">
-            {onAddToCart && (
-              <Button
-                onClick={onAddToCart}
-                disabled={isAdding || isOutOfStock}
-                className="h-10 w-full"
-              >
-                {isOutOfStock
-                  ? "Out of Stock"
-                  : isAdding
-                    ? "Adding..."
-                    : "Move to Cart"}
-              </Button>
-            )}
-
+        {/* ACTIONS */}
+        <div className="mt-2 flex gap-2">
+          {onAddToCart && (
             <Button
-              variant="outline"
-              onClick={onRemove}
-              disabled={isAdding}
-              className="h-10 w-full"
+              onClick={onAddToCart}
+              disabled={isAdding || isOutOfStock}
+              className="h-8 flex-1 text-xs"
             >
-              Remove
+              {isOutOfStock ? "Out" : "Move to Cart"}
             </Button>
-          </div>
+          )}
+
+          <Button
+            variant="outline"
+            onClick={onRemove}
+            className="h-8 px-2 text-xs"
+          >
+            ✕
+          </Button>
         </div>
       </div>
     </div>
