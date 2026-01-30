@@ -19,13 +19,13 @@ const WishlistItem = ({
   onAddToCart,
   isAdding,
 }: Props) => {
-  const variant = product.variants.find(v => v._id === variantId);
+  const variant = product.variants.find((v) => v._id === variantId);
   if (!variant) return null;
 
   const isOutOfStock = variant.stock <= 0;
 
   const imageUrl =
-    variant.images?.find(img => img.isPrimary)?.url ||
+    variant.images?.find((img) => img.isPrimary)?.url ||
     variant.images?.[0]?.url ||
     product.repImage ||
     product.image ||
@@ -46,15 +46,14 @@ const WishlistItem = ({
 
       {/* CONTENT */}
       <div className="p-3 flex flex-col gap-1">
-        <h3 className="text-sm font-medium line-clamp-2">
-          {product.name}
-        </h3>
+        <h3 className="text-sm font-medium line-clamp-2">{product.name}</h3>
 
         <div className="text-xs text-gray-500 line-clamp-1">
           {[
             variant.attributes?.finish,
             variant.attributes?.size,
             variant.attributes?.seating,
+            variant.attributes?.configuration,
           ]
             .filter(Boolean)
             .join(" • ")}

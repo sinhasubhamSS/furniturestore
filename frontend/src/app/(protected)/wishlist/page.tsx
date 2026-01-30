@@ -44,18 +44,27 @@ const WishlistPage = () => {
   return (
     <div className="min-h-screen bg-[var(--color-primary)] pb-10">
       <div className="max-w-[1600px] mx-auto px-4">
-        {/* HEADER */}
+        {/* Header */}
         <div className="py-5 flex items-center justify-between border-b">
-          <h1 className="text-xl md:text-2xl font-semibold">
-            My Wishlist
-          </h1>
+          <h1 className="text-xl md:text-2xl font-semibold">My Wishlist</h1>
           <span className="text-xs bg-black text-white px-3 py-1 rounded-full">
             {wishlistItems.length}
           </span>
         </div>
 
-        {/* FLIPKART STYLE GRID */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pt-6">
+        {/* GRID – FINAL FIX */}
+        <div
+          className="
+            grid
+            grid-cols-1        /* Mobile */
+            md:grid-cols-1     /* Tablet */
+            lg:grid-cols-3     /* Laptop */
+            xl:grid-cols-4     /* Desktop */
+            2xl:grid-cols-5    /* Big screen */
+            gap-4
+            pt-6
+          "
+        >
           {wishlistItems.map((item: WishlistItemType) => (
             <WishlistItem
               key={`${item.product._id}-${item.variantId}`}
