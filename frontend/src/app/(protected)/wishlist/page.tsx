@@ -19,7 +19,7 @@ const WishlistPage = () => {
 
   if (isLoading)
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center text-sm">
         Loading your wishlist…
       </div>
     );
@@ -34,7 +34,7 @@ const WishlistPage = () => {
   if (!wishlistItems.length)
     return (
       <div className="min-h-screen flex flex-col items-center justify-center text-center gap-2">
-        <h2 className="text-xl font-semibold">Your wishlist is empty 💔</h2>
+        <h2 className="text-lg font-semibold">Your wishlist is empty</h2>
         <p className="text-sm text-gray-500">
           Products you save will appear here
         </p>
@@ -42,29 +42,18 @@ const WishlistPage = () => {
     );
 
   return (
-    <div className="min-h-screen bg-[var(--color-primary)] pb-10">
-      <div className="max-w-[1600px] mx-auto px-4">
-        {/* Header */}
-        <div className="py-5 flex items-center justify-between border-b">
-          <h1 className="text-xl md:text-2xl font-semibold">My Wishlist</h1>
-          <span className="text-xs bg-black text-white px-3 py-1 rounded-full">
-            {wishlistItems.length}
+    <div className="min-h-screen bg-[var(--color-primary)]">
+      <div className="max-w-4xl mx-auto px-2">
+        {/* HEADER */}
+        <div className="py-4 flex items-center justify-between border-b">
+          <h1 className="text-lg font-semibold">My Wishlist</h1>
+          <span className="text-xs text-gray-600">
+            {wishlistItems.length} items
           </span>
         </div>
 
-        {/* GRID – FINAL FIX */}
-        <div
-          className="
-            grid
-            grid-cols-1        /* Mobile */
-            md:grid-cols-1     /* Tablet */
-            lg:grid-cols-3     /* Laptop */
-            xl:grid-cols-4     /* Desktop */
-            2xl:grid-cols-5    /* Big screen */
-            gap-4
-            pt-6
-          "
-        >
+        {/* LIST */}
+        <div className="divide-y">
           {wishlistItems.map((item: WishlistItemType) => (
             <WishlistItem
               key={`${item.product._id}-${item.variantId}`}

@@ -3,6 +3,7 @@
 import { DisplayProduct } from "@/types/Product";
 import Image from "next/image";
 import Button from "@/components/ui/Button";
+import { Trash2, ShoppingCart } from "lucide-react";
 
 type Props = {
   product: DisplayProduct;
@@ -19,79 +20,78 @@ const WishlistItem = ({
   onAddToCart,
   isAdding,
 }: Props) => {
-  const variant = product.variants.find((v) => v._id === variantId);
+  const variant = product.variants.find(v => v._id === variantId);
   if (!variant) return null;
 
   const isOutOfStock = variant.stock <= 0;
 
   const imageUrl =
-    variant.images?.find((img) => img.isPrimary)?.url ||
+    variant.images?.find(img => img.isPrimary)?.url ||
     variant.images?.[0]?.url ||
     product.repImage ||
     product.image ||
     "/placeholder.jpg";
 
   return (
-    <div className="rounded-lg border bg-[var(--color-card)] overflow-hidden hover:shadow-md transition">
-      {/* IMAGE – WHITE BACKGROUND ONLY */}
-      <div className="bg-white p-4 flex items-center justify-center">
+    <div className="flex items-center gap-2 border-b bg-white px-2 py-2">
+      {/* IMAGE */}
+      <div className="h-14 w-14 flex-shrink-0 flex items-center justify-center">
         <Image
           src={imageUrl}
           alt={product.name}
-          width={180}
-          height={180}
+          width={56}
+          height={56}
           className="object-contain"
         />
       </div>
 
-      {/* CONTENT */}
-      <div className="p-3 flex flex-col gap-1">
-        <h3 className="text-sm font-medium line-clamp-2">{product.name}</h3>
+      {/* INFO */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">
+          {product.name}
+        </p>
 
-        <div className="text-xs text-gray-500 line-clamp-1">
-          {[
-            variant.attributes?.finish,
-            variant.attributes?.size,
-            variant.attributes?.seating,
-            variant.attributes?.configuration,
-          ]
-            .filter(Boolean)
-            .join(" • ")}
-        </div>
+        <p className="text-xs text-gray-500 truncate">
+          ₹{variant.sellingPrice.toLocaleString()}
+        </p>
+      </div>
 
-        {/* PRICE */}
-        <div className="mt-1 flex items-center gap-2">
-          <span className="font-semibold text-sm">
-            ₹{variant.sellingPrice.toLocaleString()}
-          </span>
-
-          {variant.listingPrice > variant.sellingPrice && (
-            <span className="text-xs line-through text-gray-400">
-              ₹{variant.listingPrice.toLocaleString()}
-            </span>
-          )}
-        </div>
-
-        {/* ACTIONS */}
-        <div className="mt-2 flex gap-2">
-          {onAddToCart && (
-            <Button
-              onClick={onAddToCart}
-              disabled={isAdding || isOutOfStock}
-              className="h-8 flex-1 text-xs"
-            >
-              {isOutOfStock ? "Out" : "Move to Cart"}
-            </Button>
-          )}
-
+      {/* ACTIONS – SINGLE ROW, SLIM */}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        {onAddToCart && (
           <Button
-            variant="outline"
-            onClick={onRemove}
-            className="h-8 px-2 text-xs"
+            onClick={onAddToCart}
+            disabled={isAdding || isOutOfStock}
+            className="
+              h-8
+              px-2
+              text-xs
+              rounded-md
+              flex items-center gap-1
+            "
           >
-            ✕
+            <ShoppingCart size={14} />
+            {isOutOfStock ? "Out" : "Cart"}
           </Button>
-        </div>
+        )}
+
+        <button
+          onClick={onRemove}
+          className="
+            h-8
+            w-8
+            rounded-md
+            border
+            flex items-center justify-center
+            text-gray-500
+            hover:text-red-600
+            hover:bg-red-50
+            transition
+          "
+          title="Remove"
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
     </div>
   );
