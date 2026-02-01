@@ -6,61 +6,44 @@ import {
   useRemoveFromWishlistMutation,
 } from "@/redux/services/user/wishlistApi";
 import { useMemo } from "react";
+import { useSelector } from "react-redux";
+import type { RootState } from "@/redux/store";
+import { skipToken } from "@reduxjs/toolkit/query";
 
 export const useWishlist = () => {
-  const { data = [], isLoading } = useGetWishlistQuery();
+  // ✅ STEP 1: auth state
+  const activeUser = useSelector(
+    (state: RootState) => state.user.activeUser
+  );
+
+  // ✅ STEP 2: skip wishlist API for guest users
+  const { data = [], isLoading } = useGetWishlistQuery(
+    activeUser ? undefined : skipToken
+  );
 
   const [addToWishlist, addState] = useAddToWishlistMutation();
   const [removeFromWishlist, removeState] = useRemoveFromWishlistMutation();
 
   /* =====================================================
-     DEBUG: RAW DATA FROM API
+     NORMALIZED SET
   ===================================================== */
-
-  // console.log("[useWishlist] raw wishlist data:", data);
-  // console.log("[useWishlist] isLoading:", isLoading);
-
-  /* =====================================================
-     NORMALIZED SET (SOURCE OF TRUTH)
-     🔥 industry standard: always normalize ids to string
-  ===================================================== */
-
   const wishlistSet = useMemo(() => {
     const set = new Set<string>();
-
     data.forEach((i) => {
       if (!i?.productId || !i?.variantId) return;
-
-      const key = `${String(i.productId)}_${String(i.variantId)}`;
-      set.add(key);
+      set.add(`${String(i.productId)}_${String(i.variantId)}`);
     });
-
-    // console.log("[useWishlist] wishlistSet keys:", Array.from(set));
-
     return set;
   }, [data]);
 
-  /* =====================================================
-     CHECK
-  ===================================================== */
-
   const isInWishlist = (productId: string, variantId: string) => {
-    const key = `${String(productId)}_${String(variantId)}`;
-    const result = wishlistSet.has(key);
-
-    return result;
+    return wishlistSet.has(`${productId}_${variantId}`);
   };
 
-  /* =====================================================
-     TOGGLE
-  ===================================================== */
-
   const toggleWishlist = async (productId: string, variantId: string) => {
-    if (!productId || !variantId) return;
-
+    if (!activeUser) return; // 🔥 HARD GUARD
     if (addState.isLoading || removeState.isLoading) return;
 
-    
     if (isInWishlist(productId, variantId)) {
       await removeFromWishlist({ productId, variantId }).unwrap();
     } else {
@@ -69,15 +52,11 @@ export const useWishlist = () => {
   };
 
   return {
-    isReady: !isLoading, // 🔥 correct & required
+    isReady: Boolean(activeUser) && !isLoading, // 🔥 IMPORTANT
     isLoading,
-    wishlistCount: data.length,
+    wishlistCount: activeUser ? data.length : 0,
     isInWishlist,
     toggleWishlist,
     isMutating: addState.isLoading || removeState.isLoading,
-
-    // DEBUG helpers (optional – future)
-    // __rawWishlist: data,
-    // __wishlistSet: wishlistSet,
   };
 };
