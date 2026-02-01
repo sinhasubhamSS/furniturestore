@@ -1,7 +1,10 @@
 export const metadata = {
   title: "About Us | Suvidhawood by Suvidha Furniture, Gumla",
   description:
-    "Suvidhawood by Suvidha Furniture has roots in the furniture business since 1995. Founded by Ashish Kumar Gupta in Gumla, Jharkhand.",
+    "Suvidhawood by Suvidha Furniture has roots in the furniture business since 1995.",
+  alternates: {
+    canonical: "https://suvidhawood.com/about",
+  },
 };
 
 export default function AboutUsPage() {

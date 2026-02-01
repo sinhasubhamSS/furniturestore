@@ -26,6 +26,7 @@ function isPublicPath(pathname: string) {
     pathname.startsWith("/category") ||
     pathname === "/" ||
     pathname === "/about" ||
+    pathname.startsWith("/about") ||
     pathname === "/contact-us"
   );
 }
@@ -78,7 +79,7 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // ✅ Normalize trailing slash (SEO safety)
-  if (pathname.endsWith("/") && pathname !== "/") {
+  if (pathname.endsWith("/") && pathname !== "/" && !isBot(req)) {
     const url = req.nextUrl.clone();
     url.pathname = pathname.slice(0, -1);
     return NextResponse.redirect(url, 301);
