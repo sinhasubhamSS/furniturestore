@@ -49,16 +49,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.9,
     },
 
-    // 🔹 Category pages
-    ...categories.map((slug: string) => ({
-      url: `${baseUrl}/category/${slug}`,
-      priority: 0.7,
-    })),
+    // // 🔹 Category pages
+    // ...categories.map((slug: string) => ({
+    //   url: `${baseUrl}/category/${slug}`,
+    //   priority: 0.7,
+    // })),
 
-    // 🔹 Product pages
-    ...products.map((slug: string) => ({
-      url: `${baseUrl}/product/${slug}`,
-      priority: 0.9,
-    })),
+    // // 🔹 Product pages
+    // ...products.map((slug: string) => ({
+    //   url: `${baseUrl}/products/${slug}`,
+    //   priority: 0.9,
+    // })),
   ];
 }
