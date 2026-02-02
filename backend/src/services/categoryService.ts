@@ -18,10 +18,16 @@ class CategoryService {
     return await newCategory.save();
   }
 
-
-
   async getAllCategories(): Promise<ICategory[]> {
     return await Category.find().sort({ createdAt: -1 });
+  }
+  async getCategorySlugs(): Promise<string[]> {
+    const categories = await Category.find(
+      {},
+      { slug: 1, _id: 0 }, // sirf slug lao
+    ).lean();
+
+    return categories.map((c) => c.slug).filter(Boolean); // safety
   }
 }
 

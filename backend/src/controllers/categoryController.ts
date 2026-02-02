@@ -19,7 +19,7 @@ export const createCategory = catchAsync(
     });
 
     res.status(201).json(new ApiResponse(201, category, "Category created"));
-  }
+  },
 );
 
 // ✅ Get All Categories
@@ -27,5 +27,13 @@ export const getAllCategories = catchAsync(
   async (_req: Request, res: Response) => {
     const categories = await categoryService.getAllCategories();
     res.status(200).json(new ApiResponse(200, categories, "All categories"));
-  }
+  },
+);
+// ✅ Get Category Slugs (SEO / Sitemap)
+export const getCategorySlugs = catchAsync(
+  async (_req: Request, res: Response) => {
+    const slugs = await categoryService.getCategorySlugs();
+
+    res.status(200).json(new ApiResponse(200, slugs, "Category slugs"));
+  },
 );

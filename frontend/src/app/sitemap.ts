@@ -22,12 +22,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // 🔹 Categories (sirf slug chahiye)
   const categoryRes = await fetch(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/categories/slugs`,
+    `${process.env.NEXT_PUBLIC_API_BASE_URL}/category/slugs`,
     { next: { revalidate: 3600 } }, // 1 hour cache
   );
   const categories = categoryRes.ok ? await categoryRes.json() : [];
 
-  // 🔹 Products (sirf slug chahiye)
+  // 🔹 Products (sirf slug chahiye) 
   const productRes = await fetch(
     `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/slugs`,
     { next: { revalidate: 3600 } },
