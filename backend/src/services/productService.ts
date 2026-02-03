@@ -744,6 +744,14 @@ class ProductService {
   async getProductById(productId: string, isAdmin: boolean = false) {
     return this.getSingleProduct({ _id: productId }, isAdmin);
   }
+  async getProductSlugs(): Promise<string[]> {
+    const products = await Product.find(
+      { isPublished: true }, // 🔥 only live products
+      { slug: 1, _id: 0 },
+    ).lean();
+
+    return products.map((p) => p.slug).filter(Boolean);
+  }
 }
 
 export const productService = new ProductService();

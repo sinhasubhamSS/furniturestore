@@ -283,3 +283,10 @@ export const getProductByIdAdmin = catchAsync(
       .json(new ApiResponse(200, product, "Product fetched (Admin)"));
   },
 );
+export const getProductSlugs = catchAsync(
+  async (req: AuthRequest, res: Response) => {
+    const slugs = await productService.getProductSlugs();
+
+    res.status(200).json(new ApiResponse(200, slugs, "Product slugs"));
+  },
+);

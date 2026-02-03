@@ -11,6 +11,7 @@ import {
   getLatestProducts,
   editProduct,
   getProductByIdAdmin,
+  getProductSlugs,
 } from "../controllers/productController";
 import { authVerify } from "../middlewares/authVerify";
 import { isAdmin } from "../middlewares/isAdmin";
@@ -30,5 +31,5 @@ router.get("/latest", getLatestProducts);
 router.get("/category/:slug", getProductsByCategory);
 router.get("/slug/:slug", getProductBySlug);
 router.get("/id/:productId", getProductById);
-
+router.get("/slugs", getProductSlugs);
 export default router;
