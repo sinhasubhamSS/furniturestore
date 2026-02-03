@@ -247,9 +247,17 @@ const ProductForm: React.FC<ProductFormProps> = ({
       </div>
 
       <SpecificationForm onChange={onSpecsChange} />
-
-      <Input label="Warranty" {...register("warranty")} />
-      <Input label="Disclaimer" {...register("disclaimer")} />
+      <Input
+        label="Warranty Period (Months)"
+        type="number"
+        placeholder="12 / 24 / 36"
+        {...register("warrantyPeriod", {
+          required: "Warranty period is required",
+          valueAsNumber: true,
+          min: { value: 1, message: "Minimum 1 month" },
+        })}
+        error={errors.warrantyPeriod?.message as string}
+      />
 
       {canSubmit ? (
         <Button type="submit" disabled={loading} className="w-full">

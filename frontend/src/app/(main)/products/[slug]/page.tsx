@@ -10,17 +10,18 @@ interface PageProps {
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-
   const { slug } = await params;
 
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/slug/${slug}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
 
   if (!res.ok) return {};
 
   const json = await res.json();
+  console.log("FULL API RESPONSE 👉", json);
+  console.log("PRODUCT DATA 👉", json.data);
   const product = json.data;
 
   if (!product) return {};
@@ -59,7 +60,7 @@ export default async function ProductSlugPage({ params }: PageProps) {
 
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/slug/${slug}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
 
   if (!res.ok) notFound();

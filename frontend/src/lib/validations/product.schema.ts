@@ -3,91 +3,76 @@ import { z } from "zod";
 
 /* ---------------- Variant Schema ---------------- */
 
-export const variantSchema = z
-  .object({
-    attributes: z.object({
-      finish: z.string().min(1, "Finish is required"), // Walnut / Teak / Natural
-      size: z.string().optional(), // King / Queen
-      seating: z.string().optional(), // 3 Seater / 5 Seater
-      configuration: z.string().optional(), // 3+1+1
-    }),
+export const variantSchema = z.object({
+  attributes: z.object({
+    finish: z.string().min(1, "Finish is required"), // Walnut / Teak / Natural
+    size: z.string().optional(), // King / Queen
+    seating: z.string().optional(), // 3 Seater / 5 Seater
+    configuration: z.string().optional(), // 3+1+1
+  }),
 
-    basePrice: z
-      .number({
-        required_error: "Base price is required",
-        invalid_type_error: "Base price must be a number",
-      })
-      .min(0.01, "Base price must be greater than 0"),
+  // SOURCE INPUT (admin enters)
+  basePrice: z
+    .number({
+      required_error: "Base price is required",
+      invalid_type_error: "Base price must be a number",
+    })
+    .min(0.01, "Base price must be greater than 0"),
 
-    gstRate: z
-      .number({
-        required_error: "GST rate is required",
-        invalid_type_error: "GST rate must be a number",
-      })
-      .min(0, "GST rate must be 0 or more"),
+  gstRate: z
+    .number({
+      required_error: "GST rate is required",
+      invalid_type_error: "GST rate must be a number",
+    })
+    .min(0, "GST rate must be 0 or more"),
 
-    listingPrice: z.number().min(0).optional(),
+  // marketing MRP (GST already included)
+  listingPrice: z.number().min(0).optional(),
 
-    stock: z
-      .number({
-        required_error: "Stock is required",
-        invalid_type_error: "Stock must be a number",
-      })
-      .int()
-      .min(0, "Stock must be 0 or more"),
+  stock: z
+    .number({
+      required_error: "Stock is required",
+      invalid_type_error: "Stock must be a number",
+    })
+    .int()
+    .min(0, "Stock must be 0 or more"),
 
-    reservedStock: z.number().int().min(0).optional(),
+  reservedStock: z.number().int().min(0).optional(),
 
-    // computed / optional (backend sets these)
-    gstAmount: z.number().optional(),
-    sellingPrice: z.number().optional(),
+  // backend-computed (not trusted from client)
+  gstAmount: z.number().optional(),
+  sellingPrice: z.number().optional(),
 
-    hasDiscount: z.boolean().default(false),
-    discountPercent: z
-      .number()
-      .min(0)
-      .max(99, "Discount must be between 0-99%")
-      .default(0),
+  // discount (computed by backend pricing engine)
+  discountPercent: z
+    .number()
+    .min(0)
+    .max(90, "Discount must be between 0–90%")
+    .default(0),
 
-    discountValidUntil: z.string().optional(),
+  discountValidUntil: z.string().optional(),
 
-    images: z
-      .array(
-        z.object({
-          url: z.string().url("Invalid image URL"),
-          public_id: z.string().min(1, "Public ID is required"),
-          thumbSafe: z.string().optional(),
-          isPrimary: z.boolean().optional(),
-        }),
-      )
-      .min(1, "At least one image is required"),
+  images: z
+    .array(
+      z.object({
+        url: z.string().url("Invalid image URL"),
+        public_id: z.string().min(1, "Public ID is required"),
+        thumbSafe: z.string().optional(),
+        isPrimary: z.boolean().optional(),
+      }),
+    )
+    .min(1, "At least one image is required"),
 
-    measurements: z
-      .object({
-        length: z.number().optional(),
-        width: z.number().optional(),
-        height: z.number().optional(),
-        depth: z.number().optional(),
-        weight: z.number().optional(),
-      })
-      .optional(),
-  })
-  .refine(
-    (data) => {
-      if (
-        data.hasDiscount &&
-        (!data.discountPercent || data.discountPercent <= 0)
-      ) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message:
-        "Discount percentage must be greater than 0 when discount is enabled",
-      path: ["discountPercent"],
-    },
-  );
+  measurements: z
+    .object({
+      length: z.number().optional(),
+      width: z.number().optional(),
+      height: z.number().optional(),
+      depth: z.number().optional(),
+      weight: z.number().optional(),
+    })
+    .optional(),
+});
 
 /* ---------------- Product Schema ---------------- */
 
@@ -128,7 +113,19 @@ export const createProductSchema = z.object({
     )
     .optional(),
 
-  warranty: z.string().optional(),
+  // ✅ WARRANTY (MONTHS ONLY – BACKEND SYNCED)
+  warrantyPeriod: z
+    .number({
+      invalid_type_error: "Warranty period must be a number",
+    })
+    .int("Warranty period must be in whole months")
+    .positive("Warranty period must be greater than 0")
+    .refine(
+      (v) => [6, 12, 18, 24, 36].includes(v),
+      "Warranty must be 6, 12, 18, 24 or 36 months",
+    )
+    .optional(),
+
   disclaimer: z.string().optional(),
 });
 

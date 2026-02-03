@@ -8,8 +8,6 @@ import { AppError } from "../utils/AppError";
 import slugify from "slugify";
 import { generateSKU } from "../utils/genetateSku";
 import { IVariant } from "../types/productservicetype";
-// IMPORTANT: updated names from utils/pricing
-import { computeVariantFromBase } from "../utils/pricing";
 
 class ProductService {
   private buildSlug(name: string) {
@@ -159,6 +157,15 @@ class ProductService {
       throw new AppError("At least one variant is required", 400);
     }
 
+    // ✅ PRODUCT-LEVEL WARRANTY VALIDATION (RIGHT PLACE)
+    if (
+      typeof productData.warrantyPeriod !== "number" ||
+      !Number.isFinite(productData.warrantyPeriod) ||
+      productData.warrantyPeriod <= 0
+    ) {
+      throw new AppError("Valid warranty period is required", 400);
+    }
+
     // 2️⃣ process variants
     const processedVariants: IVariant[] = productData.variants.map(
       (variant) => {
@@ -182,41 +189,30 @@ class ProductService {
         // normalize images
         const images = this.normalizeImages(variant.images);
 
-        // SKU (attributes based – FINAL)
+        // SKU (attributes based)
         const sku = generateSKU(productData.name, variant.attributes);
 
         // pricing (SOURCE OF TRUTH)
-        const pricing = computeVariantFromBase(
-          Math.round(variant.basePrice * 100) / 100,
-          variant.gstRate,
-          variant.listingPrice ?? undefined,
-        );
 
         return {
           sku,
-          attributes: variant.attributes, // ✅ finish / size / seating / configuration
-          basePrice: pricing.base,
-          gstRate: variant.gstRate,
-          gstAmount: pricing.gstAmount,
-          sellingPrice: pricing.sellingPrice,
-          listingPrice: pricing.listingPrice,
+          attributes: variant.attributes,
 
-          savings: pricing.savings,
-          discountPercent: pricing.discountPercent,
-          hasDiscount: pricing.savings > 0,
+          // 🔥 RAW INPUT ONLY
+          basePrice: variant.basePrice,
+          gstRate: variant.gstRate,
+          listingPrice: variant.listingPrice,
 
           stock: variant.stock ?? 0,
           reservedStock: 0,
 
           images,
-          measurements: variant.measurements, // ✅ variant-level only
-
-          priceUpdatedAt: new Date(),
+          measurements: variant.measurements,
         };
       },
     );
 
-    // 3️⃣ product-level aggregates (legacy support only)
+    // 3️⃣ product-level aggregates
     const minListingPrice = Math.min(
       ...processedVariants.map((v) => v.listingPrice ?? Infinity),
     );
@@ -236,6 +232,8 @@ class ProductService {
       title: productData.title,
       description: productData.description,
       category: productData.category,
+
+      warrantyPeriod: Math.floor(productData.warrantyPeriod), // 🔒 safe
 
       slug: this.buildSlug(productData.name),
 
@@ -272,20 +270,64 @@ class ProductService {
       _id: productId,
       createdBy: userId,
     });
-    if (!product) throw new AppError("Product not found or unauthorized", 404);
 
-    // ---------- slug ----------
+    if (!product) {
+      throw new AppError("Product not found or unauthorized", 404);
+    }
+
+    /* ================= WARRANTY ================= */
+    if (updateData.warrantyPeriod !== undefined) {
+      if (
+        typeof updateData.warrantyPeriod !== "number" ||
+        !Number.isFinite(updateData.warrantyPeriod) ||
+        updateData.warrantyPeriod <= 0
+      ) {
+        throw new AppError("Valid warranty period is required", 400);
+      }
+
+      product.warrantyPeriod = Math.floor(updateData.warrantyPeriod);
+    }
+
+    /* ================= SLUG ================= */
     if (updateData.name && updateData.name !== product.name) {
       product.slug = this.buildSlug(updateData.name);
     }
 
-    // ---------- variants ----------
+    /* ================= SPECIFICATIONS ================= */
+    if (updateData.specifications !== undefined) {
+      if (!Array.isArray(updateData.specifications)) {
+        throw new AppError("Invalid specifications format", 400);
+      }
+
+      for (const section of updateData.specifications) {
+        if (!section.section?.trim()) {
+          throw new AppError("Specification section name is required", 400);
+        }
+
+        if (!Array.isArray(section.specs) || section.specs.length === 0) {
+          throw new AppError(
+            `At least one spec is required in section ${section.section}`,
+            400,
+          );
+        }
+
+        for (const spec of section.specs) {
+          if (!spec.key?.trim() || !spec.value?.trim()) {
+            throw new AppError("Specification key and value are required", 400);
+          }
+        }
+      }
+
+      product.specifications = updateData.specifications as any;
+    }
+
+    /* ================= VARIANTS ================= */
     if (updateData.variants) {
       if (updateData.variants.length === 0) {
         throw new AppError("At least one variant is required", 400);
       }
 
-      /* ----- delete removed images ----- */
+      // ---- delete removed images ----
       const oldPublicIds = new Set<string>();
       product.variants.forEach((v: any) => {
         (v.images || []).forEach((img: any) => {
@@ -305,7 +347,7 @@ class ProductService {
       );
       await this.deletePublicIds(toDeleteIds);
 
-      /* ----- rebuild variants ----- */
+      // ---- rebuild variants (RAW INPUT ONLY) ----
       const processedVariants: IVariant[] = updateData.variants.map(
         (variant) => {
           if (!this.validateImages(variant.images)) {
@@ -324,60 +366,42 @@ class ProductService {
           }
 
           const images = this.normalizeImages(variant.images);
+
           const sku = generateSKU(
             updateData.name || product.name,
             variant.attributes,
           );
 
-          const pricing = computeVariantFromBase(
-            Math.round(variant.basePrice * 100) / 100,
-            variant.gstRate,
-            variant.listingPrice ?? undefined,
-          );
-
           return {
-            ...variant,
-            images,
             sku,
-            basePrice: pricing.base,
+            attributes: variant.attributes,
+
+            basePrice: variant.basePrice,
             gstRate: variant.gstRate,
-            gstAmount: pricing.gstAmount,
-            sellingPrice: pricing.sellingPrice,
-            listingPrice: pricing.listingPrice,
-            savings: pricing.savings,
-            discountPercent: pricing.discountPercent ?? 0,
-            hasDiscount: pricing.savings > 0,
+            listingPrice: variant.listingPrice,
+
             stock: variant.stock ?? 0,
+            reservedStock: variant.reservedStock ?? 0,
+
+            images,
+            measurements: variant.measurements,
           } as IVariant;
         },
       );
 
-      /* ----- replace variants atomically ----- */
+      // ---- atomic replace ----
       product.variants.splice(
         0,
         product.variants.length,
         ...(processedVariants as any),
       );
-
-      /* ----- product-level aggregates ----- */
-      product.lowestSellingPrice = Math.min(
-        ...processedVariants.map((v) => v.sellingPrice ?? Infinity),
-      );
-
-      product.maxSavings = Math.max(
-        ...processedVariants.map((v) => v.savings ?? Infinity),
-        0,
-      );
     }
 
-    // ---------- simple fields ----------
+    /* ================= SIMPLE FIELDS ================= */
     const updatableFields: (keyof IProductInput)[] = [
       "name",
       "title",
       "description",
-      "specifications",
-      "warranty",
-      "disclaimer",
       "category",
       "isPublished",
     ];
@@ -390,7 +414,7 @@ class ProductService {
 
     await product.save();
 
-    // ---------- denormalized sync ----------
+    /* ================= DENORMALIZED SYNC ================= */
     try {
       await Product.recomputeDenorm(product._id);
     } catch (e) {

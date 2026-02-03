@@ -133,18 +133,28 @@ const orderSchema = new Schema<OrderDocument>(
       {
         productId: { type: Schema.Types.ObjectId, required: true },
         variantId: { type: Schema.Types.ObjectId, required: true },
+
         name: { type: String, required: true },
         image: String,
+
         quantity: { type: Number, required: true },
-        price: { type: Number, required: true },
+
+        // ✅ PRICES (SNAPSHOT)
+        sellingPrice: { type: Number, required: true }, // final paid
+        listingPrice: { type: Number, required: true }, // MRP
+        basePrice: { type: Number, required: true },
+        gstAmount: { type: Number, required: true },
+
         hasDiscount: { type: Boolean, default: false },
         discountPercent: { type: Number, default: 0 },
-        aattributes: {
+
+        attributes: {
           finish: String,
           size: String,
           seating: String,
           configuration: String,
         },
+
         sku: String,
         weight: { type: Number, required: true },
       },

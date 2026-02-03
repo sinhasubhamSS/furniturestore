@@ -57,9 +57,7 @@ export interface IProduct extends Document {
 
   variants: Types.DocumentArray<IVariant>;
   category: Types.ObjectId;
-
- 
-
+  warrantyPeriod: number; // months (12 / 24 / 36)
   // denormalized
   lowestSellingPrice?: number;
   maxSavings: number;
@@ -76,6 +74,13 @@ export interface IProduct extends Document {
 
   totalStock?: number;
   inStock?: boolean;
+  specifications?: {
+    section: string;
+    specs: {
+      key: string;
+      value: string;
+    }[];
+  }[];
 
   createdBy: Types.ObjectId;
   isPublished: boolean;
@@ -155,11 +160,11 @@ const variantSchema = new Schema<IVariant>(
     sellingPrice: { type: Number, default: 0 },
 
     savings: { type: Number, default: 0 },
-    discountPercent: { type: Number, default: 0 },
+    discountPercent: { type: Number, default: 0, max: 90 },
     hasDiscount: { type: Boolean, default: false },
 
-    stock: { type: Number, default: 0 },
-    reservedStock: { type: Number, default: 0 },
+    stock: { type: Number, default: 0, min: 0 },
+    reservedStock: { type: Number, default: 0, min: 0 },
 
     images: { type: [variantImageSchema], default: [] },
     measurements: {
@@ -191,7 +196,7 @@ variantSchema.pre("save", function (this: any, next) {
     this.listingPrice = pricing.listingPrice;
 
     this.savings = pricing.savings;
-    this.discountPercent = pricing.discountPercent;
+    this.discountPercent = Math.min(pricing.discountPercent, 90);
     this.hasDiscount = pricing.savings > 0;
 
     this.priceUpdatedAt = new Date();
@@ -206,18 +211,33 @@ variantSchema.pre("save", function (this: any, next) {
 const productSchema = new Schema<IProduct, IProductModel>(
   {
     name: { type: String, required: true, trim: true },
-    slug: { type: String, required: true },
+    slug: { type: String, required: true, unique: true, index: true },
 
-    title: { type: String, required: true },
+    title: { type: String },
     description: { type: String, required: true },
+    specifications: [
+      {
+        section: { type: String, required: true },
+        specs: [
+          {
+            key: { type: String, required: true },
+            value: { type: String, required: true },
+          },
+        ],
+      },
+    ],
 
     variants: { type: [variantSchema], required: true },
 
     category: { type: Schema.Types.ObjectId, ref: "Category", required: true },
-
+    warrantyPeriod: {
+      type: Number,
+      required: true,
+      enum: [6, 12, 18, 24, 36],
+    },
     lowestSellingPrice: Number,
     maxSavings: { type: Number, default: 0 },
-    maxDiscountPercent: { type: Number, default: 0 },
+    maxDiscountPercent: { type: Number, default: 0, max: 90 },
 
     primaryVariantId: Schema.Types.ObjectId,
     primaryLocked: { type: Boolean, default: false },

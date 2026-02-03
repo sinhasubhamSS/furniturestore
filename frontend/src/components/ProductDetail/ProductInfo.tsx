@@ -4,6 +4,7 @@ import React from "react";
 import { DisplayProduct } from "@/types/Product";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
+import { Link } from "lucide-react";
 
 type Props = {
   product: DisplayProduct;
@@ -137,11 +138,22 @@ const ProductInfo: React.FC<Props> = ({ product }) => {
           </div>
         </div>
 
-        {product.warranty && (
-          <div className="mt-3 pt-3 border-t border-[var(--color-border-custom)]">
-            <p className="text-[var(--text-accent)] text-sm">
-              <strong>Warranty:</strong> {product.warranty}
+        {product.warrantyPeriod && (
+          <div className="mt-4 pt-3 border-t border-[var(--color-border-custom)]">
+            <p className="text-sm font-medium text-[var(--color-foreground)]">
+              🛠️ {product.warrantyPeriod} Months Warranty
             </p>
+
+            <p className="text-xs text-[var(--text-accent)] mt-1">
+              Covers manufacturing defects under normal household use.
+            </p>
+
+            <Link
+              href="/warranty"
+              className="inline-block mt-2 text-xs text-blue-600 hover:underline"
+            >
+              View Warranty Details
+            </Link>
           </div>
         )}
       </div>

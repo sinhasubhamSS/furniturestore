@@ -12,7 +12,7 @@ const objectId = z.preprocess(
   },
   z.custom<Types.ObjectId>((val) => val instanceof Types.ObjectId, {
     message: "Invalid ObjectId",
-  })
+  }),
 );
 
 /* ---------------- helpers ---------------- */
@@ -37,9 +37,9 @@ const variantSchema = z
 
     attributes: z
       .object({
-        finish: z.string().optional(),        // Walnut / Teak / Natural
-        size: z.string().optional(),          // King / Queen
-        seating: z.string().optional(),       // 3 Seater / 5 Seater
+        finish: z.string().optional(), // Walnut / Teak / Natural
+        size: z.string().optional(), // King / Queen
+        seating: z.string().optional(), // 3 Seater / 5 Seater
         configuration: z.string().optional(), // 3+1+1 / L Shape
       })
       .optional(),
@@ -56,24 +56,24 @@ const variantSchema = z
 
     basePrice: z.preprocess(
       (v) => Number(v),
-      z.number().positive("Base price must be positive")
+      z.number().positive("Base price must be positive"),
     ),
 
     gstRate: z.preprocess(
       (v) => Number(v),
-      z.number().min(0).max(100, "GST must be 0-100%")
+      z.number().min(0).max(100, "GST must be 0-100%"),
     ),
 
     stock: z.preprocess(
       (v) => Number(v),
-      z.number().int().nonnegative().default(0)
+      z.number().int().nonnegative().default(0),
     ),
 
     hasDiscount: z.boolean().optional().default(false),
 
     discountPercent: z.preprocess(
       (v) => (v === "" || v === null || v === undefined ? 0 : Number(v)),
-      z.number().min(0).max(70).optional().default(0)
+      z.number().min(0).max(70).optional().default(0),
     ),
 
     discountValidUntil: z.preprocess((v) => {
@@ -88,7 +88,10 @@ const variantSchema = z
   })
   .refine(
     (data) => {
-      if (data.hasDiscount && (!data.discountPercent || data.discountPercent <= 0)) {
+      if (
+        data.hasDiscount &&
+        (!data.discountPercent || data.discountPercent <= 0)
+      ) {
         return false;
       }
       return true;
@@ -96,7 +99,7 @@ const variantSchema = z
     {
       message: "Discount percent must be > 0 when discount is enabled",
       path: ["discountPercent"],
-    }
+    },
   );
 
 /* ---------------- Specification schema ---------------- */
@@ -107,7 +110,7 @@ const specificationSchema = z.object({
       z.object({
         key: z.string().min(1, "Spec key is required"),
         value: z.string().min(1, "Spec value is required"),
-      })
+      }),
     )
     .min(1, "At least one spec is required"),
 });
@@ -122,7 +125,11 @@ export const createProductSchema = z.object({
   variants: z.array(variantSchema).min(1, "At least one variant is required"),
 
   specifications: z.array(specificationSchema).optional(),
-  warranty: z.string().optional(),
+  warrantyPeriod: z.preprocess(
+    (v) => Number(v),
+    z.number().int().positive("Warranty period must be greater than 0"),
+  ),
+
   disclaimer: z.string().optional(),
 
   slug: z.string().optional(),
@@ -132,14 +139,18 @@ export const createProductSchema = z.object({
 /* ---------------- Update Product ---------------- */
 export const updateProductSchema = createProductSchema.partial().refine(
   (data) => {
-    if (data.variants && Array.isArray(data.variants) && data.variants.length === 0) {
+    if (
+      data.variants &&
+      Array.isArray(data.variants) &&
+      data.variants.length === 0
+    ) {
       return false;
     }
     return true;
   },
   {
     message: "Cannot remove all variants",
-  }
+  },
 );
 
 /* ---------------- Types ---------------- */

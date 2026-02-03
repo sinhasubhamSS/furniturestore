@@ -71,7 +71,7 @@ export type Variant = {
   discountValidUntil?: string | Date;
 
   // audit / meta (optional)
-    priceUpdatedAt?: string | Date;
+  priceUpdatedAt?: string | Date;
   priceUpdatedBy?: string;
 };
 
@@ -94,7 +94,7 @@ export type BaseProduct = {
   variants: Variant[];
   specifications?: Specification[];
   isPublished: boolean;
-  warranty?: string;
+  warrantyPeriod?: number;
   disclaimer?: string;
   slug: string;
 

@@ -77,7 +77,7 @@ export interface IProductInput {
   // ❌ product-level measurements removed (variant-level only)
   // measurements?: ❌ (INTENTIONALLY REMOVED)
 
-  warranty?: string;
+  warrantyPeriod: number;
   disclaimer?: string;
 
   category: Types.ObjectId;
