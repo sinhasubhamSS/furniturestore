@@ -711,7 +711,7 @@ class ProductService {
     specifications: 1,
     warranty: 1,
     disclaimer: 1,
-
+    warrantyPeriod: 1,
     category: 1,
 
     reviewStats: {

@@ -4,7 +4,7 @@ import React from "react";
 import { DisplayProduct } from "@/types/Product";
 import { useSelector } from "react-redux";
 import { RootState } from "@/redux/store";
-import { Link } from "lucide-react";
+import Link from "next/link";
 
 type Props = {
   product: DisplayProduct;
@@ -15,150 +15,160 @@ const ProductInfo: React.FC<Props> = ({ product }) => {
     (state: RootState) => state.productDetail.selectedVariant,
   );
 
-  return (
-    <div className="bg-[var(--color-card)]  shadow-lg border border-[var(--color-border-custom)] p-4">
-      <h2 className="text-xl font-bold text-[var(--color-foreground)] mb-3">
-        Product Details
-      </h2>
-      <p className="text-[var(--color-foreground)] mb-4 leading-relaxed text-sm">
-        {product.description}
-      </p>
+  const specifications = product.specifications ?? [];
+  const measurements = selectedVariant?.measurements;
 
-      {/* Specifications - Compact Grid */}
-      {product.specifications && product.specifications.length > 0 && (
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold text-[var(--color-foreground)] mb-3">
+  return (
+    <div className="bg-[var(--color-card)] border border-[var(--color-border-custom)] rounded-2xl p-6 md:p-8 space-y-12 shadow-sm">
+      {/* ================= DESCRIPTION ================= */}
+      <section>
+        <h2 className="text-xl font-semibold text-[var(--color-foreground)] mb-3">
+          Product Details
+        </h2>
+        <p className="text-sm leading-relaxed text-[var(--color-foreground)]">
+          {product.description}
+        </p>
+      </section>
+
+      {/* ================= SPECIFICATIONS ================= */}
+      {specifications.length > 0 && (
+        <section>
+          <h3 className="text-lg font-semibold text-[var(--color-foreground)] mb-4">
             Specifications
           </h3>
-          {product.specifications.map((section, idx) => (
-            <div key={idx} className="mb-3">
-              <h4 className="text-base font-medium text-[var(--text-accent)] mb-2">
-                {section.section}
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {section.specs.map((spec, i) => (
-                  <div
-                    key={i}
-                    className="flex justify-between border-b border-[var(--color-border-custom)] pb-1"
-                  >
-                    <span className="text-[var(--text-accent)] text-sm">
-                      {spec.key}
-                    </span>
-                    <span className="text-[var(--color-foreground)] font-medium text-sm">
-                      {spec.value}
-                    </span>
-                  </div>
-                ))}
+
+          <div className="space-y-8">
+            {specifications.map((section, idx) => (
+              <div key={idx}>
+                {/* Section title */}
+                <h4 className="text-sm font-semibold text-[var(--color-foreground)] mb-3">
+                  {section.section}
+                </h4>
+
+                {/* Table */}
+                <div className="border border-[var(--color-border-custom)] rounded-lg overflow-hidden">
+                  {section.specs.map((spec, i) => (
+                    <div
+                      key={i}
+                      className="flex border-b last:border-b-0 border-[var(--color-border-custom)]"
+                    >
+                      {/* LEFT (Key) */}
+                      <div className="w-[45%] bg-[var(--color-secondary)] px-4 py-3 text-sm text-[var(--text-accent)]">
+                        {spec.key}
+                      </div>
+
+                      {/* RIGHT (Value) */}
+                      <div className="w-[55%] px-4 py-3 text-sm text-[var(--color-foreground)] font-medium">
+                        {spec.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </section>
       )}
 
-      {/* Measurements - Compact Cards */}
-      {selectedVariant?.measurements && (
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold text-[var(--color-foreground)] mb-3">
+      {/* ================= MEASUREMENTS ================= */}
+      {measurements && (
+        <section>
+          <h3 className="text-lg font-semibold text-[var(--color-foreground)] mb-5">
             Measurements
           </h3>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {selectedVariant.measurements.width && (
-              <div className="bg-[var(--color-secondary)] p-3 rounded-lg border border-[var(--color-border-custom)]">
-                <p className="text-[var(--text-accent)] text-xs">Width</p>
-                <p className="font-semibold text-[var(--color-foreground)]">
-                  {selectedVariant.measurements.width} cm
-                </p>
-              </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {measurements.width && (
+              <MeasurementCard
+                label="Width"
+                value={`${measurements.width} cm`}
+              />
             )}
-
-            {selectedVariant.measurements.height && (
-              <div className="bg-[var(--color-secondary)] p-3 rounded-lg border border-[var(--color-border-custom)]">
-                <p className="text-[var(--text-accent)] text-xs">Height</p>
-                <p className="font-semibold text-[var(--color-foreground)]">
-                  {selectedVariant.measurements.height} cm
-                </p>
-              </div>
+            {measurements.height && (
+              <MeasurementCard
+                label="Height"
+                value={`${measurements.height} cm`}
+              />
             )}
-
-            {selectedVariant.measurements.depth && (
-              <div className="bg-[var(--color-secondary)] p-3 rounded-lg border border-[var(--color-border-custom)]">
-                <p className="text-[var(--text-accent)] text-xs">Depth</p>
-                <p className="font-semibold text-[var(--color-foreground)]">
-                  {selectedVariant.measurements.depth} cm
-                </p>
-              </div>
+            {measurements.depth && (
+              <MeasurementCard
+                label="Depth"
+                value={`${measurements.depth} cm`}
+              />
             )}
-
-            {selectedVariant.measurements.weight && (
-              <div className="bg-[var(--color-secondary)] p-3 rounded-lg border border-[var(--color-border-custom)]">
-                <p className="text-[var(--text-accent)] text-xs">Weight</p>
-                <p className="font-semibold text-[var(--color-foreground)]">
-                  {selectedVariant.measurements.weight} kg
-                </p>
-              </div>
+            {measurements.weight && (
+              <MeasurementCard
+                label="Weight"
+                value={`${measurements.weight} kg`}
+              />
             )}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Warranty & Policies - Inline */}
-      <div className="pt-4 border-t border-[var(--color-border-custom)]">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🚚</span>
-            <div>
-              <p className="font-medium text-[var(--color-foreground)]">
-                Free Shipping
-              </p>
-              <p className="text-[var(--text-accent)] text-xs">
-                All over India
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🔒</span>
-            <div>
-              <p className="font-medium text-[var(--color-foreground)]">
-                Secure Payment
-              </p>
-              <p className="text-[var(--text-accent)] text-xs">
-                100% Protected
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xl">↩️</span>
-            <div>
-              <p className="font-medium text-[var(--color-foreground)]">
-                Easy Returns
-              </p>
-              <p className="text-[var(--text-accent)] text-xs">7 Days Policy</p>
-            </div>
-          </div>
+      {/* ================= WARRANTY & POLICIES ================= */}
+      <section className="border-t border-[var(--color-border-custom)] pt-6 space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-sm">
+          <Policy icon="🚚" title="Free Shipping" subtitle="Across India" />
+          <Policy icon="🔒" title="Secure Payment" subtitle="100% Protected" />
+          <Policy icon="↩️" title="Easy Returns" subtitle="7 Days Policy" />
         </div>
 
         {product.warrantyPeriod && (
-          <div className="mt-4 pt-3 border-t border-[var(--color-border-custom)]">
-            <p className="text-sm font-medium text-[var(--color-foreground)]">
+          <div className="pt-4 border-t border-[var(--color-border-custom)]">
+            <p className="text-sm font-semibold text-[var(--color-foreground)]">
               🛠️ {product.warrantyPeriod} Months Warranty
             </p>
-
-            <p className="text-xs text-[var(--text-accent)] mt-1">
+            <p className="text-xs text-[var(--text-accent)] mt-1 leading-relaxed">
               Covers manufacturing defects under normal household use.
             </p>
 
             <Link
               href="/warranty"
-              className="inline-block mt-2 text-xs text-blue-600 hover:underline"
+              className="inline-block mt-3 text-xs font-medium text-blue-600 hover:underline"
             >
-              View Warranty Details
+              View full warranty terms →
             </Link>
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 };
+
+/* ================= SUB COMPONENTS ================= */
+
+const MeasurementCard = ({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) => (
+  <div className="bg-[var(--color-secondary)] p-4 rounded-xl border border-[var(--color-border-custom)]">
+    <p className="text-xs text-[var(--text-accent)] mb-1">{label}</p>
+    <p className="font-semibold text-[var(--color-foreground)]">{value}</p>
+  </div>
+);
+
+const Policy = ({
+  icon,
+  title,
+  subtitle,
+}: {
+  icon: string;
+  title: string;
+  subtitle: string;
+}) => (
+  <div className="flex items-start gap-3">
+    <span className="text-xl">{icon}</span>
+    <div>
+      <p className="text-sm font-medium text-[var(--color-foreground)]">
+        {title}
+      </p>
+      <p className="text-xs text-[var(--text-accent)]">{subtitle}</p>
+    </div>
+  </div>
+);
 
 export default ProductInfo;
