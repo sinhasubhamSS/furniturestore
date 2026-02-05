@@ -53,52 +53,60 @@ const ProductDetailClient: React.FC<Props> = ({ product }) => {
   return (
     <>
       {/* ================= PDP ROOT ================= */}
-      <div className="w-full bg-[var(--color-primary)] pt-6 pb-16">
-        {/* Wider container like Flipkart */}
+      <div className="w-full bg-[var(--color-primary)] pt-3 pb-16">
         <div className="max-w-[1440px] mx-auto px-3 lg:px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-[40%_60%] gap-4 lg:gap-6">
-            {/* ================= LEFT: IMAGE (STICKY) ================= */}
+          <div className="grid grid-cols-1 lg:grid-cols-[40%_60%] gap-2 lg:gap-3">
+            {/* ================= LEFT: IMAGE + CTA (STICKY) ================= */}
             <div>
-              <div className="lg:sticky lg:top-24">
+              <div className="lg:sticky lg:top-24 space-y-2">
                 <ImageGallery />
+
+
+                <div className="hidden lg:block">
+                  <ActionButtons productId={product._id} />
+                </div>
               </div>
             </div>
 
-            {/* ================= RIGHT: DETAILS (NORMAL FLOW) ================= */}
-            <div className="bg-[var(--color-card)] rounded-md p-4 md:p-5">
+            {/* ================= RIGHT: DETAILS ================= */}
+            <div className="bg-[var(--color-card)] border border-black/5 rounded-md p-4 md:p-5">
+              {/* TITLE */}
               <ProductHeader product={product} />
+
+              {/* PRICE */}
               <ProductPrice />
 
-              {/* CTA – IMPORTANT (Flipkart style: close to price) */}
-              <div className="mt-4">
-                <ActionButtons productId={product._id} />
-              </div>
+              {/* DIVIDER */}
+              <div className="my-6 h-px bg-black/10" />
 
-              <div className="mt-5">
-                <VariantSelector variants={product.variants} />
-              </div>
+              {/* VARIANTS */}
+              <VariantSelector variants={product.variants} />
 
-              <div className="flex flex-col sm:flex-row gap-3 mt-5">
+              {/* QTY + STOCK */}
+              <div className="flex flex-wrap items-center gap-4 mt-5">
                 <QuantitySelector />
                 <StockStatus />
               </div>
 
+              {/* PINCODE */}
               <div className="mt-5">
                 <PincodeChecker />
               </div>
 
+              {/* DIVIDER */}
+              <div className="my-8 h-px bg-black/10" />
+
               {/* PRODUCT INFO */}
-              <div className="mt-10 border-t pt-8">
-                <ProductInfo product={product} />
-              </div>
+              <ProductInfo product={product} />
+
+              {/* DIVIDER */}
+              <div className="my-8 h-px bg-black/10" />
 
               {/* REVIEWS */}
-              <div className="mt-12 border-t pt-8">
-                <ReviewsSection
-                  productId={product._id}
-                  currentUserId={user?._id}
-                />
-              </div>
+              <ReviewsSection
+                productId={product._id}
+                currentUserId={user?._id}
+              />
             </div>
           </div>
         </div>

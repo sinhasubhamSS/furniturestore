@@ -12,7 +12,7 @@ const ImageGallery = () => {
   const [activeImage, setActiveImage] = useState<string | null>(null);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
-  // 🔹 Reset image when variant changes
+  /* Reset image when variant changes */
   useEffect(() => {
     if (selectedVariant?.images?.length) {
       setActiveImage(selectedVariant.images[0].url);
@@ -21,87 +21,88 @@ const ImageGallery = () => {
     }
   }, [selectedVariant]);
 
-  if (!selectedVariant || !selectedVariant.images?.length) {
-    return null;
-  }
+  if (!selectedVariant || !selectedVariant.images?.length) return null;
 
   const images = selectedVariant.images;
-  const mainImage = activeImage;
 
   return (
     <div className="w-full">
-      {/* 🔍 Lightbox */}
-      {isLightboxOpen && mainImage && (
+      {/* ================= LIGHTBOX ================= */}
+      {isLightboxOpen && activeImage && (
         <div
           className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
           onClick={() => setIsLightboxOpen(false)}
         >
           <img
-            src={mainImage}
+            src={activeImage}
             alt="Full View"
             className="max-w-full max-h-[90vh] object-contain cursor-zoom-out"
           />
         </div>
       )}
 
-      {/* Gallery Container */}
-      <div className="w-full p-4 lg:p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border border-gray-200 shadow-md">
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* ================= Thumbnails – LEFT (Desktop) ================= */}
-          <div className="hidden lg:flex w-16 flex-col gap-2 max-h-96 overflow-y-auto bg-white rounded-lg p-1 shadow-inner">
+      {/* ================= GALLERY CONTAINER ================= */}
+      <div className="w-full bg-white border border-black/10 rounded-md">
+        <div className="flex gap-3 p-3">
+          {/* ================= THUMBNAILS (DESKTOP) ================= */}
+          <div className="hidden lg:flex flex-col gap-2">
             {images.map((img, idx) => (
               <button
                 key={idx}
                 onClick={() => setActiveImage(img.url)}
-                className={`border-2 rounded-lg overflow-hidden transition-all ${
-                  mainImage === img.url
-                    ? "border-[var(--color-accent)] scale-105"
-                    : "border-gray-300 hover:border-[var(--color-accent)]"
-                }`}
+                className={`w-14 h-14 border rounded-sm overflow-hidden transition
+                  ${
+                    activeImage === img.url
+                      ? "border-orange-500"
+                      : "border-black/20 hover:border-black/40"
+                  }`}
               >
                 <img
                   src={img.url}
                   alt={`Thumbnail ${idx + 1}`}
-                  className="w-full h-14 object-cover"
+                  className="w-full h-full object-contain bg-white"
                 />
               </button>
             ))}
           </div>
 
-          {/* ================= Main Image ================= */}
+          {/* ================= MAIN IMAGE ================= */}
           <div
-            className="w-fullh-64 sm:h-80 md:h-[420px] lg:h-[520px] xl:h-[600px] bg-white rounded-xl border border-gray-300 shadow-inner p-2 lg:p-4 flex items-center justify-center overflow-hidden cursor-zoom-in"
+            className="flex-1 flex items-center justify-center cursor-zoom-in"
             onClick={() => setIsLightboxOpen(true)}
           >
-            {mainImage && (
-              <img
-                src={mainImage}
-                alt="Product Image"
-                className="max-w-full max-h-full object-contain"
-              />
-            )}
-          </div>
-
-          {/* ================= Thumbnails – BOTTOM (Mobile / Tablet) ================= */}
-          <div className="flex lg:hidden gap-3 overflow-x-auto pt-2">
-            {images.map((img, idx) => (
-              <button
-                key={idx}
-                onClick={() => setActiveImage(img.url)}
-                className={`min-w-[72px] border-2 rounded-lg overflow-hidden transition-all ${
-                  mainImage === img.url
-                    ? "border-[var(--color-accent)]"
-                    : "border-gray-300"
-                }`}
-              >
+            <div className="w-full h-[360px] sm:h-[420px] lg:h-[500px] flex items-center justify-center">
+              {activeImage && (
                 <img
-                  src={img.url}
-                  alt={`Thumbnail ${idx + 1}`}
-                  className="w-full h-16 object-cover"
+                  src={activeImage}
+                  alt="Product Image"
+                  className="max-w-full max-h-full object-contain"
                 />
-              </button>
-            ))}
+              )}
+            </div>
           </div>
+        </div>
+
+        {/* ================= THUMBNAILS (MOBILE) ================= */}
+        <div className="flex lg:hidden gap-3 px-3 pb-3 overflow-x-auto">
+          {images.map((img, idx) => (
+            <button
+              key={idx}
+              onClick={() => setActiveImage(img.url)}
+              className={`min-w-[64px] h-16 border rounded-sm overflow-hidden
+                ${
+                  activeImage === img.url
+                    ? "border-orange-500"
+                    : "border-black/20"
+                }`}
+            >
+              <img
+                src={img.url}
+                alt={`Thumbnail ${idx + 1}`}
+                className="w-full h-full object-contain bg-white"
+              />
+            </button>
+          ))}
         </div>
       </div>
     </div>
