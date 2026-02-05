@@ -20,8 +20,7 @@ export async function generateMetadata({
   if (!res.ok) return {};
 
   const json = await res.json();
-  console.log("FULL API RESPONSE 👉", json);
-  console.log("PRODUCT DATA 👉", json.data);
+
   const product = json.data;
 
   if (!product) return {};

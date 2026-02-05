@@ -70,7 +70,7 @@ const ImageGallery = () => {
 
           {/* ================= Main Image ================= */}
           <div
-            className="w-full h-64 sm:h-80 lg:h-96 bg-white rounded-xl border border-gray-300 shadow-inner p-2 lg:p-4 flex items-center justify-center overflow-hidden cursor-zoom-in"
+            className="w-fullh-64 sm:h-80 md:h-[420px] lg:h-[520px] xl:h-[600px] bg-white rounded-xl border border-gray-300 shadow-inner p-2 lg:p-4 flex items-center justify-center overflow-hidden cursor-zoom-in"
             onClick={() => setIsLightboxOpen(true)}
           >
             {mainImage && (

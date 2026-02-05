@@ -1,4 +1,3 @@
-// components/ProductDetail/ProductDetailClient.tsx
 "use client";
 
 import React, { useEffect } from "react";
@@ -32,7 +31,7 @@ const ProductDetailClient: React.FC<Props> = ({ product }) => {
   const dispatch = useDispatch<AppDispatch>();
   const user = useSelector((state: RootState) => state.user.activeUser);
 
-  // ✅ Default variant select
+  /* ================= DEFAULT VARIANT ================= */
   useEffect(() => {
     if (!product?.variants?.length) return;
 
@@ -44,7 +43,7 @@ const ProductDetailClient: React.FC<Props> = ({ product }) => {
     dispatch(setQuantity(1));
   }, [product, dispatch]);
 
-  // ✅ Cleanup
+  /* ================= CLEANUP ================= */
   useEffect(() => {
     return () => {
       dispatch(resetProductState());
@@ -53,31 +52,33 @@ const ProductDetailClient: React.FC<Props> = ({ product }) => {
 
   return (
     <>
-      {/* ================= MAIN PDP ================= */}
-      <div className="w-full min-h-screen bg-[var(--color-primary)] pt-8 pb-24 lg:pb-0">
-        <div className="container mx-auto px-4 lg:px-6">
-          <div className="flex flex-col lg:flex-row gap-6 lg:gap-10">
-            {/* ================= LEFT: IMAGES ================= */}
-            <div className="w-full lg:w-[40%]">
-              <ImageGallery />
-
-              {/* Desktop CTA */}
-              <div className="mt-6 hidden lg:block">
-                <ActionButtons productId={product._id} />
+      {/* ================= PDP ROOT ================= */}
+      <div className="w-full bg-[var(--color-primary)] pt-6 pb-16">
+        {/* Wider container like Flipkart */}
+        <div className="max-w-[1440px] mx-auto px-3 lg:px-4">
+          <div className="grid grid-cols-1 lg:grid-cols-[40%_60%] gap-4 lg:gap-6">
+            {/* ================= LEFT: IMAGE (STICKY) ================= */}
+            <div>
+              <div className="lg:sticky lg:top-24">
+                <ImageGallery />
               </div>
             </div>
 
-            {/* ================= RIGHT: DETAILS ================= */}
-            <div className="w-full lg:w-[60%] bg-[var(--color-card)] rounded-2xl p-6 shadow-sm">
+            {/* ================= RIGHT: DETAILS (NORMAL FLOW) ================= */}
+            <div className="bg-[var(--color-card)] rounded-md p-4 md:p-5">
               <ProductHeader product={product} />
-
               <ProductPrice />
 
+              {/* CTA – IMPORTANT (Flipkart style: close to price) */}
               <div className="mt-4">
+                <ActionButtons productId={product._id} />
+              </div>
+
+              <div className="mt-5">
                 <VariantSelector variants={product.variants} />
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 mt-5">
+              <div className="flex flex-col sm:flex-row gap-3 mt-5">
                 <QuantitySelector />
                 <StockStatus />
               </div>
@@ -85,13 +86,20 @@ const ProductDetailClient: React.FC<Props> = ({ product }) => {
               <div className="mt-5">
                 <PincodeChecker />
               </div>
-            </div>
-          </div>
 
-          {/* ================= INFO + REVIEWS ================= */}
-          <div className="mt-10 space-y-8">
-            <ProductInfo product={product} />
-            <ReviewsSection productId={product._id} currentUserId={user?._id} />
+              {/* PRODUCT INFO */}
+              <div className="mt-10 border-t pt-8">
+                <ProductInfo product={product} />
+              </div>
+
+              {/* REVIEWS */}
+              <div className="mt-12 border-t pt-8">
+                <ReviewsSection
+                  productId={product._id}
+                  currentUserId={user?._id}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
