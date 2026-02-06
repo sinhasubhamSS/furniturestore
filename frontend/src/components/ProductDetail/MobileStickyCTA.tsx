@@ -17,10 +17,12 @@ const MobileStickyCTA: React.FC<Props> = ({ productId }) => {
   if (!selectedVariant) return null;
 
   return (
-    // 🔥 lg:hidden YAHI lagna chahiye
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 lg:hidden">
-      <div className="mx-auto max-w-7xl px-4 py-3">
-        <ActionButtons productId={productId} />
+    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-black/10 lg:hidden">
+      {/* ✅ CONTENT-ALIGNED CONTAINER */}
+      <div className="mx-auto max-w-[1440px] px-3">
+        <div className="py-3">
+          <ActionButtons productId={productId} />
+        </div>
       </div>
     </div>
   );

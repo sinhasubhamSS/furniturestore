@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { setSelectedVariant } from "@/redux/slices/ProductDetailSlice";
 import { Variant } from "@/types/Product";
+import { RootState } from "@/redux/store";
 
 type Props = {
   variants: Variant[];
@@ -11,6 +12,10 @@ type Props = {
 
 const VariantSelector: React.FC<Props> = ({ variants }) => {
   const dispatch = useDispatch();
+
+  const selectedVariant = useSelector(
+    (state: RootState) => state.productDetail.selectedVariant,
+  );
 
   const [finish, setFinish] = useState<string | null>(null);
   const [size, setSize] = useState<string | null>(null);
@@ -41,36 +46,37 @@ const VariantSelector: React.FC<Props> = ({ variants }) => {
     );
   }, [variants, finish]);
 
-  /* ========= INIT ========= */
+  /* ========= INIT PRIMARY VARIANT ========= */
 
   useEffect(() => {
     if (!variants.length) return;
 
     const primary = variants.find((v) => v.stock > 0) || variants[0];
-
-    setFinish(primary.attributes?.finish ?? null);
-    setSize(primary.attributes?.size ?? null);
     dispatch(setSelectedVariant(primary));
   }, [variants, dispatch]);
+
+  /* ========= SYNC UI WITH REDUX ========= */
+
+  useEffect(() => {
+    if (!selectedVariant) return;
+
+    setFinish(selectedVariant.attributes?.finish ?? null);
+    setSize(selectedVariant.attributes?.size ?? null);
+  }, [selectedVariant]);
 
   /* ========= HANDLERS ========= */
 
   const handleFinishSelect = (f: string) => {
-    setFinish(f);
-
     const match =
       variants.find((v) => v.attributes?.finish === f && v.stock > 0) ||
       variants.find((v) => v.attributes?.finish === f);
 
     if (!match) return;
 
-    setSize(match.attributes?.size ?? null);
     dispatch(setSelectedVariant(match));
   };
 
   const handleSizeSelect = (s: string) => {
-    setSize(s);
-
     const match = variants.find(
       (v) => v.attributes?.finish === finish && v.attributes?.size === s,
     );
