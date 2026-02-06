@@ -19,46 +19,48 @@ const ProductInfo: React.FC<Props> = ({ product }) => {
   const measurements = selectedVariant?.measurements;
 
   return (
-    <div className="bg-[var(--color-card)] border border-[var(--color-border-custom)] rounded-2xl p-6 md:p-8 space-y-12 shadow-sm">
+    <div className="bg-[var(--color-card)] border border-[var(--color-border-custom)] rounded-xl p-5 md:p-7 space-y-10 shadow-sm">
       {/* ================= DESCRIPTION ================= */}
       <section>
-        <h2 className="text-xl font-semibold text-[var(--color-foreground)] mb-3">
+        <h2 className="text-base font-semibold text-[var(--color-foreground)] mb-2">
           Product Details
         </h2>
-        <p className="text-sm leading-relaxed text-[var(--color-foreground)]">
-          {product.description}
-        </p>
+
+        <div
+          className="text-[13px] md:text-sm leading-relaxed text-[var(--color-foreground)]"
+          dangerouslySetInnerHTML={{
+            __html: product.description || "",
+          }}
+        />
       </section>
 
       {/* ================= SPECIFICATIONS ================= */}
       {specifications.length > 0 && (
         <section>
-          <h3 className="text-lg font-semibold text-[var(--color-foreground)] mb-4">
+          <h3 className="text-base font-semibold text-[var(--color-foreground)] mb-3">
             Specifications
           </h3>
 
-          <div className="space-y-8">
+          <div className="space-y-6">
             {specifications.map((section, idx) => (
               <div key={idx}>
-                {/* Section title */}
-                <h4 className="text-sm font-semibold text-[var(--color-foreground)] mb-3">
+                <h4 className="text-sm font-semibold text-[var(--color-foreground)] mb-2">
                   {section.section}
                 </h4>
 
-                {/* Table */}
                 <div className="border border-[var(--color-border-custom)] rounded-lg overflow-hidden">
                   {section.specs.map((spec, i) => (
                     <div
                       key={i}
                       className="flex border-b last:border-b-0 border-[var(--color-border-custom)]"
                     >
-                      {/* LEFT (Key) */}
-                      <div className="w-[45%] bg-[var(--color-secondary)] px-4 py-3 text-sm text-[var(--text-accent)]">
+                      {/* KEY */}
+                      <div className="w-[25%] bg-[var(--color-secondary)] px-3 py-2 text-xs text-[var(--text-accent)]">
                         {spec.key}
                       </div>
 
-                      {/* RIGHT (Value) */}
-                      <div className="w-[55%] px-4 py-3 text-sm text-[var(--color-foreground)] font-medium">
+                      {/* VALUE */}
+                      <div className="w-[75%] px-3 py-2 text-xs md:text-sm text-[var(--color-foreground)] font-medium">
                         {spec.value}
                       </div>
                     </div>
@@ -73,11 +75,11 @@ const ProductInfo: React.FC<Props> = ({ product }) => {
       {/* ================= MEASUREMENTS ================= */}
       {measurements && (
         <section>
-          <h3 className="text-lg font-semibold text-[var(--color-foreground)] mb-5">
+          <h3 className="text-base font-semibold text-[var(--color-foreground)] mb-3">
             Measurements
           </h3>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {measurements.width && (
               <MeasurementCard
                 label="Width"
@@ -107,25 +109,25 @@ const ProductInfo: React.FC<Props> = ({ product }) => {
       )}
 
       {/* ================= WARRANTY & POLICIES ================= */}
-      <section className="border-t border-[var(--color-border-custom)] pt-6 space-y-5">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-sm">
+      <section className="border-t border-[var(--color-border-custom)] pt-5 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <Policy icon="🚚" title="Free Shipping" subtitle="Across India" />
           <Policy icon="🔒" title="Secure Payment" subtitle="100% Protected" />
           <Policy icon="↩️" title="Easy Returns" subtitle="7 Days Policy" />
         </div>
 
         {product.warrantyPeriod && (
-          <div className="pt-4 border-t border-[var(--color-border-custom)]">
+          <div className="pt-3 border-t border-[var(--color-border-custom)]">
             <p className="text-sm font-semibold text-[var(--color-foreground)]">
               🛠️ {product.warrantyPeriod} Months Warranty
             </p>
-            <p className="text-xs text-[var(--text-accent)] mt-1 leading-relaxed">
+            <p className="text-xs text-[var(--text-accent)] mt-1">
               Covers manufacturing defects under normal household use.
             </p>
 
             <Link
               href="/warranty"
-              className="inline-block mt-3 text-xs font-medium text-blue-600 hover:underline"
+              className="inline-block mt-2 text-xs font-medium text-blue-600 hover:underline"
             >
               View full warranty terms →
             </Link>
@@ -145,9 +147,11 @@ const MeasurementCard = ({
   label: string;
   value: string;
 }) => (
-  <div className="bg-[var(--color-secondary)] p-4 rounded-xl border border-[var(--color-border-custom)]">
-    <p className="text-xs text-[var(--text-accent)] mb-1">{label}</p>
-    <p className="font-semibold text-[var(--color-foreground)]">{value}</p>
+  <div className="bg-[var(--color-secondary)] p-3 rounded-xl border border-[var(--color-border-custom)]">
+    <p className="text-xs text-[var(--text-accent)] mb-0.5">{label}</p>
+    <p className="text-sm font-semibold text-[var(--color-foreground)]">
+      {value}
+    </p>
   </div>
 );
 
@@ -160,8 +164,8 @@ const Policy = ({
   title: string;
   subtitle: string;
 }) => (
-  <div className="flex items-start gap-3">
-    <span className="text-xl">{icon}</span>
+  <div className="flex items-start gap-2">
+    <span className="text-lg">{icon}</span>
     <div>
       <p className="text-sm font-medium text-[var(--color-foreground)]">
         {title}

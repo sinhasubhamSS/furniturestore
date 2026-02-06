@@ -8,29 +8,56 @@ import { setQuantity } from "@/redux/slices/ProductDetailSlice";
 const QuantitySelector: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { quantity, selectedVariant } = useSelector(
-    (state: RootState) => state.productDetail
+    (state: RootState) => state.productDetail,
   );
 
+  const maxQty = selectedVariant?.stock || 1;
+
   return (
-    <div className="flex items-center">
-      <h3 className="text-lg font-medium text-gray-900 mr-4">Quantity</h3>
-      <div className="flex items-center border border-gray-300 rounded-md">
+    <div className="flex items-center gap-3">
+      {/* Label */}
+      <span className="text-sm font-medium text-gray-700">Qty</span>
+
+      {/* Counter */}
+      <div className="flex items-center border border-gray-300 rounded-md overflow-hidden">
         <button
-          className="px-4 py-2 text-gray-600 hover:bg-gray-100"
+          type="button"
+          aria-label="Decrease quantity"
           onClick={() => dispatch(setQuantity(Math.max(1, quantity - 1)))}
           disabled={quantity <= 1}
+          className="
+            w-9 h-9
+            flex items-center justify-center
+            text-lg text-gray-700
+            hover:bg-gray-100
+            disabled:opacity-40 disabled:cursor-not-allowed
+          "
         >
-          -
+          −
         </button>
-        <span className="px-4 py-2">{quantity}</span>
+
+        <span className="w-10 text-center text-sm font-medium select-none">
+          {quantity}
+        </span>
+
         <button
-          className="px-4 py-2 text-gray-600 hover:bg-gray-100"
-          onClick={() => dispatch(setQuantity(quantity + 1))}
-          disabled={quantity >= (selectedVariant?.stock || 1)}
+          type="button"
+          aria-label="Increase quantity"
+          onClick={() => dispatch(setQuantity(Math.min(maxQty, quantity + 1)))}
+          disabled={quantity >= maxQty}
+          className="
+            w-9 h-9
+            flex items-center justify-center
+            text-lg text-gray-700
+            hover:bg-gray-100
+            disabled:opacity-40 disabled:cursor-not-allowed
+          "
         >
           +
         </button>
       </div>
+
+    
     </div>
   );
 };

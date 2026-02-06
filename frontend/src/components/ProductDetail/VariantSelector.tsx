@@ -50,7 +50,6 @@ const VariantSelector: React.FC<Props> = ({ variants }) => {
 
   useEffect(() => {
     if (!variants.length) return;
-
     const primary = variants.find((v) => v.stock > 0) || variants[0];
     dispatch(setSelectedVariant(primary));
   }, [variants, dispatch]);
@@ -59,7 +58,6 @@ const VariantSelector: React.FC<Props> = ({ variants }) => {
 
   useEffect(() => {
     if (!selectedVariant) return;
-
     setFinish(selectedVariant.attributes?.finish ?? null);
     setSize(selectedVariant.attributes?.size ?? null);
   }, [selectedVariant]);
@@ -72,7 +70,6 @@ const VariantSelector: React.FC<Props> = ({ variants }) => {
       variants.find((v) => v.attributes?.finish === f);
 
     if (!match) return;
-
     dispatch(setSelectedVariant(match));
   };
 
@@ -80,9 +77,7 @@ const VariantSelector: React.FC<Props> = ({ variants }) => {
     const match = variants.find(
       (v) => v.attributes?.finish === finish && v.attributes?.size === s,
     );
-
     if (!match) return;
-
     dispatch(setSelectedVariant(match));
   };
 
@@ -97,32 +92,46 @@ const VariantSelector: React.FC<Props> = ({ variants }) => {
   /* ========= UI ========= */
 
   return (
-    <div className="space-y-4">
-      {/* FINISH */}
-      <div>
-        <h3 className="font-medium mb-2">Finish</h3>
-        <div className="flex flex-wrap gap-2">
-          {finishes.map((f) => (
-            <button
-              key={f}
-              onClick={() => handleFinishSelect(f)}
-              className={`px-4 py-2 rounded-full border text-sm
-                ${
-                  finish === f
-                    ? "bg-black text-white"
-                    : "bg-white border-gray-300"
-                }`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-      </div>
+    <div className="space-y-5">
+      {/* ================= FINISH ================= */}
+      {finishes.length > 0 && (
+        <div>
+          <p className="text-sm font-medium text-gray-700 mb-2">Finish</p>
 
-      {/* SIZE */}
+          <div className="flex flex-wrap gap-2">
+            {finishes.map((f) => {
+              const active = finish === f;
+
+              return (
+                <button
+                  key={f}
+                  onClick={() => handleFinishSelect(f)}
+                  className={`
+                    px-3 py-1.5
+                    text-xs md:text-sm
+                    rounded-full
+                    border
+                    transition
+                    ${
+                      active
+                        ? "bg-gray-900 text-white border-gray-900"
+                        : "bg-white text-gray-700 border-gray-300 hover:border-gray-500"
+                    }
+                  `}
+                >
+                  {f}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ================= SIZE ================= */}
       {sizesForFinish.length > 0 && (
         <div>
-          <h3 className="font-medium mb-2">Size</h3>
+          <p className="text-sm font-medium text-gray-700 mb-2">Size</p>
+
           <div className="flex flex-wrap gap-2">
             {sizesForFinish.map((s) => {
               const available = isSizeAvailable(s);
@@ -133,13 +142,19 @@ const VariantSelector: React.FC<Props> = ({ variants }) => {
                   key={s}
                   disabled={!available}
                   onClick={() => handleSizeSelect(s)}
-                  className={`px-4 py-2 rounded-md border text-sm
+                  className={`
+                    min-w-[60px]
+                    px-3 py-1.5
+                    text-xs md:text-sm
+                    rounded-md
+                    border
+                    transition
                     ${
                       active
-                        ? "bg-black text-white"
-                        : "bg-white border-gray-300"
+                        ? "bg-gray-900 text-white border-gray-900"
+                        : "bg-white text-gray-700 border-gray-300 hover:border-gray-500"
                     }
-                    ${!available ? "opacity-50" : ""}
+                    ${!available ? "opacity-40 cursor-not-allowed" : ""}
                   `}
                 >
                   {s}

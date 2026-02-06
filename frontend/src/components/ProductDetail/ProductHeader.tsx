@@ -7,49 +7,63 @@ type Props = {
   product: DisplayProduct;
 };
 
-const MAX_TITLE_LENGTH = 60;
+const MAX_TITLE_LENGTH = 70;
 
 const ProductHeader: React.FC<Props> = ({ product }) => {
-  const [showFullTitle, setShowFullTitle] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
-  // ✅ Safe category name resolver (no "Uncategorized")
   const categoryName =
-    typeof product.category === "string"
-      ? "" // ← plain string (ID) = don't show anything
-      : product.category?.name ?? "";
+    typeof product.category === "string" ? "" : (product.category?.name ?? "");
 
-  // Title logic
-  const title = product.title || "";
-  const isLong = title.length > MAX_TITLE_LENGTH;
-  const displayedTitle = showFullTitle
-    ? title
-    : title.slice(0, MAX_TITLE_LENGTH);
+  const subtitle = product.title || "";
+  const isLong = subtitle.length > MAX_TITLE_LENGTH;
+  const visibleSubtitle = expanded
+    ? subtitle
+    : subtitle.slice(0, MAX_TITLE_LENGTH);
 
   return (
-    <div className="mb-4">
+    <div className="space-y-1">
+      {/* CATEGORY */}
       {categoryName && (
-        <span className="text-[var(--text-accent)] font-medium text-sm uppercase tracking-wide">
+        <p className="text-xs uppercase tracking-wide text-gray-500">
           {categoryName}
-        </span>
+        </p>
       )}
 
-      <h1 className="text-2xl md:text-3xl font-bold text-[var(--color-foreground)] mt-1 leading-tight">
+      {/* PRODUCT NAME */}
+      <h1
+        className="
+          text-xl sm:text-2xl md:text-3xl
+          font-semibold
+          text-gray-900
+          leading-snug
+        "
+      >
         {product.name}
       </h1>
 
-      <p className="text-[var(--text-accent)] mt-2 text-sm">
-        {displayedTitle}
-        {isLong && !showFullTitle && "... "}
-        {isLong && (
-          <button
-            className="text-[var(--text-accent)] underline ml-1"
-            onClick={() => setShowFullTitle(!showFullTitle)}
-            type="button"
-          >
-            {showFullTitle ? "less" : "more"}
-          </button>
-        )}
-      </p>
+      {/* SUB TITLE / SHORT DESC */}
+      {subtitle && (
+        <p className="text-sm text-gray-600 leading-relaxed">
+          {visibleSubtitle}
+          {isLong && !expanded && "…"}
+          {isLong && (
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              className="
+                ml-1
+                text-sm
+                font-medium
+                text-blue-600
+                hover:underline
+              "
+            >
+              {expanded ? "Read less" : "Read more"}
+            </button>
+          )}
+        </p>
+      )}
     </div>
   );
 };

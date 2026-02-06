@@ -10,7 +10,8 @@ interface PincodeCheckerProps {
 
 const PincodeChecker: React.FC<PincodeCheckerProps> = ({ className = "" }) => {
   const [pincode, setPincode] = useState("");
-  const [checkDelivery, { data, isLoading, error }] = useCheckDeliveryMutation();
+  const [checkDelivery, { data, isLoading, error }] =
+    useCheckDeliveryMutation();
   const [showResult, setShowResult] = useState(false);
 
   const handleCheck = async () => {
@@ -18,9 +19,8 @@ const PincodeChecker: React.FC<PincodeCheckerProps> = ({ className = "" }) => {
       try {
         await checkDelivery({ pincode }).unwrap();
         setShowResult(true);
-      } catch (err) {
+      } catch {
         setShowResult(false);
-        console.error("Delivery check failed:", err);
       }
     }
   };
@@ -40,90 +40,87 @@ const PincodeChecker: React.FC<PincodeCheckerProps> = ({ className = "" }) => {
 
   return (
     <div className={`space-y-2 ${className}`}>
-      {/* Label + Input + Button */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-        <label htmlFor="pincode" className="sr-only">
-          Pincode
-        </label>
+      {/* INPUT ROW */}
+      <div className="flex flex-col sm:flex-row gap-2">
         <input
           id="pincode"
           type="text"
           inputMode="numeric"
-          name="pincode"
           value={pincode}
           onChange={handlePincodeChange}
           onKeyDown={handleKeyDown}
-          placeholder="Pincode"
+          placeholder="Enter pincode"
           maxLength={6}
-          className="w-full sm:flex-1 px-3 py-2 rounded-md border border-[var(--color-border-custom)] bg-[var(--color-surface)] text-[var(--text-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+          className="
+            w-full sm:flex-1
+            px-3 py-2.5
+            text-sm
+            rounded-md
+            border border-gray-300
+            bg-white
+            focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]
+          "
         />
+
         <button
           onClick={handleCheck}
           disabled={isLoading || pincode.length !== 6}
-          className={`w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-md text-white transition-colors duration-200 ${
-            isLoading || pincode.length !== 6
-              ? "bg-[var(--color-accent)]/60 cursor-not-allowed"
-              : "bg-[var(--color-accent)] hover:bg-[var(--color-accent)]/90"
-          }`}
-          style={{ boxShadow: "0 2px 8px rgb(107 60 26 / 0.5)" }}
-          aria-label="Check delivery availability"
+          className="
+            w-full sm:w-auto
+            px-4 py-2.5
+            text-sm font-semibold
+            rounded-md
+            text-white
+            bg-[var(--color-accent)]
+            hover:bg-[var(--color-accent)]/90
+            transition
+            disabled:opacity-60 disabled:cursor-not-allowed
+          "
         >
-          {isLoading ? (
-            <span className="inline-flex items-center gap-2">
-              <span
-                className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
-                style={{
-                  borderColor:
-                    "var(--color-accent) transparent transparent transparent",
-                }}
-              />
-              Checking...
-            </span>
-          ) : (
-            "Check"
-          )}
+          {isLoading ? "Checking…" : "Check"}
         </button>
       </div>
 
-      {/* Error */}
+      {/* ERROR */}
       {Boolean(error) && (
-        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          <XCircle className="h-4 w-4 flex-shrink-0" />
-          <span>Unable to check delivery. Please try again.</span>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-red-50 border border-red-200 text-red-700 text-xs">
+          <XCircle className="h-4 w-4" />
+          <span>Unable to check delivery</span>
         </div>
       )}
 
-      {/* Minimal Result: Available + Charge */}
+      {/* RESULT */}
       {showResult && data && (
-        <div className="p-3 rounded-lg border text-sm flex items-center justify-between gap-3"
-             style={{
-               backgroundColor: isServiceable ? "var(--green-50, #f0fdf4)" : "var(--red-50, #fef2f2)",
-               borderColor: isServiceable ? "var(--green-200, #bbf7d0)" : "var(--red-200, #fecaca)",
-               color: "var(--text-accent)"
-             }}
+        <div
+          className={`flex items-center justify-between gap-3 px-3 py-2 rounded-md border text-sm
+            ${
+              isServiceable
+                ? "bg-green-50 border-green-200"
+                : "bg-red-50 border-red-200"
+            }
+          `}
         >
           <div className="flex items-center gap-2">
             {isServiceable ? (
               <>
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                <span className="font-medium text-green-700">Available</span>
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span className="font-medium text-green-700">
+                  Delivery available
+                </span>
               </>
             ) : (
               <>
-                <XCircle className="h-5 w-5 text-red-600" />
-                <span className="font-medium text-red-700">Not Available</span>
+                <XCircle className="h-4 w-4 text-red-600" />
+                <span className="font-medium text-red-700">
+                  Not deliverable
+                </span>
               </>
             )}
           </div>
 
-          {/* Charge on right, only if serviceable and charge is a number */}
-          <div className="text-right">
-            {isServiceable && typeof charge === "number" && (
-              <span className="font-semibold">
-                ₹{charge}
-              </span>
-            )}
-          </div>
+          {isServiceable && typeof charge === "number" && (
+            <span className="font-semibold text-gray-800">₹{charge}</span>
+          )}
         </div>
       )}
     </div>

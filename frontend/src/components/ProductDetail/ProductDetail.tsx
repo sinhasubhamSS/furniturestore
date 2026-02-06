@@ -59,8 +59,9 @@ const ProductDetailClient: React.FC<Props> = ({ product }) => {
             {/* ================= LEFT: IMAGE + CTA (STICKY) ================= */}
             <div>
               <div className="lg:sticky lg:top-24 space-y-2">
-                <ImageGallery />
-
+                <div className="mt-2 sm:mt-3">
+                  <ImageGallery />
+                </div>
 
                 <div className="hidden lg:block">
                   <ActionButtons productId={product._id} />

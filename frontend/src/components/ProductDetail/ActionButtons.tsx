@@ -58,33 +58,37 @@ const ActionButtons: React.FC<Props> = ({ productId }) => {
   const isVariantSelected = !!selectedVariant?._id;
 
   return (
-    <div className="flex w-full gap-3 items-center flex-nowrap">
+    <div className="flex w-full gap-2 sm:gap-3 items-center">
+      {/* ADD TO CART */}
       <Button
         onClick={handleAddToCart}
         disabled={isAdding || isOutOfStock || !isVariantSelected}
         className="
           flex-1 min-w-0
           bg-gray-900 text-white hover:bg-gray-800
-          py-3 md:py-4
-          text-sm md:text-base lg:text-lg
-          rounded-lg
-          transition font-medium text-center
+          py-2.5 sm:py-3 md:py-4
+          text-[13px] sm:text-sm md:text-base lg:text-lg
+          font-semibold
+          rounded-md sm:rounded-lg
+          transition
           disabled:opacity-60 disabled:cursor-not-allowed
         "
       >
-        {isAdding ? "Adding..." : "Add to Cart"}
+        {isAdding ? "Adding…" : "Add to Cart"}
       </Button>
 
+      {/* BUY NOW */}
       <Button
         onClick={handleBuyNow}
         disabled={isOutOfStock || !isVariantSelected}
         className="
           flex-1 min-w-0
           bg-[--color-accent] text-white hover:bg-[--color-accent-dark]
-          py-3 md:py-4
-          text-sm md:text-base lg:text-lg
-          rounded-lg
-          transition font-medium text-center
+          py-2.5 sm:py-3 md:py-4
+          text-[13px] sm:text-sm md:text-base lg:text-lg
+          font-semibold
+          rounded-md sm:rounded-lg
+          transition
           disabled:opacity-60 disabled:cursor-not-allowed
         "
       >
