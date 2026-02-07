@@ -1,54 +1,42 @@
 import React from "react";
-import type { ContactInfo as ContactInfoType } from "../../../types/footer/footer";
+
+const PHONE = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
+const EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
 
 const ContactInfo: React.FC = () => {
-  const contactDetails: ContactInfoType = {
-    phone: "+91 1800-123-4567",
-    email: "support@yourstore.com",
-    address: "Head Office: Main Road Gumla Jharkand - 835207",
-    hours: "Mon-Fri: 9 AM - 8 PM, Sat-Sun: 10 AM - 6 PM",
-  };
-
   return (
-    <div className="w-full bg-[--color-secondary] py-8">
+    <div className="w-full bg-[--color-secondary] py-8 border-t border-[--color-border-custom]">
       <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Contact Details */}
+          {/* Contact */}
           <div className="space-y-4">
             <h4 className="text-lg font-semibold text-[--color-accent]">
               Contact Us
             </h4>
-            <div className="space-y-3 text-sm">
-              <div className="flex items-start space-x-3">
-                <span className="text-[--color-accent]">📞</span>
-                <div>
-                  <p className="font-medium text-[--text-accent]">
-                    Customer Care
-                  </p>
-                  <a
-                    href={`tel:${contactDetails.phone}`}
-                    className="text-[--text-accent] hover:text-[--color-accent]"
-                  >
-                    {contactDetails.phone}
-                  </a>
-                </div>
-              </div>
 
-              <div className="flex items-start space-x-3">
-                <span className="text-[--color-accent]">📧</span>
-                <div>
-                  <p className="font-medium text-[--text-accent]">
-                    Email Support
-                  </p>
-                  <a
-                    href={`mailto:${contactDetails.email}`}
-                    className="text-[--text-accent] hover:text-[--color-accent]"
-                  >
-                    {contactDetails.email}
-                  </a>
-                </div>
+            {PHONE && (
+              <div className="flex gap-3 text-sm">
+                <span>📞</span>
+                <a
+                  href={`tel:+91${PHONE}`}
+                  className="hover:text-[--color-accent]"
+                >
+                  +91 {PHONE}
+                </a>
               </div>
-            </div>
+            )}
+
+            {EMAIL && (
+              <div className="flex gap-3 text-sm">
+                <span>📧</span>
+                <a
+                  href={`mailto:${EMAIL}`}
+                  className="hover:text-[--color-accent]"
+                >
+                  {EMAIL}
+                </a>
+              </div>
+            )}
           </div>
 
           {/* Address */}
@@ -56,25 +44,20 @@ const ContactInfo: React.FC = () => {
             <h4 className="text-lg font-semibold text-[--color-accent]">
               Head Office
             </h4>
-            <div className="flex items-start space-x-3 text-sm">
-              <span className="text-[--color-accent]">📍</span>
-              <p className="text-[--text-accent] leading-relaxed">
-                {contactDetails.address}
-              </p>
-            </div>
+            <p className="text-sm leading-relaxed">
+              📍 Main Road, Gumla, Jharkhand – 835207
+            </p>
           </div>
 
-          {/* Business Hours */}
+          {/* Hours */}
           <div className="space-y-4">
             <h4 className="text-lg font-semibold text-[--color-accent]">
               Business Hours
             </h4>
-            <div className="flex items-start space-x-3 text-sm">
-              <span className="text-[--color-accent]">⏰</span>
-              <p className="text-[--text-accent] leading-relaxed">
-                {contactDetails.hours}
-              </p>
-            </div>
+            <p className="text-sm">
+              ⏰ Mon–Fri: 9 AM – 8 PM <br />
+              Sat–Sun: 10 AM – 6 PM
+            </p>
           </div>
         </div>
       </div>

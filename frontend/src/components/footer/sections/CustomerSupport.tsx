@@ -1,55 +1,55 @@
-'use client'
+"use client";
 
 import React, { useState } from "react";
-import { useRouter } from 'next/navigation';
+import { useRouter } from "next/navigation";
 
 interface SupportOption {
   id: string;
   name: string;
   icon: string;
-  action: () => void;
+  action?: () => void;
   description: string;
+  disabled?: boolean;
 }
+
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
 
 const CustomerSupport: React.FC = () => {
   const router = useRouter();
-  const [showChatbot, setShowChatbot] = useState<boolean>(false);
+  const [showChatbotInfo, setShowChatbotInfo] = useState(false);
 
-  const handleWhatsAppClick = (): void => {
+  /* ================= ACTIONS ================= */
+
+  const handleWhatsAppClick = () => {
+    if (!WHATSAPP_NUMBER) return;
+
     const message = "Hi! I need help with my order.";
-    const phoneNumber = "919876543210"; // Replace with your actual number
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(
-      message
+    const whatsappUrl = `https://wa.me/91${WHATSAPP_NUMBER}?text=${encodeURIComponent(
+      message,
     )}`;
     window.open(whatsappUrl, "_blank");
   };
 
-  const toggleChatbot = (): void => {
-    setShowChatbot((prev) => !prev);
-    // Future: Integrate actual chatbot
-    console.log("Chatbot coming soon...");
+  const handleRaiseTicket = () => {
+    router.push("/support/create-ticket");
   };
 
-  // ✅ New: Raise a Ticket instead of email
-  const handleRaiseTicket = (): void => {
-    router.push('/support/create-ticket'); // Navigate to ticket form
-    // Or open modal: setShowTicketModal(true)
-  };
+  /* ================= OPTIONS ================= */
 
   const supportOptions: SupportOption[] = [
     {
       id: "faq",
       name: "FAQs",
       icon: "❓",
-      action: () => router.push('/FAQs'),
+      action: () => router.push("/FAQs"),
       description: "Find answers to common questions",
     },
     {
-      id: "ticket", // ✅ Changed from "email" to "ticket"
-      name: "Raise a Ticket", // ✅ Updated name
-      icon: "🎫", // ✅ Updated icon
-      action: handleRaiseTicket, // ✅ New action
-      description: "Create a support ticket", // ✅ Updated description
+      id: "ticket",
+      name: "Raise a Ticket",
+      icon: "🎫",
+      action: handleRaiseTicket,
+      description: "Create a support ticket for your issue",
     },
     {
       id: "whatsapp",
@@ -62,8 +62,8 @@ const CustomerSupport: React.FC = () => {
       id: "chatbot",
       name: "Live Chat",
       icon: "🤖",
-      action: toggleChatbot,
-      description: "Chat with our AI assistant (Coming Soon)",
+      disabled: true,
+      description: "AI chat support (Coming Soon)",
     },
   ];
 
@@ -73,40 +73,56 @@ const CustomerSupport: React.FC = () => {
         Customer Support
       </h4>
 
+      {/* SUPPORT OPTIONS */}
       <div className="space-y-3">
-        {supportOptions.map((option: SupportOption) => (
+        {supportOptions.map((option) => (
           <button
             key={option.id}
-            onClick={option.action}
-            className="w-full flex items-center space-x-3 p-3 bg-[--color-secondary] hover:bg-[--color-hover-card] rounded-lg border border-[--color-border-custom] transition-colors text-left"
+            onClick={
+              option.disabled ? () => setShowChatbotInfo(true) : option.action
+            }
+            disabled={option.disabled}
+            className={`w-full flex items-center gap-3 p-3 rounded-lg border transition text-left
+              ${
+                option.disabled
+                  ? "bg-[--color-secondary] opacity-60 cursor-not-allowed"
+                  : "bg-[--color-secondary] hover:bg-[--color-hover-card]"
+              }
+            `}
           >
             <span className="text-xl">{option.icon}</span>
+
             <div>
-              <div className="font-medium text-[--text-accent]">
-                {option.name}
-              </div>
-              <div className="text-xs text-[--text-accent] opacity-70">
+              <p className="font-medium text-[--text-accent]">{option.name}</p>
+              <p className="text-xs text-[--text-accent] opacity-70">
                 {option.description}
-              </div>
+              </p>
             </div>
+
+            {option.disabled && (
+              <span className="ml-auto text-[10px] font-bold text-green-600">
+                SOON
+              </span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* Support Hours */}
+      {/* SUPPORT HOURS */}
       <div className="bg-[--color-secondary] p-4 rounded-lg border border-[--color-border-custom]">
         <h5 className="font-medium text-[--text-accent] mb-2">Support Hours</h5>
         <div className="text-sm text-[--text-accent] space-y-1">
-          <p>📅 Mon - Fri: 9:00 AM - 8:00 PM</p>
-          <p>📅 Saturday: 10:00 AM - 6:00 PM</p>
-          <p>📅 Sunday: 10:00 AM - 4:00 PM</p>
+          <p>📅 Mon – Fri: 9:00 AM – 8:00 PM</p>
+          <p>📅 Saturday: 10:00 AM – 6:00 PM</p>
+          <p>📅 Sunday: 10:00 AM – 4:00 PM</p>
         </div>
       </div>
 
-      {/* Future Chatbot Indicator */}
-      {showChatbot && (
+      {/* CHATBOT INFO */}
+      {showChatbotInfo && (
         <div className="bg-[--color-accent] text-[--text-light] p-3 rounded-lg text-sm">
-          🤖 Live Chat coming soon! For now, please raise a ticket or contact us on WhatsApp.
+          🤖 Live Chat is coming soon. For now, please raise a ticket or contact
+          us on WhatsApp.
         </div>
       )}
     </div>
