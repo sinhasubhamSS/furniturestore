@@ -70,7 +70,7 @@ const ProductDetailClient: React.FC<Props> = ({ product }) => {
             </div>
 
             {/* ================= RIGHT: DETAILS ================= */}
-            <div className="bg-[var(--color-card)] border border-black/5 rounded-md p-4 md:p-5">
+            <div className="bg-[var(--color-card)] border border-black/5 rounded-sm p-2 md:p-4">
               {/* TITLE */}
               <ProductHeader product={product} />
 
@@ -78,30 +78,30 @@ const ProductDetailClient: React.FC<Props> = ({ product }) => {
               <ProductPrice />
 
               {/* DIVIDER */}
-              <div className="my-6 h-px bg-black/10" />
+              <div className="my-1 h-px bg-black/10" />
 
               {/* VARIANTS */}
               <VariantSelector variants={product.variants} />
 
               {/* QTY + STOCK */}
-              <div className="flex flex-wrap items-center gap-4 mt-5">
+              <div className="flex flex-wrap items-center gap-4 mt-3">
                 <QuantitySelector />
                 <StockStatus />
               </div>
 
               {/* PINCODE */}
-              <div className="mt-5">
+              <div className="mt-4">
                 <PincodeChecker />
               </div>
 
               {/* DIVIDER */}
-              <div className="my-8 h-px bg-black/10" />
+              <div className="my-4 h-px bg-black/10" />
 
               {/* PRODUCT INFO */}
               <ProductInfo product={product} />
 
               {/* DIVIDER */}
-              <div className="my-8 h-px bg-black/10" />
+              <div className="my-4 h-px bg-black/10" />
 
               {/* REVIEWS */}
               <ReviewsSection

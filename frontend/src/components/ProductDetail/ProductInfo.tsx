@@ -19,8 +19,8 @@ const ProductInfo: React.FC<Props> = ({ product }) => {
   const measurements = selectedVariant?.measurements;
 
   return (
-    <div className="bg-[var(--color-card)] border border-[var(--color-border-custom)] rounded-xl p-5 md:p-7 space-y-10 shadow-sm">
-      {/* ================= DESCRIPTION ================= */}
+    <div className="bg-[var(--color-card)] space-y-10">
+      {/* ================= PRODUCT DETAILS ================= */}
       <section>
         <h2 className="text-base font-semibold text-[var(--color-foreground)] mb-2">
           Product Details
@@ -41,26 +41,26 @@ const ProductInfo: React.FC<Props> = ({ product }) => {
             Specifications
           </h3>
 
-          <div className="space-y-6">
+          <div className="space-y-5">
             {specifications.map((section, idx) => (
               <div key={idx}>
-                <h4 className="text-sm font-semibold text-[var(--color-foreground)] mb-2">
+                <h4 className="text-sm font-medium text-[var(--color-foreground)] mb-2">
                   {section.section}
                 </h4>
 
-                <div className="border border-[var(--color-border-custom)] rounded-lg overflow-hidden">
+                <div className="border border-[var(--color-border-custom)] rounded-md overflow-hidden">
                   {section.specs.map((spec, i) => (
                     <div
                       key={i}
                       className="flex border-b last:border-b-0 border-[var(--color-border-custom)]"
                     >
                       {/* KEY */}
-                      <div className="w-[25%] bg-[var(--color-secondary)] px-3 py-2 text-xs text-[var(--text-accent)]">
+                      <div className="w-[28%] bg-[var(--color-secondary)] px-3 py-2 text-xs text-[var(--text-accent)]">
                         {spec.key}
                       </div>
 
                       {/* VALUE */}
-                      <div className="w-[75%] px-3 py-2 text-xs md:text-sm text-[var(--color-foreground)] font-medium">
+                      <div className="w-[72%] px-3 py-2 text-xs md:text-sm text-[var(--color-foreground)] font-medium">
                         {spec.value}
                       </div>
                     </div>
@@ -110,7 +110,7 @@ const ProductInfo: React.FC<Props> = ({ product }) => {
 
       {/* ================= WARRANTY & POLICIES ================= */}
       <section className="border-t border-[var(--color-border-custom)] pt-5 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Policy icon="🚚" title="Free Shipping" subtitle="Across India" />
           <Policy icon="🔒" title="Secure Payment" subtitle="100% Protected" />
           <Policy icon="↩️" title="Easy Returns" subtitle="7 Days Policy" />
@@ -147,7 +147,7 @@ const MeasurementCard = ({
   label: string;
   value: string;
 }) => (
-  <div className="bg-[var(--color-secondary)] p-3 rounded-xl border border-[var(--color-border-custom)]">
+  <div className="bg-[var(--color-secondary)] p-3 rounded-lg border border-[var(--color-border-custom)]">
     <p className="text-xs text-[var(--text-accent)] mb-0.5">{label}</p>
     <p className="text-sm font-semibold text-[var(--color-foreground)]">
       {value}

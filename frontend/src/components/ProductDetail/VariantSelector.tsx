@@ -92,7 +92,7 @@ const VariantSelector: React.FC<Props> = ({ variants }) => {
   /* ========= UI ========= */
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* ================= FINISH ================= */}
       {finishes.length > 0 && (
         <div>
@@ -130,7 +130,7 @@ const VariantSelector: React.FC<Props> = ({ variants }) => {
       {/* ================= SIZE ================= */}
       {sizesForFinish.length > 0 && (
         <div>
-          <p className="text-sm font-medium text-gray-700 mb-2">Size</p>
+          <p className="text-sm font-medium text-gray-700 mb-2 mt-2">Size</p>
 
           <div className="flex flex-wrap gap-2">
             {sizesForFinish.map((s) => {
