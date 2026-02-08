@@ -20,66 +20,71 @@ const WishlistItem = ({
   onAddToCart,
   isAdding,
 }: Props) => {
-  const variant = product.variants.find(v => v._id === variantId);
+  const variant = product.variants.find((v) => v._id === variantId);
   if (!variant) return null;
 
   const isOutOfStock = variant.stock <= 0;
 
   const imageUrl =
-    variant.images?.find(img => img.isPrimary)?.url ||
+    variant.images?.find((img) => img.isPrimary)?.url ||
     variant.images?.[0]?.url ||
     product.repImage ||
     product.image ||
     "/placeholder.jpg";
 
   return (
-    <div className="flex items-center gap-2 border-b bg-white px-2 py-2">
+    <div className="flex gap-3 sm:gap-4 bg-white px-3 py-3 sm:py-4">
       {/* IMAGE */}
-      <div className="h-14 w-14 flex-shrink-0 flex items-center justify-center">
+      <div className="h-16 w-16 sm:h-20 sm:w-20 flex-shrink-0 border rounded-md flex items-center justify-center bg-gray-50">
         <Image
           src={imageUrl}
           alt={product.name}
-          width={56}
-          height={56}
+          width={80}
+          height={80}
           className="object-contain"
         />
       </div>
 
       {/* INFO */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">
+        <p className="text-sm sm:text-base font-medium truncate">
           {product.name}
         </p>
 
-        <p className="text-xs text-gray-500 truncate">
+        <p className="text-sm text-gray-600 mt-1">
           ₹{variant.sellingPrice.toLocaleString()}
         </p>
+
+        {isOutOfStock && (
+          <span className="inline-block mt-1 text-xs text-red-600">
+            Out of stock
+          </span>
+        )}
       </div>
 
-      {/* ACTIONS – SINGLE ROW, SLIM */}
-      <div className="flex items-center gap-1 flex-shrink-0">
+      {/* ACTIONS */}
+      <div className="flex flex-col sm:flex-row items-center gap-2">
         {onAddToCart && (
           <Button
             onClick={onAddToCart}
             disabled={isAdding || isOutOfStock}
             className="
-              h-8
-              px-2
-              text-xs
+              h-8 sm:h-9
+              px-3
+              text-xs sm:text-sm
               rounded-md
               flex items-center gap-1
             "
           >
             <ShoppingCart size={14} />
-            {isOutOfStock ? "Out" : "Cart"}
+            {isOutOfStock ? "Out" : "Add"}
           </Button>
         )}
 
         <button
           onClick={onRemove}
           className="
-            h-8
-            w-8
+            h-8 w-8 sm:h-9 sm:w-9
             rounded-md
             border
             flex items-center justify-center
@@ -88,7 +93,7 @@ const WishlistItem = ({
             hover:bg-red-50
             transition
           "
-          title="Remove"
+          title="Remove from wishlist"
         >
           <Trash2 size={14} />
         </button>

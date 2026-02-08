@@ -17,36 +17,39 @@ const WishlistPage = () => {
   const { toggleWishlist } = useWishlist();
   const [addToCart, { isLoading: isAdding }] = useAddToCartMutation();
 
-  if (isLoading)
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-sm">
+      <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">
         Loading your wishlist…
       </div>
     );
+  }
 
-  if (isError)
+  if (isError) {
     return (
       <div className="min-h-screen flex items-center justify-center text-red-500">
-        Something went wrong.
+        Something went wrong. Please try again.
       </div>
     );
+  }
 
-  if (!wishlistItems.length)
+  if (!wishlistItems.length) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center text-center gap-2">
-        <h2 className="text-lg font-semibold">Your wishlist is empty</h2>
-        <p className="text-sm text-gray-500">
-          Products you save will appear here
+      <div className="min-h-screen flex flex-col items-center justify-center text-center gap-3">
+        <h2 className="text-xl font-semibold">Your wishlist is empty 💔</h2>
+        <p className="text-sm text-gray-500 max-w-xs">
+          Save products you like and they will appear here.
         </p>
       </div>
     );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--color-primary)]">
-      <div className="max-w-4xl mx-auto px-2">
+      <div className="max-w-5xl mx-auto px-3 sm:px-4">
         {/* HEADER */}
-        <div className="py-4 flex items-center justify-between border-b">
-          <h1 className="text-lg font-semibold">My Wishlist</h1>
+        <div className="py-4 flex items-center justify-between border-b sticky top-0 bg-[var(--color-primary)] z-10">
+          <h1 className="text-lg sm:text-xl font-semibold">My Wishlist</h1>
           <span className="text-xs text-gray-600">
             {wishlistItems.length} items
           </span>
