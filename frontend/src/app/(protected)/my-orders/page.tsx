@@ -186,8 +186,8 @@ const MyOrders: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-4">
-      <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-xl font-bold mb-4">My Orders</h1>
+      <div className="max-w-4xl mx-auto px-6">
+        <h1 className="text-xl font-bold my-4">My Orders</h1>
 
         {/* Orders List */}
         <div className="space-y-3">
