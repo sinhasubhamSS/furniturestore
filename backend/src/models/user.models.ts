@@ -1,18 +1,24 @@
-import { Schema, model, models, Document ,Types} from "mongoose";
+import { Schema, model, models, Document, Types } from "mongoose";
 
-// 1. Interface (avoid using Document directly with generics, better to extend)
 export interface IUser extends Document {
   _id: Types.ObjectId;
+
   name: string;
   email: string;
   password: string;
+
   avatar?: string;
-  role: string;
+  role: "buyer" | "admin";
+
+  // 🔐 Email Verification
+  isEmailVerified: boolean;
+  emailVerificationToken?: string;
+  emailVerificationExpires?: Date;
 
   createdAt: Date;
+  updatedAt: Date;
 }
 
-// 2. Schema
 const userSchema = new Schema<IUser>(
   {
     name: {
@@ -20,6 +26,7 @@ const userSchema = new Schema<IUser>(
       required: [true, "Name is required"],
       trim: true,
     },
+
     email: {
       type: String,
       required: [true, "Email is required"],
@@ -27,25 +34,38 @@ const userSchema = new Schema<IUser>(
       lowercase: true,
       trim: true,
     },
+
     password: {
       type: String,
       required: [true, "Password is required"],
-      select: false, // Good practice: password should not be returned by default
+      select: false,
     },
+
     avatar: {
       type: String,
       default: "",
     },
+
     role: {
       type: String,
-      enum: ["buyer", "admin"], // seller hata de
+      enum: ["buyer", "admin"],
       default: "buyer",
     },
 
-  
-    createdAt: {
+    // ✅ NEW FIELDS FOR VERIFICATION
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    emailVerificationToken: {
+      type: String,
+      select: false,
+    },
+
+    emailVerificationExpires: {
       type: Date,
-      default: Date.now,
+      select: false,
     },
   },
   {
@@ -53,7 +73,6 @@ const userSchema = new Schema<IUser>(
   }
 );
 
-// 3. Model
 const User = models.User || model<IUser>("User", userSchema);
 
 export default User;
