@@ -4,18 +4,26 @@ import {
   logoutUser,
   refreshAccessToken,
   registerUser,
+  verifyEmail,
+  resendVerificationEmail,
 } from "../controllers/authUserController";
-import { authVerify } from "../middlewares/authVerify";
 
+import { authVerify } from "../middlewares/authVerify";
 import { Router } from "express";
 
 const router = Router();
 
+// 🔐 Auth
 router.post("/register", registerUser);
+router.post("/login", loginUser);
+router.post("/logout", authVerify, logoutUser);
+router.post("/refresh-token", refreshAccessToken);
 
-router.post("/login", loginUser); // Assuming you have a loginUser function in your controller
-router.post("/logout",authVerify, logoutUser); // Assuming you have a loginUser function in your controller
-router.post("/refresh-token", refreshAccessToken); // Assuming you have a loginUser function in your controller
-router.get("/my-profile",authVerify, getMyProfile); // Assuming you have a loginUser function in your controller
+// 📩 Email Verification
+router.get("/verify-email", verifyEmail);
+router.post("/resend-verification", resendVerificationEmail);
+
+// 👤 Profile
+router.get("/my-profile", authVerify, getMyProfile);
 
 export default router;

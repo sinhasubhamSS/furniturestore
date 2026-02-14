@@ -15,30 +15,33 @@ import {
   generateAccessToken,
   generateRefreshToken,
 } from "../utils/auth/generateTokens";
-
+import { emailService } from "../utils/emailServices";
 /**
  * Register
  */
+
 export const registerUser = catchAsync(async (req: Request, res: Response) => {
-  // accept confirmPassword from client
   const { name, email, password, confirmPassword, avatar } = req.body;
 
-  // basic required fields check
   if (!name || !email || !password || !confirmPassword) {
     throw new AppError(
       "Name, email, password & confirm password are required",
-      400
+      400,
     );
   }
 
-  // normalize email
-  const normalizedEmail = String(email).trim().toLowerCase();
+  const normalizedEmail = String(email || "")
+    .trim()
+    .toLowerCase();
 
-  // simple password policy (example)
-  if (String(password).length < 6)
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(normalizedEmail)) {
+    throw new AppError("Invalid email format", 400);
+  }
+
+  if (password.length < 6)
     throw new AppError("Password must be at least 6 characters", 400);
 
-  // confirm password check (server-side must have this)
   if (password !== confirmPassword)
     throw new AppError("Passwords do not match", 400);
 
@@ -47,59 +50,183 @@ export const registerUser = catchAsync(async (req: Request, res: Response) => {
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(rawToken)
+    .digest("hex");
+
+  const tokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
+
+  // 🔥 Create user FIRST
   const newUser = await User.create({
-    name: String(name).trim(),
+    name: name.trim(),
     email: normalizedEmail,
     password: hashedPassword,
     avatar: avatar || "",
     role: "buyer",
+    emailVerified: false,
+    emailVerificationToken: hashedToken,
+    emailVerificationTokenExpires: tokenExpiry,
   });
 
-  console.log("✅ register: created user", {
-    userId: newUser._id.toString(),
-    email: newUser.email,
-  });
+  const verifyUrl = `${process.env.CLIENT_URL}/verify-email?token=${rawToken}`;
 
-  // send tokens only after session persistence handled by sendTokenResponse
-  await sendTokenResponse(
-    res,
-    newUser._id.toString(),
-    "Registration successful",
-    {
-      userData: {
-        _id: newUser._id.toString(),
-        name: newUser.name,
-        email: newUser.email,
-        avatar: newUser.avatar,
-      },
-    }
-  );
+  try {
+    await emailService.sendEmail({
+      from: "Suvidha Wood <no-reply@suvidhawood.com>",
+      to: normalizedEmail,
+      subject: "Verify Your Email - Suvidha Wood",
+      html: `
+        <div style="font-family: Arial; max-width:500px; margin:auto;">
+          <h2>Welcome to Suvidha Wood</h2>
+          <p>Please verify your email by clicking below:</p>
+          <div style="text-align:center;margin:20px 0;">
+            <a href="${verifyUrl}"
+              style="padding:12px 20px;background:#000;color:#fff;text-decoration:none;border-radius:5px;">
+              Verify My Email
+            </a>
+          </div>
+          <p>If you did not create this account, ignore this email.</p>
+        </div>
+      `,
+      text: `Verify your email here: ${verifyUrl}`,
+    });
+  } catch (err: any) {
+    // 🔥 IMPORTANT: Delete user if email fails
+    await User.findByIdAndDelete(newUser._id);
+
+    throw new AppError(
+      "Failed to send verification email. Please try again.",
+      500,
+    );
+  }
+
+  return res.status(201).json({
+    success: true,
+    message: "Registration successful. Please verify your email.",
+  });
 });
+
+export const verifyEmail = catchAsync(async (req: Request, res: Response) => {
+  const { token } = req.query;
+
+  if (!token) throw new AppError("Verification token missing", 400);
+
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(String(token))
+    .digest("hex");
+
+  const user = await User.findOne({
+    emailVerificationToken: hashedToken,
+    emailVerificationTokenExpires: { $gt: new Date() },
+  });
+
+  if (!user) throw new AppError("Invalid or expired verification token", 400);
+
+  user.emailVerified = true;
+  user.emailVerificationToken = undefined;
+  user.emailVerificationTokenExpires = undefined;
+
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Email verified successfully. You can now login.",
+  });
+});
+export const resendVerificationEmail = catchAsync(
+  async (req: Request, res: Response) => {
+    const { email } = req.body;
+
+    if (!email) {
+      throw new AppError("Email is required", 400);
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) throw new AppError("User not found", 404);
+
+    if (user.emailVerified) throw new AppError("Email already verified", 400);
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+
+    user.emailVerificationToken = hashedToken;
+    user.emailVerificationTokenExpires = new Date(Date.now() + 15 * 60 * 1000);
+
+    await user.save();
+
+    const verifyUrl = `${process.env.CLIENT_URL}/verify-email?token=${rawToken}`;
+
+    await emailService.sendEmail({
+      from: "Suvidha Wood <no-reply@suvidhawood.com>",
+      to: user.email,
+      subject: "Suvidha Wood Email Verification",
+      html: `<a href="${verifyUrl}">Verify Email</a>`,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Verification email resent",
+    });
+  },
+);
+
 /**
  * Login
  */
 export const loginUser = catchAsync(async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
-  const user = await User.findOne({ email }).select("+password");
-  if (!user) {
-    console.warn("-> login failed: user not found", { email, ip: req.ip });
-    throw new AppError("Invalid credentials", 401);
+  if (!email || !password) {
+    throw new AppError("Email and password are required", 400);
   }
 
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) {
-    console.warn("-> login failed: invalid password", { email, ip: req.ip });
-    throw new AppError("Invalid credentials", 401);
-  }
+  // Normalize email (same as register)
+  const normalizedEmail = String(email).trim().toLowerCase();
 
-  console.log(
-    "-> login success, creating session for user:",
-    user._id.toString(),
-    "ip:",
-    req.ip
+  const user = await User.findOne({ email: normalizedEmail }).select(
+    "+password",
   );
 
+  if (!user) {
+    console.warn("-> login failed: user not found", {
+      email: normalizedEmail,
+      ip: req.ip,
+    });
+    throw new AppError("Invalid credentials", 401);
+  }
+
+  // 🔐 Compare password
+  const isMatch = await bcrypt.compare(password, user.password);
+
+  if (!isMatch) {
+    console.warn("-> login failed: invalid password", {
+      email: normalizedEmail,
+      ip: req.ip,
+    });
+    throw new AppError("Invalid credentials", 401);
+  }
+
+  // 🔥 Email verification check (VERY IMPORTANT)
+  if (!user.emailVerified) {
+    throw new AppError("Please verify your email before logging in", 401);
+  }
+
+  console.log("-> login success, creating session for user:", {
+    userId: user._id.toString(),
+    ip: req.ip,
+  });
+
+  // Generate tokens + create session
   await sendTokenResponse(res, user._id.toString(), "Login successful", {
     userData: {
       _id: user._id.toString(),
@@ -122,7 +249,7 @@ export const logoutUser = catchAsync(async (req: Request, res: Response) => {
       // revoke only the matching session
       const result = await Session.updateOne(
         { refreshTokenHash: hash, revokedAt: null },
-        { $set: { revokedAt: new Date() } }
+        { $set: { revokedAt: new Date() } },
       );
       // mongoose update result shape varies by version; show what we can
       const modifiedCount =
@@ -169,7 +296,7 @@ export const refreshAccessToken = catchAsync(
     try {
       decoded = jwt.verify(
         refreshToken,
-        process.env.REFRESH_TOKEN_SECRET as string
+        process.env.REFRESH_TOKEN_SECRET as string,
       ) as { userId: string };
     } catch (err: any) {
       console.warn("-> refresh: jwt verify failed:", err?.message || err);
@@ -210,12 +337,12 @@ export const refreshAccessToken = catchAsync(
             ip: req.ip,
           },
         },
-        { new: true }
+        { new: true },
       );
     } catch (err: any) {
       console.error(
         "-> refresh: DB error during rotation:",
-        err?.message || err
+        err?.message || err,
       );
       clearAuthCookies(res);
       return res.status(500).json({ message: "Server error" });
@@ -232,23 +359,23 @@ export const refreshAccessToken = catchAsync(
           // session exists => strong signal of reuse or double-use; revoke all (security)
           console.warn(
             "-> refresh: token reuse suspected — revoking all sessions for user:",
-            decoded.userId
+            decoded.userId,
           );
           await Session.updateMany(
             { user: decoded.userId },
-            { $set: { revokedAt: new Date() } }
+            { $set: { revokedAt: new Date() } },
           );
         } else {
           // session not found => could be race/expired or DB timing issue.
           // Safer to NOT revoke other sessions. Just clear cookies and return 401.
           console.warn(
-            "-> refresh: rotation failed but session not found (race/expired). Not revoking other sessions."
+            "-> refresh: rotation failed but session not found (race/expired). Not revoking other sessions.",
           );
         }
       } catch (uErr: any) {
         console.error(
           "-> refresh: error during reuse handling:",
-          uErr?.message || uErr
+          uErr?.message || uErr,
         );
         // As a fallback, do not revoke all here to avoid accidental logouts,
         // but you may choose otherwise if you prefer strict behavior.
@@ -272,7 +399,7 @@ export const refreshAccessToken = catchAsync(
     return res
       .status(200)
       .json({ success: true, message: "Access token refreshed" });
-  }
+  },
 );
 
 /**
@@ -290,5 +417,5 @@ export const getMyProfile = catchAsync(
     res
       .status(200)
       .json(new ApiResponse(200, user, "User profile fetched successfully"));
-  }
+  },
 );
