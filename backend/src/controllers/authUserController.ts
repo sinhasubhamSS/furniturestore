@@ -164,7 +164,7 @@ export const resendVerificationEmail = catchAsync(
 
     await user.save();
 
-    const verifyUrl = `${process.env.CLIENT_URL}/verify-email?token=${rawToken}`;
+    const verifyUrl = `${process.env.CLIENT_URL}/auth/verify-email?token=${rawToken}`;
 
     await emailService.sendEmail({
       from: "Suvidha Wood <no-reply@suvidhawood.com>",
