@@ -70,7 +70,7 @@ export const registerUser = catchAsync(async (req: Request, res: Response) => {
     emailVerificationTokenExpires: tokenExpiry,
   });
 
-  const verifyUrl = `${process.env.CLIENT_URL}/verify-email?token=${rawToken}`;
+  const verifyUrl = `${process.env.CLIENT_URL}/auth/verify-email?token=${rawToken}`;
 
   try {
     await emailService.sendEmail({
