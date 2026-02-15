@@ -110,7 +110,7 @@ export const registerUser = catchAsync(async (req: Request, res: Response) => {
 
 export const verifyEmail = catchAsync(async (req: Request, res: Response) => {
   const { token } = req.query;
-
+  console.log("RAW TOKEN FROM QUERY:", token);
   if (!token) throw new AppError("Verification token missing", 400);
 
   const hashedToken = crypto
@@ -120,10 +120,32 @@ export const verifyEmail = catchAsync(async (req: Request, res: Response) => {
 
   const user = await User.findOne({
     emailVerificationToken: hashedToken,
-    emailVerificationTokenExpires: { $gt: new Date() },
   });
 
-  if (!user) throw new AppError("Invalid or expired verification token", 400);
+  if (!user) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid verification link.",
+    });
+  }
+  console.log("USER FOUND:", user);
+  if (user.emailVerified) {
+    return res.status(200).json({
+      success: true,
+      message: "Email already verified. Please login.",
+    });
+  }
+
+  if (
+    !user.emailVerificationTokenExpires ||
+    user.emailVerificationTokenExpires < new Date()
+  ) {
+    return res.status(400).json({
+      success: false,
+      expired: true,
+      message: "Verification link expired. Please request a new one.",
+    });
+  }
 
   user.emailVerified = true;
   user.emailVerificationToken = undefined;
@@ -131,11 +153,12 @@ export const verifyEmail = catchAsync(async (req: Request, res: Response) => {
 
   await user.save();
 
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     message: "Email verified successfully. You can now login.",
   });
 });
+
 export const resendVerificationEmail = catchAsync(
   async (req: Request, res: Response) => {
     const { email } = req.body;
