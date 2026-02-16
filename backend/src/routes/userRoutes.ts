@@ -1,11 +1,10 @@
 import {
-  getMyProfile,
+  sendSignupOtp,
+  verifySignupOtp,
   loginUser,
   logoutUser,
   refreshAccessToken,
-  registerUser,
-  verifyEmail,
-  resendVerificationEmail,
+  getMyProfile,
 } from "../controllers/authUserController";
 
 import { authVerify } from "../middlewares/authVerify";
@@ -13,17 +12,29 @@ import { Router } from "express";
 
 const router = Router();
 
-// 🔐 Auth
-router.post("/register", registerUser);
+/* =========================================================
+   🔐 AUTH ROUTES
+========================================================= */
+
+// 🔹 Step 1: Send OTP for signup
+router.post("/send-otp", sendSignupOtp);
+
+// 🔹 Step 2: Verify OTP & create user
+router.post("/verify-otp", verifySignupOtp);
+
+// 🔹 Login
 router.post("/login", loginUser);
+
+// 🔹 Logout (Protected)
 router.post("/logout", authVerify, logoutUser);
+
+// 🔹 Refresh token
 router.post("/refresh-token", refreshAccessToken);
 
-// 📩 Email Verification
-router.get("/verify-email", verifyEmail);
-router.post("/resend-verification", resendVerificationEmail);
+/* =========================================================
+   👤 PROFILE
+========================================================= */
 
-// 👤 Profile
 router.get("/my-profile", authVerify, getMyProfile);
 
 export default router;
