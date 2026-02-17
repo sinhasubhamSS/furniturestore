@@ -30,8 +30,7 @@ export const sendSignupOtp = catchAsync(async (req: Request, res: Response) => {
 
   const normalizedEmail = String(email).trim().toLowerCase();
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(normalizedEmail)) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
     throw new AppError("Invalid email format", 400);
   }
 
@@ -44,26 +43,21 @@ export const sendSignupOtp = catchAsync(async (req: Request, res: Response) => {
   const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) throw new AppError("Email already exists", 409);
 
-  // 🔥 Generate 6 digit OTP
   const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
-
-  // 🔐 Hash OTP
   const hashedOtp = crypto.createHash("sha256").update(rawOtp).digest("hex");
-
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min
 
   await Otp.deleteMany({ email: normalizedEmail });
 
   await Otp.create({
     email: normalizedEmail,
     otp: hashedOtp,
-    expiresAt,
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
   });
 
   await emailService.sendEmail({
     from: "Suvidha Wood <no-reply@suvidhawood.com>",
     to: normalizedEmail,
-    subject: "Your OTP for Suvidha Wood Signup",
+    subject: "Your OTP for Signup",
     html: `
       <div style="text-align:center;font-family:Arial">
         <h2>Your Signup OTP</h2>
@@ -96,13 +90,16 @@ export const verifySignupOtp = catchAsync(
 
     const otpDoc = await Otp.findOne({ email: normalizedEmail }).select("+otp");
 
-    if (!otpDoc) {
-      throw new AppError("OTP expired or not found", 400);
-    }
+    if (!otpDoc) throw new AppError("OTP expired or not found", 400);
 
     if (otpDoc.expiresAt < new Date()) {
       await Otp.deleteMany({ email: normalizedEmail });
       throw new AppError("OTP expired", 400);
+    }
+
+    if (otpDoc.attempts >= 5) {
+      await Otp.deleteMany({ email: normalizedEmail });
+      throw new AppError("Too many attempts. Please request new OTP.", 429);
     }
 
     const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
@@ -133,15 +130,14 @@ export const verifySignupOtp = catchAsync(
 );
 
 /* =========================================================
-   LOGIN
+   LOGIN + SESSION CREATION
 ========================================================= */
 
 export const loginUser = catchAsync(async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
+  if (!email || !password)
     throw new AppError("Email and password are required", 400);
-  }
 
   const normalizedEmail = String(email).trim().toLowerCase();
 
@@ -152,16 +148,33 @@ export const loginUser = catchAsync(async (req: Request, res: Response) => {
   if (!user) throw new AppError("Invalid credentials", 401);
 
   const isMatch = await bcrypt.compare(password, user.password);
-
   if (!isMatch) throw new AppError("Invalid credentials", 401);
 
-  if (!user.isEmailVerified) {
-    throw new AppError("Email not verified", 401);
-  }
+  if (!user.isEmailVerified) throw new AppError("Email not verified", 401);
 
-  await sendTokenResponse(res, user._id.toString(), "Login successful", {
+  const accessToken = generateAccessToken(user._id.toString());
+  const refreshToken = generateRefreshToken(user._id.toString());
+
+  const refreshTokenHash = crypto
+    .createHash("sha256")
+    .update(refreshToken)
+    .digest("hex");
+
+  await Session.create({
+    user: user._id,
+    refreshTokenHash,
+    userAgent: req.headers["user-agent"],
+    ip: req.ip,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  });
+
+  setAuthCookies(res, accessToken, refreshToken);
+
+  return res.status(200).json({
+    success: true,
+    message: "Login successful",
     userData: {
-      _id: user._id.toString(),
+      _id: user._id,
       name: user.name,
       email: user.email,
       avatar: user.avatar,
@@ -175,10 +188,10 @@ export const loginUser = catchAsync(async (req: Request, res: Response) => {
 ========================================================= */
 
 export const logoutUser = catchAsync(async (req: Request, res: Response) => {
-  const rt = req.cookies?.refreshToken;
+  const refreshToken = req.cookies?.refreshToken;
 
-  if (rt) {
-    const hash = crypto.createHash("sha256").update(rt).digest("hex");
+  if (refreshToken) {
+    const hash = crypto.createHash("sha256").update(refreshToken).digest("hex");
     await Session.updateOne(
       { refreshTokenHash: hash, revokedAt: null },
       { $set: { revokedAt: new Date() } },
@@ -191,7 +204,7 @@ export const logoutUser = catchAsync(async (req: Request, res: Response) => {
 });
 
 /* =========================================================
-   REFRESH
+   REFRESH TOKEN ROTATION
 ========================================================= */
 
 export const refreshAccessToken = catchAsync(
@@ -200,19 +213,47 @@ export const refreshAccessToken = catchAsync(
     if (!refreshToken)
       return res.status(401).json({ message: "Refresh token not found" });
 
-    let decoded;
+    let decoded: any;
+
     try {
       decoded = jwt.verify(
         refreshToken,
         process.env.REFRESH_TOKEN_SECRET as string,
-      ) as { userId: string };
+      );
     } catch {
       clearAuthCookies(res);
       return res.status(401).json({ message: "Invalid refresh token" });
     }
 
+    const receivedHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    const session = await Session.findOne({
+      refreshTokenHash: receivedHash,
+      revokedAt: null,
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!session) {
+      clearAuthCookies(res);
+      return res
+        .status(401)
+        .json({ message: "Invalid or reused refresh token" });
+    }
+
     const newAccess = generateAccessToken(decoded.userId);
     const newRefresh = generateRefreshToken(decoded.userId);
+
+    const newHash = crypto
+      .createHash("sha256")
+      .update(newRefresh)
+      .digest("hex");
+
+    session.refreshTokenHash = newHash;
+    session.lastUsedAt = new Date();
+    await session.save();
 
     setAuthCookies(res, newAccess, newRefresh);
 
@@ -233,7 +274,6 @@ export const getMyProfile = catchAsync(
       throw new AppError("Unauthorized: User not authenticated", 401);
 
     const user = await User.findById(req.userId).select("-password");
-
     if (!user) throw new AppError("User not found", 404);
 
     res

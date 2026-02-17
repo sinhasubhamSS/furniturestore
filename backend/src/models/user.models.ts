@@ -1,5 +1,3 @@
-// src/models/user.model.ts
-
 import { Schema, model, models, Document, Types } from "mongoose";
 
 export interface IUser extends Document {
@@ -10,17 +8,11 @@ export interface IUser extends Document {
   avatar?: string;
   role: "buyer" | "admin";
   isEmailVerified: boolean;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 const userSchema = new Schema<IUser>(
   {
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+    name: { type: String, required: true, trim: true },
 
     email: {
       type: String,
@@ -28,6 +20,7 @@ const userSchema = new Schema<IUser>(
       unique: true,
       lowercase: true,
       trim: true,
+      index: true,
     },
 
     password: {
@@ -36,10 +29,7 @@ const userSchema = new Schema<IUser>(
       select: false,
     },
 
-    avatar: {
-      type: String,
-      default: "",
-    },
+    avatar: { type: String, default: "" },
 
     role: {
       type: String,

@@ -36,7 +36,7 @@ const LoginPage = () => {
 
   const onSubmit = async (data: LoginFormValues) => {
     const res = await login(data);
-    if (res?.user?._id) {
+    if (res?.userData?._id) {
       toast.success("Login successful! 🎉");
 
       // redirect back to original protected page (safe)

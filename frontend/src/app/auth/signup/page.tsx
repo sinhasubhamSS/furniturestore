@@ -6,12 +6,14 @@ import Input from "@/components/ui/Input";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
+import { useState } from "react";
 
 type SignupFormValues = {
   name: string;
   email: string;
   password: string;
   confirmPassword: string;
+  otp?: string;
 };
 
 const SignupPage = () => {
@@ -22,29 +24,58 @@ const SignupPage = () => {
     formState: { errors },
   } = useForm<SignupFormValues>({ mode: "onChange" });
 
-  const { signup, loading, error } = useSignup();
+  const { sendOtp, verifyOtp, loading, error } = useSignup();
   const router = useRouter();
+
+  const [otpSent, setOtpSent] = useState(false);
+  const [savedData, setSavedData] = useState<SignupFormValues | null>(null);
+
   const passwordValue = watch("password");
 
-  const onSubmit = async (data: SignupFormValues) => {
+  /* ===============================
+     STEP 1 → SEND OTP
+  =============================== */
+
+  const handleSendOtp = async (data: SignupFormValues) => {
     if (data.password !== data.confirmPassword) {
       toast.error("Passwords do not match");
       return;
     }
 
-    const res = await signup(data);
+    const res = await sendOtp(data);
 
     if (res?.success) {
-      toast.success("Verification email sent! 📩");
-      router.push("/auth/verify-notice");
+      toast.success("OTP sent to your email 📩");
+      setSavedData(data);
+      setOtpSent(true);
+    }
+  };
+
+  /* ===============================
+     STEP 2 → VERIFY OTP
+  =============================== */
+
+  const handleVerifyOtp = async (data: SignupFormValues) => {
+    if (!savedData) return;
+
+    const res = await verifyOtp({
+      name: savedData.name,
+      email: savedData.email,
+      password: savedData.password,
+      otp: data.otp!,
+    });
+
+    if (res?.success) {
+      toast.success("Signup successful 🎉");
+      router.push("/auth/login");
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--background)] px-4 py-8">
       <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="w-full max-w-md bg-[var(--card-bg)] text-[var(--foreground)] p-8 rounded-2xl shadow-md transition-colors duration-300"
+        onSubmit={handleSubmit(otpSent ? handleVerifyOtp : handleSendOtp)}
+        className="w-full max-w-md bg-[var(--card-bg)] text-[var(--foreground)] p-8 rounded-2xl shadow-md"
       >
         <h2 className="text-3xl font-bold mb-2 text-center text-[var(--text-accent)]">
           Create Account
@@ -54,64 +85,76 @@ const SignupPage = () => {
           Join Suvidha Wood today
         </p>
 
-        <div className="space-y-4">
-          <Input
-            label="Full Name"
-            name="name"
-            type="text"
-            placeholder="John Doe"
-            register={register("name", {
-              required: "Name is required",
-            })}
-            error={errors.name?.message}
-          />
+        {!otpSent && (
+          <div className="space-y-4">
+            <Input
+              label="Full Name"
+              name="name"
+              type="text"
+              placeholder="John Doe"
+              register={register("name", { required: "Name is required" })}
+              error={errors.name?.message}
+            />
 
-          <Input
-            label="Email Address"
-            name="email"
-            type="email"
-            placeholder="john@example.com"
-            register={register("email", {
-              required: "Email is required",
-              pattern: {
-                value: /^\S+@\S+$/i,
-                message: "Invalid email address",
-              },
-            })}
-            error={errors.email?.message}
-          />
+            <Input
+              label="Email Address"
+              name="email"
+              type="email"
+              placeholder="john@example.com"
+              register={register("email", {
+                required: "Email is required",
+              })}
+              error={errors.email?.message}
+            />
 
-          <Input
-            label="Password"
-            name="password"
-            type="password"
-            placeholder="Minimum 6 characters"
-            register={register("password", {
-              required: "Password is required",
-              minLength: { value: 6, message: "Minimum 6 characters" },
-            })}
-            error={errors.password?.message}
-          />
+            <Input
+              label="Password"
+              name="password"
+              type="password"
+              placeholder="Minimum 6 characters"
+              register={register("password", {
+                required: "Password is required",
+                minLength: { value: 6, message: "Minimum 6 characters" },
+              })}
+              error={errors.password?.message}
+            />
 
-          <Input
-            label="Confirm Password"
-            name="confirmPassword"
-            type="password"
-            placeholder="Re-enter your password"
-            register={register("confirmPassword", {
-              validate: (value) =>
-                value === passwordValue || "Passwords do not match",
-            })}
-            error={errors.confirmPassword?.message}
-          />
-        </div>
+            <Input
+              label="Confirm Password"
+              name="confirmPassword"
+              type="password"
+              placeholder="Re-enter password"
+              register={register("confirmPassword", {
+                validate: (value) =>
+                  value === passwordValue || "Passwords do not match",
+              })}
+              error={errors.confirmPassword?.message}
+            />
+          </div>
+        )}
+
+        {otpSent && (
+          <div className="space-y-4">
+            <Input
+              label="Enter 6 Digit OTP"
+              name="otp"
+              type="text"
+              placeholder="123456"
+              register={register("otp", {
+                required: "OTP is required",
+                minLength: { value: 6, message: "6 digit OTP required" },
+              })}
+              error={errors.otp?.message}
+            />
+          </div>
+        )}
 
         <button
           type="submit"
           disabled={loading}
           className="w-full py-2 mt-6 bg-[var(--color-accent)] text-white rounded-md font-medium hover:opacity-90 transition-all duration-200 disabled:opacity-60"
         >
-          {loading ? "Creating account..." : "Sign Up"}
+          {loading ? "Please wait..." : otpSent ? "Verify OTP" : "Send OTP"}
         </button>
 
         {error && (

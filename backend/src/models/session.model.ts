@@ -19,22 +19,41 @@ const sessionSchema = new Schema<ISession>(
       required: true,
       index: true,
     },
-    refreshTokenHash: { type: String, required: true, unique: true },
-    userAgent: { type: String },
-    ip: { type: String },
-    lastUsedAt: { type: Date, default: Date.now },
-    expiresAt: { type: Date, required: true },
-    revokedAt: { type: Date, default: null },
+
+    refreshTokenHash: {
+      type: String,
+      required: true,
+      index: true, // ❌ remove unique
+    },
+
+    userAgent: String,
+    ip: String,
+
+    lastUsedAt: {
+      type: Date,
+      default: Date.now,
+    },
+
+    expiresAt: {
+      type: Date,
+      required: true,
+    },
+
+    revokedAt: {
+      type: Date,
+      default: null,
+    },
   },
-  { timestamps: { createdAt: true, updatedAt: false } }
+  { timestamps: { createdAt: true, updatedAt: false } },
 );
 
-// Auto-delete when expiresAt passes (expire immediately after the date/time)
+// Auto delete expired sessions
 sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-// Auto-delete revoked sessions after 5 days (5*24*60*60 seconds)
+// Auto delete revoked sessions after 5 days
 sessionSchema.index({ revokedAt: 1 }, { expireAfterSeconds: 5 * 24 * 60 * 60 });
 
 export const Session =
   mongoose.models.Session || mongoose.model<ISession>("Session", sessionSchema);
+
 export default Session;

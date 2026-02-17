@@ -22,8 +22,8 @@ export const useLogin = () => {
 
     try {
       const res = await axiosClient.post("/user/login", data);
+      dispatch(setActiveUser(res.data.userData));
 
-      dispatch(setActiveUser(res.data.user));
       return res.data;
     } catch (err: any) {
       // ✅ EXPECTED AUTH FAILURE (NO CONSOLE ERROR)
