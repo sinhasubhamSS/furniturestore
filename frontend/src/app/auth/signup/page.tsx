@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 import { useState } from "react";
-
+import OtpInput from "@/components/helperComponents/otpInput";
 type SignupFormValues = {
   name: string;
   email: string;
@@ -135,17 +135,29 @@ const SignupPage = () => {
 
         {otpSent && (
           <div className="space-y-4">
-            <Input
-              label="Enter 6 Digit OTP"
-              name="otp"
-              type="text"
-              placeholder="123456"
-              register={register("otp", {
-                required: "OTP is required",
-                minLength: { value: 6, message: "6 digit OTP required" },
-              })}
-              error={errors.otp?.message}
+            <label className="block text-sm font-medium text-center">
+              Enter 6 Digit OTP
+            </label>
+
+            <OtpInput
+              value={watch("otp") || ""}
+              onChange={(val) => {
+                // manually update react-hook-form
+                const event = {
+                  target: { name: "otp", value: val },
+                } as any;
+                register("otp", {
+                  required: "OTP is required",
+                  minLength: { value: 6, message: "Enter full 6 digit OTP" },
+                }).onChange(event);
+              }}
             />
+
+            {errors.otp && (
+              <p className="text-sm text-red-500 text-center">
+                {errors.otp.message}
+              </p>
+            )}
           </div>
         )}
 

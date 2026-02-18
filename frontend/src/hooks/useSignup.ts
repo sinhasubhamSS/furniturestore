@@ -9,41 +9,60 @@ interface SignupData {
   confirmPassword: string;
 }
 
+interface VerifyOtpData {
+  name: string;
+  email: string;
+  password: string;
+  otp: string;
+}
+
+interface ApiResponse {
+  success: boolean;
+  message?: string;
+}
+
 export const useSignup = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const sendOtp = async (data: SignupData) => {
-    setLoading(true);
-    setError(null);
-
+  /* ===============================
+     SEND OTP
+  =============================== */
+  const sendOtp = async (data: SignupData): Promise<ApiResponse | null> => {
     try {
-      const res = await axiosClient.post("/user/send-otp", data);
+      setLoading(true);
+      setError(null);
+
+      const res = await axiosClient.post<ApiResponse>("/user/send-otp", data);
+
       return res.data;
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || "Failed to send OTP";
-      setError(msg);
+    } catch (err: unknown) {
+      const message =
+        (err as any)?.response?.data?.message || "Failed to send OTP";
+      setError(message);
       return null;
     } finally {
       setLoading(false);
     }
   };
 
-  const verifyOtp = async (data: {
-    name: string;
-    email: string;
-    password: string;
-    otp: string;
-  }) => {
-    setLoading(true);
-    setError(null);
-
+  /* ===============================
+     VERIFY OTP
+  =============================== */
+  const verifyOtp = async (
+    data: VerifyOtpData,
+  ): Promise<ApiResponse | null> => {
     try {
-      const res = await axiosClient.post("/user/verify-otp", data);
+      setLoading(true);
+      setError(null);
+
+      const res = await axiosClient.post<ApiResponse>("/user/verify-otp", data);
+
       return res.data;
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || "OTP verification failed";
-      setError(msg);
+    } catch (err: unknown) {
+      const message =
+        (err as any)?.response?.data?.message || "OTP verification failed";
+      setError(message);
       return null;
     } finally {
       setLoading(false);
