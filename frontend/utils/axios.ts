@@ -1,5 +1,7 @@
 // utils/axios.ts
 import axios, { AxiosRequestConfig } from "axios";
+import { store } from "@/redux/store";
+import { clearActiveUser, openLoginModal } from "@/redux/slices/userSlice";
 
 const axiosClient = axios.create({
   baseURL: "/api",
@@ -14,8 +16,8 @@ interface RetryableRequestConfig extends AxiosRequestConfig {
 let isRefreshing = false;
 let failedQueue: any[] = [];
 
-const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve(token)));
+const processQueue = (error: any) => {
+  failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve()));
   failedQueue = [];
 };
 
@@ -29,6 +31,7 @@ axiosClient.interceptors.response.use(
   (res) => res,
   async (error) => {
     const originalRequest = error.config as RetryableRequestConfig;
+
     if (!originalRequest) return Promise.reject(error);
 
     if (
@@ -39,35 +42,27 @@ axiosClient.interceptors.response.use(
       originalRequest._retry = true;
 
       if (isRefreshing) {
-        return new Promise((resolve, reject) =>
-          failedQueue.push({ resolve, reject })
-        ).then(() => axiosClient(originalRequest));
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then(() => axiosClient(originalRequest));
       }
 
       isRefreshing = true;
 
       try {
-        const { data } = await axiosClient.post("/user/refresh-token");
-        const token = data?.accessToken;
+        // 🔄 Try refresh silently
+        await axiosClient.post("/user/refresh-token");
 
-        if (token) {
-          axiosClient.defaults.headers.common.Authorization = `Bearer ${token}`;
-          originalRequest.headers = {
-            ...originalRequest.headers,
-            Authorization: `Bearer ${token}`,
-          };
-        }
+        processQueue(null);
 
-        processQueue(null, token ?? null);
         return axiosClient(originalRequest);
       } catch (err) {
-        // 🔥 FINAL HARD LOGOUT
-        processQueue(err, null);
+        processQueue(err);
 
+        // 🔥 FINAL SOFT LOGOUT (NO REDIRECT)
         if (typeof window !== "undefined") {
-          document.cookie = "accessToken=; Max-Age=0; path=/";
-          document.cookie = "refreshToken=; Max-Age=0; path=/";
-          window.location.replace("/auth/login");
+          store.dispatch(clearActiveUser());
+          store.dispatch(openLoginModal());
         }
 
         return Promise.reject(err);
@@ -77,7 +72,7 @@ axiosClient.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default axiosClient;

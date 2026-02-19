@@ -7,11 +7,15 @@ type LoggedInUser = {
   avatar?: string;
   role: "buyer" | "admin";
 };
+
 type UserState = {
   activeUser: LoggedInUser | null;
+  isLoginModalOpen: boolean; // ✅ NEW
 };
+
 const initialState: UserState = {
   activeUser: null,
+  isLoginModalOpen: false, // ✅ NEW
 };
 
 const userSlice = createSlice({
@@ -21,11 +25,27 @@ const userSlice = createSlice({
     setActiveUser: (state, action: PayloadAction<LoggedInUser | null>) => {
       state.activeUser = action.payload;
     },
+
     clearActiveUser: (state) => {
       state.activeUser = null;
     },
+
+    openLoginModal: (state) => {
+      state.isLoginModalOpen = true;
+    },
+
+    closeLoginModal: (state) => {
+      state.isLoginModalOpen = false;
+    },
   },
 });
-export const { setActiveUser, clearActiveUser } = userSlice.actions;
+
+export const {
+  setActiveUser,
+  clearActiveUser,
+  openLoginModal,
+  closeLoginModal,
+} = userSlice.actions;
+
 export default userSlice.reducer;
 export type { LoggedInUser };

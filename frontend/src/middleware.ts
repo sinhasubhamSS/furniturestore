@@ -1,35 +1,18 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-/* ---------------- PROTECTED ROUTES ---------------- */
-const PROTECTED_PATHS = [
+/* ---------------- STRICT PROTECTED ROUTES ---------------- */
+const STRICT_ROUTES = ["/checkout", "/ordersuccess"];
+
+/* ---------------- SOFT PROTECTED ROUTES ---------------- */
+const SOFT_ROUTES = [
   "/cart",
   "/wishlist",
   "/my-orders",
   "/my-profile",
   "/support",
   "/returns",
-  "/checkout",
-  "/ordersuccess",
 ];
-
-/* ---------------- PUBLIC PATH CHECK ---------------- */
-function isPublicPath(pathname: string) {
-  return (
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/api") ||
-    pathname.startsWith("/static") ||
-    pathname.startsWith("/auth") ||
-    pathname.startsWith("/policies") ||
-    pathname.startsWith("/products") || // ✅ product listing
-    pathname.startsWith("/product") || // ✅ product detail
-    pathname.startsWith("/category") ||
-    pathname === "/" ||
-    pathname === "/about" ||
-    pathname.startsWith("/about") ||
-    pathname === "/contact-us"
-  );
-}
 
 /* ---------------- BOT DETECTION ---------------- */
 function isBot(req: NextRequest) {
@@ -37,7 +20,7 @@ function isBot(req: NextRequest) {
   return /googlebot|bingbot|yandex|duckduckbot|baiduspider/i.test(ua);
 }
 
-/* ---------------- REFRESH TOKEN HANDLER ---------------- */
+/* ---------------- REFRESH HANDLER ---------------- */
 const REFRESH_ENDPOINT_REL = "/api/user/refresh-token";
 
 async function tryServerRefresh(req: NextRequest) {
@@ -55,21 +38,12 @@ async function tryServerRefresh(req: NextRequest) {
     if (!refreshRes.ok) return null;
 
     const res = NextResponse.next();
+
     const setCookie = refreshRes.headers.get("set-cookie");
     if (setCookie) res.headers.append("set-cookie", setCookie);
 
-    // Edge compatibility
-    // @ts-ignore
-    if (typeof refreshRes.headers.getAll === "function") {
-      // @ts-ignore
-      refreshRes.headers.getAll("set-cookie").forEach((c: string) => {
-        res.headers.append("set-cookie", c);
-      });
-    }
-
     return res;
-  } catch (err) {
-    console.error("🔴 middleware refresh failed", err);
+  } catch {
     return null;
   }
 }
@@ -78,23 +52,15 @@ async function tryServerRefresh(req: NextRequest) {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // ✅ Normalize trailing slash (SEO safety)
-  if (pathname.endsWith("/") && pathname !== "/" && !isBot(req)) {
-    const url = req.nextUrl.clone();
-    url.pathname = pathname.slice(0, -1);
-    return NextResponse.redirect(url, 301);
-  }
-
-  // ✅ Public paths allowed
-  if (isPublicPath(pathname)) {
-    return NextResponse.next();
-  }
-
-  const isProtected = PROTECTED_PATHS.some(
+  const isStrict = STRICT_ROUTES.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
 
-  if (!isProtected) {
+  const isSoft = SOFT_ROUTES.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
+
+  if (!isStrict && !isSoft) {
     return NextResponse.next();
   }
 
@@ -102,24 +68,28 @@ export async function middleware(req: NextRequest) {
 
   // 🔐 No access token
   if (!accessToken) {
-    // ✅ Bots should NEVER be redirected or blocked
     if (isBot(req)) {
       return NextResponse.next();
     }
 
     const refreshToken = req.cookies.get("refreshToken")?.value;
+
     if (refreshToken) {
       const refreshed = await tryServerRefresh(req);
       if (refreshed) return refreshed;
     }
 
-    // 👤 Real user → login redirect
-    const loginUrl = new URL("/auth/login", req.url);
-    loginUrl.searchParams.set("from", pathname);
-    return NextResponse.redirect(loginUrl);
+    // 🔴 STRICT → Hard redirect
+    if (isStrict) {
+      const loginUrl = new URL("/auth/login", req.url);
+      loginUrl.searchParams.set("from", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    // 🟢 SOFT → Allow request (modal will handle on client)
+    return NextResponse.next();
   }
 
-  // ✅ Authenticated user
   return NextResponse.next();
 }
 
