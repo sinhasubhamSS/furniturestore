@@ -110,9 +110,10 @@ export const verifySignupOtp = catchAsync(
       throw new AppError("Invalid OTP", 400);
     }
 
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    await User.create({
+    const user = await User.create({
       name,
       email: normalizedEmail,
       password: hashedPassword,
@@ -122,9 +123,37 @@ export const verifySignupOtp = catchAsync(
 
     await Otp.deleteMany({ email: normalizedEmail });
 
+    /* =============================
+       🔐 AUTO LOGIN PART
+    ============================= */
+
+    const accessToken = generateAccessToken(user._id.toString());
+    const refreshToken = generateRefreshToken(user._id.toString());
+
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    await Session.create({
+      user: user._id,
+      refreshTokenHash,
+      userAgent: req.headers["user-agent"],
+      ip: req.ip,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+
+    setAuthCookies(res, accessToken, refreshToken);
+
     return res.status(201).json({
       success: true,
-      message: "Signup successful. Please login.",
+      message: "Signup successful",
+      userData: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
     });
   },
 );

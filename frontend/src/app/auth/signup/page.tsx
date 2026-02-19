@@ -8,6 +8,9 @@ import { toast } from "react-hot-toast";
 import Link from "next/link";
 import { useState } from "react";
 import OtpInput from "@/components/helperComponents/otpInput";
+import { useDispatch } from "react-redux";
+import { setActiveUser } from "@/redux/slices/userSlice";
+
 type SignupFormValues = {
   name: string;
   email: string;
@@ -21,20 +24,18 @@ const SignupPage = () => {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<SignupFormValues>({ mode: "onChange" });
 
   const { sendOtp, verifyOtp, loading, error } = useSignup();
   const router = useRouter();
+  const dispatch = useDispatch();
 
   const [otpSent, setOtpSent] = useState(false);
   const [savedData, setSavedData] = useState<SignupFormValues | null>(null);
 
   const passwordValue = watch("password");
-
-  /* ===============================
-     STEP 1 → SEND OTP
-  =============================== */
 
   const handleSendOtp = async (data: SignupFormValues) => {
     if (data.password !== data.confirmPassword) {
@@ -51,10 +52,6 @@ const SignupPage = () => {
     }
   };
 
-  /* ===============================
-     STEP 2 → VERIFY OTP
-  =============================== */
-
   const handleVerifyOtp = async (data: SignupFormValues) => {
     if (!savedData) return;
 
@@ -67,7 +64,11 @@ const SignupPage = () => {
 
     if (res?.success) {
       toast.success("Signup successful 🎉");
-      router.push("/auth/login");
+
+      // Cookie already set by backend
+      router.push("/");
+      dispatch(setActiveUser(res.userData));
+      router.refresh(); // re-fetch server components
     }
   };
 
@@ -141,16 +142,7 @@ const SignupPage = () => {
 
             <OtpInput
               value={watch("otp") || ""}
-              onChange={(val) => {
-                // manually update react-hook-form
-                const event = {
-                  target: { name: "otp", value: val },
-                } as any;
-                register("otp", {
-                  required: "OTP is required",
-                  minLength: { value: 6, message: "Enter full 6 digit OTP" },
-                }).onChange(event);
-              }}
+              onChange={(val) => setValue("otp", val, { shouldValidate: true })}
             />
 
             {errors.otp && (
