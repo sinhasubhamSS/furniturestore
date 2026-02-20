@@ -7,7 +7,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "seed:interactive-faq": "ts-node scripts/seedInteractiveFAQ.ts",
-    "seed": "ts-node scripts/seed-delivery-zones.ts" },
+    "seed": "ts-node scripts/seed-delivery-zones.ts"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -20,6 +21,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.2.1",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.18.0",
     "multer": "^2.0.2",

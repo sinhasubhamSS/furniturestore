@@ -9,27 +9,18 @@ import {
 
 import { authVerify } from "../middlewares/authVerify";
 import { Router } from "express";
-
+import { otpRateLimiter, loginRateLimiter } from "../middlewares/rateLimiters";
 const router = Router();
 
 /* =========================================================
    🔐 AUTH ROUTES
 ========================================================= */
 
-// 🔹 Step 1: Send OTP for signup
-router.post("/send-otp", sendSignupOtp);
-
-// 🔹 Step 2: Verify OTP & create user
-router.post("/verify-otp", verifySignupOtp);
-
-// 🔹 Login
-router.post("/login", loginUser);
-
-// 🔹 Logout (Protected)
+router.post("/send-otp", otpRateLimiter, sendSignupOtp);
+router.post("/verify-otp", otpRateLimiter, verifySignupOtp);
+router.post("/login", loginRateLimiter, loginUser);
 router.post("/logout", authVerify, logoutUser);
-
-// 🔹 Refresh token
-router.post("/refresh-token", refreshAccessToken);
+router.post("/refresh-token", loginRateLimiter, refreshAccessToken);
 
 /* =========================================================
    👤 PROFILE

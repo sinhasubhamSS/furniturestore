@@ -42,7 +42,14 @@ export const sendSignupOtp = catchAsync(async (req: Request, res: Response) => {
 
   const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) throw new AppError("Email already exists", 409);
+  const existingOtp = await Otp.findOne({ email: normalizedEmail });
 
+  if (existingOtp && existingOtp.expiresAt > new Date()) {
+    throw new AppError(
+      "OTP already sent. Please wait 5 minutes before requesting again.",
+      429,
+    );
+  }
   const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
   const hashedOtp = crypto.createHash("sha256").update(rawOtp).digest("hex");
 
@@ -112,6 +119,10 @@ export const verifySignupOtp = catchAsync(
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    if (existingUser) {
+      throw new AppError("User already exists", 409);
+    }
 
     const user = await User.create({
       name,
@@ -134,12 +145,24 @@ export const verifySignupOtp = catchAsync(
       .createHash("sha256")
       .update(refreshToken)
       .digest("hex");
+    // 🔐 Limit max 3 active sessions
+    const activeSessions = await Session.find({
+      user: user._id,
+      revokedAt: null,
+      expiresAt: { $gt: new Date() },
+    }).sort({ createdAt: 1 });
+
+    if (activeSessions.length >= 3) {
+      // remove oldest session
+      await Session.deleteOne({ _id: activeSessions[0]._id });
+    }
 
     await Session.create({
       user: user._id,
       refreshTokenHash,
       userAgent: req.headers["user-agent"],
-      ip: req.ip,
+      ip: req.headers["x-forwarded-for"] || req.ip,
+
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
 
@@ -188,12 +211,23 @@ export const loginUser = catchAsync(async (req: Request, res: Response) => {
     .createHash("sha256")
     .update(refreshToken)
     .digest("hex");
+  // 🔐 Limit max 3 active sessions
+  const activeSessions = await Session.find({
+    user: user._id,
+    revokedAt: null,
+    expiresAt: { $gt: new Date() },
+  }).sort({ createdAt: 1 });
+
+  if (activeSessions.length >= 3) {
+    // remove oldest session
+    await Session.deleteOne({ _id: activeSessions[0]._id });
+  }
 
   await Session.create({
     user: user._id,
     refreshTokenHash,
     userAgent: req.headers["user-agent"],
-    ip: req.ip,
+    ip: req.headers["x-forwarded-for"] || req.ip,
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
 
