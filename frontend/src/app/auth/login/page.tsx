@@ -94,7 +94,14 @@ const LoginPage = () => {
             {error}
           </p>
         )}
-
+        <div className="text-left mt-1 mb-2">
+          <Link
+            href="/auth/forgot-password"
+            className="text-sm text-[var(--text-accent)] hover:underline"
+          >
+            Forgot Password?
+          </Link>
+        </div>
         <div className="mt-4 text-sm text-center">
           <span className="text-[var(--foreground)]">
             Don't have an account?{" "}

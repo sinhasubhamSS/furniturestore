@@ -20,7 +20,11 @@ import { emailService } from "../utils/emailServices";
 /* =========================================================
    1️⃣ SEND OTP FOR SIGNUP
 ========================================================= */
-
+const getClientIp = (req: Request) => {
+  return (
+    (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip
+  );
+};
 export const sendSignupOtp = catchAsync(async (req: Request, res: Response) => {
   const { name, email, password, confirmPassword } = req.body;
 
@@ -42,7 +46,10 @@ export const sendSignupOtp = catchAsync(async (req: Request, res: Response) => {
 
   const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) throw new AppError("Email already exists", 409);
-  const existingOtp = await Otp.findOne({ email: normalizedEmail });
+  const existingOtp = await Otp.findOne({
+    email: normalizedEmail,
+    type: "signup",
+  });
 
   if (existingOtp && existingOtp.expiresAt > new Date()) {
     throw new AppError(
@@ -53,12 +60,16 @@ export const sendSignupOtp = catchAsync(async (req: Request, res: Response) => {
   const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
   const hashedOtp = crypto.createHash("sha256").update(rawOtp).digest("hex");
 
-  await Otp.deleteMany({ email: normalizedEmail });
+  await Otp.deleteMany({
+    email: normalizedEmail,
+    type: "signup",
+  });
 
   await Otp.create({
     email: normalizedEmail,
     otp: hashedOtp,
     expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    type: "signup",
   });
 
   await emailService.sendEmail({
@@ -95,17 +106,26 @@ export const verifySignupOtp = catchAsync(
 
     const normalizedEmail = String(email).trim().toLowerCase();
 
-    const otpDoc = await Otp.findOne({ email: normalizedEmail }).select("+otp");
+    const otpDoc = await Otp.findOne({
+      email: normalizedEmail,
+      type: "signup",
+    }).select("+otp");
 
     if (!otpDoc) throw new AppError("OTP expired or not found", 400);
 
     if (otpDoc.expiresAt < new Date()) {
-      await Otp.deleteMany({ email: normalizedEmail });
+      await Otp.deleteMany({
+        email: normalizedEmail,
+        type: "signup",
+      });
       throw new AppError("OTP expired", 400);
     }
 
     if (otpDoc.attempts >= 5) {
-      await Otp.deleteMany({ email: normalizedEmail });
+      await Otp.deleteMany({
+        email: normalizedEmail,
+        type: "signup",
+      });
       throw new AppError("Too many attempts. Please request new OTP.", 429);
     }
 
@@ -132,7 +152,10 @@ export const verifySignupOtp = catchAsync(
       isEmailVerified: true,
     });
 
-    await Otp.deleteMany({ email: normalizedEmail });
+    await Otp.deleteMany({
+      email: normalizedEmail,
+      type: "signup",
+    });
 
     /* =============================
        🔐 AUTO LOGIN PART
@@ -153,15 +176,17 @@ export const verifySignupOtp = catchAsync(
     }).sort({ createdAt: 1 });
 
     if (activeSessions.length >= 3) {
-      // remove oldest session
-      await Session.deleteOne({ _id: activeSessions[0]._id });
+      await Session.updateOne(
+        { _id: activeSessions[0]._id },
+        { $set: { revokedAt: new Date() } },
+      );
     }
 
     await Session.create({
       user: user._id,
       refreshTokenHash,
       userAgent: req.headers["user-agent"],
-      ip: req.headers["x-forwarded-for"] || req.ip,
+      ip: getClientIp(req),
 
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
@@ -219,15 +244,16 @@ export const loginUser = catchAsync(async (req: Request, res: Response) => {
   }).sort({ createdAt: 1 });
 
   if (activeSessions.length >= 3) {
-    // remove oldest session
-    await Session.deleteOne({ _id: activeSessions[0]._id });
+    await Session.updateOne(
+      { _id: activeSessions[0]._id },
+      { $set: { revokedAt: new Date() } },
+    );
   }
-
   await Session.create({
     user: user._id,
     refreshTokenHash,
     userAgent: req.headers["user-agent"],
-    ip: req.headers["x-forwarded-for"] || req.ip,
+    ip: getClientIp(req),
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
 
@@ -245,7 +271,41 @@ export const loginUser = catchAsync(async (req: Request, res: Response) => {
     },
   });
 });
+export const sendResetOtp = catchAsync(async (req: Request, res: Response) => {
+  const { email } = req.body;
 
+  if (!email) throw new AppError("Email required", 400);
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await User.findOne({ email: normalizedEmail });
+
+  if (!user)
+    return res.json({
+      success: true,
+      message: "If account exists, OTP sent.",
+    });
+
+  const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
+  const hashedOtp = crypto.createHash("sha256").update(rawOtp).digest("hex");
+
+  await Otp.deleteMany({ email: normalizedEmail, type: "reset" });
+
+  await Otp.create({
+    email: normalizedEmail,
+    otp: hashedOtp,
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    type: "reset",
+  });
+
+  await emailService.sendEmail({
+    from: "Suvidha Wood <no-reply@suvidhawood.com>",
+    to: normalizedEmail,
+    subject: "Password Reset OTP",
+    text: `Your OTP is ${rawOtp}`,
+  });
+
+  return res.json({ success: true });
+});
 /* =========================================================
    LOGOUT
 ========================================================= */
@@ -344,3 +404,72 @@ export const getMyProfile = catchAsync(
       .json(new ApiResponse(200, user, "User profile fetched successfully"));
   },
 );
+export const resetPassword = catchAsync(async (req: Request, res: Response) => {
+  const { email, otp, newPassword } = req.body;
+
+  if (!email || !otp || !newPassword)
+    throw new AppError("All fields required", 400);
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // 🔐 Password validation
+  if (newPassword.length < 6)
+    throw new AppError("Password must be at least 6 characters", 400);
+
+  const otpDoc = await Otp.findOne({
+    email: normalizedEmail,
+    type: "reset",
+  }).select("+otp");
+
+  if (!otpDoc) throw new AppError("OTP expired or invalid", 400);
+
+  // 🔐 Expiry check
+  if (otpDoc.expiresAt < new Date()) {
+    await Otp.deleteMany({
+      email: normalizedEmail,
+      type: "reset",
+    });
+    throw new AppError("OTP expired", 400);
+  }
+
+  // 🔐 Attempt limit
+  if (otpDoc.attempts >= 5) {
+    await Otp.deleteMany({
+      email: normalizedEmail,
+      type: "reset",
+    });
+    throw new AppError("Too many attempts. Request new OTP.", 429);
+  }
+
+  const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
+
+  if (hashedOtp !== otpDoc.otp) {
+    otpDoc.attempts += 1;
+    await otpDoc.save();
+    throw new AppError("Invalid OTP", 400);
+  }
+
+  const user = await User.findOne({ email: normalizedEmail });
+  if (!user) throw new AppError("User not found", 404);
+
+  // 🔐 Update password
+  user.password = await bcrypt.hash(newPassword, 10);
+  await user.save();
+
+  // 🔥 Revoke ALL active sessions
+  await Session.updateMany(
+    { user: user._id, revokedAt: null },
+    { $set: { revokedAt: new Date() } },
+  );
+
+  // 🧹 Clean OTP
+  await Otp.deleteMany({
+    email: normalizedEmail,
+    type: "reset",
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: "Password reset successful. Please login again.",
+  });
+});

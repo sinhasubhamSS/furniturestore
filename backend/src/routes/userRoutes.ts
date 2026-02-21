@@ -5,6 +5,8 @@ import {
   logoutUser,
   refreshAccessToken,
   getMyProfile,
+  sendResetOtp,
+  resetPassword,
 } from "../controllers/authUserController";
 
 import { authVerify } from "../middlewares/authVerify";
@@ -21,7 +23,8 @@ router.post("/verify-otp", otpRateLimiter, verifySignupOtp);
 router.post("/login", loginRateLimiter, loginUser);
 router.post("/logout", authVerify, logoutUser);
 router.post("/refresh-token", loginRateLimiter, refreshAccessToken);
-
+router.post("/forgot-password", otpRateLimiter, sendResetOtp);
+router.post("/reset-password", otpRateLimiter, resetPassword);
 /* =========================================================
    👤 PROFILE
 ========================================================= */
