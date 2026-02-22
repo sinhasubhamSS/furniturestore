@@ -14,15 +14,14 @@ const OtpInput = ({ length = 6, value, onChange }: OtpInputProps) => {
     e: React.ChangeEvent<HTMLInputElement>,
     index: number,
   ) => {
-    const val = e.target.value.replace(/\D/, ""); // only numbers
+    const val = e.target.value.replace(/\D/g, "");
     if (!val) return;
 
-    const newOtp = value.split("");
-    newOtp[index] = val;
-    const updatedOtp = newOtp.join("");
+    const otpArray = value.split("");
+    otpArray[index] = val[0];
+    const updatedOtp = otpArray.join("");
     onChange(updatedOtp);
 
-    // move to next
     if (index < length - 1) {
       inputsRef.current[index + 1]?.focus();
     }
@@ -33,13 +32,24 @@ const OtpInput = ({ length = 6, value, onChange }: OtpInputProps) => {
     index: number,
   ) => {
     if (e.key === "Backspace") {
-      const newOtp = value.split("");
-      newOtp[index] = "";
-      onChange(newOtp.join(""));
+      const otpArray = value.split("");
+      otpArray[index] = "";
+      onChange(otpArray.join(""));
 
       if (index > 0) {
         inputsRef.current[index - 1]?.focus();
       }
+    }
+  };
+
+  // 🔥 Paste full OTP support
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData("text").replace(/\D/g, "");
+
+    if (pasteData.length === length) {
+      onChange(pasteData);
+      inputsRef.current[length - 1]?.focus();
     }
   };
 
@@ -52,10 +62,12 @@ const OtpInput = ({ length = 6, value, onChange }: OtpInputProps) => {
             inputsRef.current[index] = el;
           }}
           type="text"
+          inputMode="numeric"
           maxLength={1}
           value={value[index] || ""}
           onChange={(e) => handleChange(e, index)}
           onKeyDown={(e) => handleKeyDown(e, index)}
+          onPaste={handlePaste}
           className="w-12 h-12 text-center text-lg font-semibold border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
         />
       ))}
