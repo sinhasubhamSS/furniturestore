@@ -12,12 +12,14 @@ type ResetForm = {
   confirmPassword: string;
 };
 
+const MAX_RESEND = 3;
+
 const ResetPasswordPage = () => {
   const {
     register,
     handleSubmit,
-    formState: { errors },
     watch,
+    formState: { errors },
   } = useForm<ResetForm>();
 
   const router = useRouter();
@@ -26,16 +28,17 @@ const ResetPasswordPage = () => {
 
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
-  const [timer, setTimer] = useState(60);
   const [resending, setResending] = useState(false);
+  const [timer, setTimer] = useState(60);
+  const [resendCount, setResendCount] = useState(0);
 
   const newPassword = watch("newPassword");
-
-  /* =========================
-     ⏳ Countdown Timer
-  ========================== */
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return <p>Invalid request</p>;
+  }
+  /* Timer */
   useEffect(() => {
-    if (timer === 0) return;
+    if (timer <= 0) return;
 
     const interval = setInterval(() => {
       setTimer((prev) => prev - 1);
@@ -44,11 +47,14 @@ const ResetPasswordPage = () => {
     return () => clearInterval(interval);
   }, [timer]);
 
-  /* =========================
-     🔄 Resend OTP
-  ========================== */
+  /* Resend */
   const handleResendOtp = async () => {
     if (!email) return;
+
+    if (resendCount >= MAX_RESEND) {
+      toast.error("Maximum resend attempts reached.");
+      return;
+    }
 
     try {
       setResending(true);
@@ -59,16 +65,15 @@ const ResetPasswordPage = () => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email }),
-        }
+        },
       );
 
       const result = await res.json();
 
-      if (!res.ok) {
-        throw new Error(result.message || "Failed to resend OTP");
-      }
+      if (!res.ok) throw new Error(result.message);
 
-      toast.success("OTP resent successfully");
+      toast.success("OTP resent 📩");
+      setResendCount((prev) => prev + 1);
       setTimer(60);
       setOtp("");
     } catch (err: any) {
@@ -78,9 +83,7 @@ const ResetPasswordPage = () => {
     }
   };
 
-  /* =========================
-     🔐 Submit Reset
-  ========================== */
+  /* Submit */
   const onSubmit = async (data: ResetForm) => {
     if (otp.length !== 6) {
       toast.error("Enter complete 6-digit OTP");
@@ -100,14 +103,11 @@ const ResetPasswordPage = () => {
             otp,
             newPassword: data.newPassword,
           }),
-        }
+        },
       );
 
       const result = await res.json();
-
-      if (!res.ok) {
-        throw new Error(result.message || "Reset failed");
-      }
+      if (!res.ok) throw new Error(result.message);
 
       toast.success("Password reset successful 🎉");
       router.replace("/auth/login");
@@ -118,79 +118,52 @@ const ResetPasswordPage = () => {
     }
   };
 
-  if (!email) {
-    return (
-      <div className="flex justify-center items-center min-h-[calc(100vh-64px)]">
-        <p className="text-center text-red-500">
-          Invalid or expired reset request.
-        </p>
-      </div>
-    );
-  }
+  if (!email) return <p className="text-center mt-20">Invalid request</p>;
 
   return (
-    <div className="flex justify-center items-center min-h-[calc(100vh-64px)] px-4">
+    <div className="flex justify-center items-center min-h-screen px-4">
       <form
         onSubmit={handleSubmit(onSubmit)}
         className="w-full max-w-md p-8 bg-[var(--card-bg)] rounded-2xl shadow-md"
       >
-        <h2 className="text-2xl font-bold mb-6 text-center text-[var(--text-accent)]">
-          Reset Password
-        </h2>
+        <h2 className="text-2xl font-bold mb-6 text-center">Reset Password</h2>
 
-        {/* OTP INPUT */}
-        <div className="mb-5">
-          <label className="block text-sm mb-2 font-medium">
-            Enter OTP
-          </label>
-          <OtpInput length={6} value={otp} onChange={setOtp} />
-        </div>
+        <OtpInput length={6} value={otp} onChange={setOtp} />
 
-        {/* RESEND SECTION */}
-        <div className="text-center mb-4 text-sm">
-          {timer > 0 ? (
-            <p className="text-gray-500">
-              Resend OTP in{" "}
-              <span className="font-semibold">{timer}s</span>
-            </p>
+        <div className="text-center text-sm mt-3 mb-4">
+          {resendCount >= MAX_RESEND ? (
+            <p className="text-red-500">Maximum resend attempts reached.</p>
+          ) : timer > 0 ? (
+            <p>Resend OTP in {timer}s</p>
           ) : (
             <button
               type="button"
               onClick={handleResendOtp}
               disabled={resending}
-              className="text-[var(--text-accent)] hover:underline font-medium disabled:opacity-60"
+              className="underline"
             >
               {resending ? "Resending..." : "Resend OTP"}
             </button>
           )}
         </div>
 
-        {/* NEW PASSWORD */}
         <Input
           label="New Password"
           name="newPassword"
           type="password"
-          placeholder="Enter new password"
           register={register("newPassword", {
-            required: "Password is required",
-            minLength: {
-              value: 6,
-              message: "Minimum 6 characters required",
-            },
+            required: "Password required",
+            minLength: { value: 6, message: "Minimum 6 characters" },
           })}
           error={errors.newPassword?.message}
         />
 
-        {/* CONFIRM PASSWORD */}
         <Input
           label="Confirm Password"
           name="confirmPassword"
           type="password"
-          placeholder="Confirm new password"
           register={register("confirmPassword", {
-            required: "Confirm your password",
-            validate: (value) =>
-              value === newPassword || "Passwords do not match",
+            validate: (val) => val === newPassword || "Passwords do not match",
           })}
           error={errors.confirmPassword?.message}
         />
@@ -198,7 +171,7 @@ const ResetPasswordPage = () => {
         <button
           type="submit"
           disabled={loading || otp.length !== 6}
-          className="w-full py-2 mt-4 bg-[var(--color-accent)] text-white rounded-md font-medium hover:opacity-90 transition disabled:opacity-60"
+          className="w-full py-2 mt-4 bg-[var(--color-accent)] text-white rounded-md"
         >
           {loading ? "Resetting..." : "Reset Password"}
         </button>

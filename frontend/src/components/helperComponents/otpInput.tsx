@@ -6,6 +6,7 @@ interface OtpInputProps {
   value: string;
   onChange: (otp: string) => void;
 }
+
 const OtpInput = ({ length = 6, value, onChange }: OtpInputProps) => {
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
@@ -16,10 +17,7 @@ const OtpInput = ({ length = 6, value, onChange }: OtpInputProps) => {
     const val = e.target.value.replace(/\D/g, "");
     if (!val) return;
 
-    const otpArray = Array(length)
-      .fill("")
-      .map((_, i) => value[i] || "");
-
+    const otpArray = Array.from({ length }, (_, i) => value[i] || "");
     otpArray[index] = val[0];
     onChange(otpArray.join(""));
 
@@ -33,10 +31,7 @@ const OtpInput = ({ length = 6, value, onChange }: OtpInputProps) => {
     index: number,
   ) => {
     if (e.key === "Backspace") {
-      const otpArray = Array(length)
-        .fill("")
-        .map((_, i) => value[i] || "");
-
+      const otpArray = Array.from({ length }, (_, i) => value[i] || "");
       otpArray[index] = "";
       onChange(otpArray.join(""));
 
@@ -57,7 +52,7 @@ const OtpInput = ({ length = 6, value, onChange }: OtpInputProps) => {
   };
 
   return (
-    <div className="flex justify-center gap-3">
+    <div className="flex justify-center gap-2 sm:gap-3">
       {Array.from({ length }).map((_, index) => (
         <input
           key={index}
@@ -66,12 +61,22 @@ const OtpInput = ({ length = 6, value, onChange }: OtpInputProps) => {
           }}
           type="text"
           inputMode="numeric"
+          pattern="[0-9]*"
+          autoComplete="one-time-code"
           maxLength={1}
           value={value[index] || ""}
           onChange={(e) => handleChange(e, index)}
           onKeyDown={(e) => handleKeyDown(e, index)}
           onPaste={handlePaste}
-          className="w-12 h-12 text-center text-lg font-semibold border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+          className="
+            w-10 h-10 
+            sm:w-12 sm:h-12 
+            text-center text-lg font-semibold 
+            border rounded-lg 
+            focus:outline-none focus:ring-2 
+            focus:ring-[var(--color-accent)]
+            transition
+          "
         />
       ))}
     </div>

@@ -16,17 +16,17 @@ type SignupFormValues = {
   email: string;
   password: string;
   confirmPassword: string;
-  otp?: string;
 };
+
+const MAX_RESEND = 3;
 
 const SignupPage = () => {
   const {
     register,
     handleSubmit,
     watch,
-    setValue,
     formState: { errors },
-  } = useForm<SignupFormValues>({ mode: "onChange" });
+  } = useForm<SignupFormValues>();
 
   const { sendOtp, verifyOtp, loading, error } = useSignup();
   const router = useRouter();
@@ -37,32 +37,22 @@ const SignupPage = () => {
   const [otp, setOtp] = useState("");
 
   const [timer, setTimer] = useState(60);
-  const [canResend, setCanResend] = useState(false);
+  const [resendCount, setResendCount] = useState(0);
 
   const passwordValue = watch("password");
 
-  /* =============================
-     ⏳ TIMER LOGIC
-  ============================= */
-
+  /* Timer */
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    if (timer <= 0) return;
 
-    if (otpSent && timer > 0) {
-      interval = setInterval(() => {
-        setTimer((prev) => prev - 1);
-      }, 1000);
-    } else if (timer === 0) {
-      setCanResend(true);
-    }
+    const interval = setInterval(() => {
+      setTimer((prev) => prev - 1);
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, [otpSent, timer]);
+  }, [timer]);
 
-  /* =============================
-     SEND OTP
-  ============================= */
-
+  /* Send OTP */
   const handleSendOtp = async (data: SignupFormValues) => {
     if (data.password !== data.confirmPassword) {
       toast.error("Passwords do not match");
@@ -72,18 +62,15 @@ const SignupPage = () => {
     const res = await sendOtp(data);
 
     if (res?.success) {
-      toast.success("OTP sent to your email 📩");
+      toast.success("OTP sent 📩");
       setSavedData(data);
       setOtpSent(true);
       setTimer(60);
-      setCanResend(false);
+      setResendCount(0);
     }
   };
 
-  /* =============================
-     VERIFY OTP
-  ============================= */
-
+  /* Verify OTP */
   const handleVerifyOtp = async () => {
     if (!savedData) return;
 
@@ -93,9 +80,7 @@ const SignupPage = () => {
     }
 
     const res = await verifyOtp({
-      name: savedData.name,
-      email: savedData.email,
-      password: savedData.password,
+      ...savedData,
       otp,
     });
 
@@ -107,40 +92,36 @@ const SignupPage = () => {
     }
   };
 
-  /* =============================
-     RESEND OTP
-  ============================= */
-
+  /* Resend OTP */
   const handleResendOtp = async () => {
     if (!savedData) return;
+
+    if (resendCount >= MAX_RESEND) {
+      toast.error("Maximum resend attempts reached.");
+      return;
+    }
 
     const res = await sendOtp(savedData);
 
     if (res?.success) {
-      toast.success("OTP resent successfully 📩");
+      toast.success("OTP resent 📩");
+      setResendCount((prev) => prev + 1);
       setTimer(60);
-      setCanResend(false);
+      setOtp("");
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--background)] px-4 py-8">
-      <div className="w-full max-w-md bg-[var(--card-bg)] text-[var(--foreground)] p-8 rounded-2xl shadow-md">
-        <h2 className="text-3xl font-bold mb-2 text-center text-[var(--text-accent)]">
-          Create Account
-        </h2>
+    <div className="min-h-screen flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-md bg-[var(--card-bg)] p-8 rounded-2xl shadow-md">
+        <h2 className="text-3xl font-bold text-center mb-6">Create Account</h2>
 
-        <p className="text-center text-sm mb-6 opacity-70">
-          Join Suvidha Wood today
-        </p>
-
-        {!otpSent && (
+        {!otpSent ? (
           <form onSubmit={handleSubmit(handleSendOtp)} className="space-y-4">
             <Input
               label="Full Name"
               name="name"
-              type="text"
-              register={register("name", { required: "Name is required" })}
+              register={register("name", { required: "Name required" })}
               error={errors.name?.message}
             />
 
@@ -148,7 +129,7 @@ const SignupPage = () => {
               label="Email"
               name="email"
               type="email"
-              register={register("email", { required: "Email is required" })}
+              register={register("email", { required: "Email required" })}
               error={errors.email?.message}
             />
 
@@ -182,9 +163,7 @@ const SignupPage = () => {
               {loading ? "Sending..." : "Send OTP"}
             </button>
           </form>
-        )}
-
-        {otpSent && (
+        ) : (
           <div className="space-y-5">
             <OtpInput length={6} value={otp} onChange={setOtp} />
 
@@ -197,12 +176,14 @@ const SignupPage = () => {
             </button>
 
             <div className="text-center text-sm">
-              {!canResend ? (
-                <p className="opacity-70">Resend OTP in {timer}s</p>
+              {resendCount >= MAX_RESEND ? (
+                <p className="text-red-500">Maximum resend attempts reached.</p>
+              ) : timer > 0 ? (
+                <p>Resend OTP in {timer}s</p>
               ) : (
                 <button
                   onClick={handleResendOtp}
-                  className="text-[var(--text-accent)] hover:underline font-medium"
+                  className="text-[var(--text-accent)] hover:underline"
                 >
                   Resend OTP
                 </button>
@@ -211,16 +192,11 @@ const SignupPage = () => {
           </div>
         )}
 
-        {error && (
-          <p className="text-red-500 text-center mt-4 text-sm">{error}</p>
-        )}
+        {error && <p className="text-red-500 text-center mt-4">{error}</p>}
 
         <div className="mt-6 text-sm text-center">
-          <span>Already have an account? </span>
-          <Link
-            href="/auth/login"
-            className="text-[var(--text-accent)] hover:underline"
-          >
+          Already have an account?{" "}
+          <Link href="/auth/login" className="underline">
             Log in
           </Link>
         </div>

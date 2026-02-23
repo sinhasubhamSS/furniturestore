@@ -277,19 +277,39 @@ export const sendResetOtp = catchAsync(async (req: Request, res: Response) => {
   if (!email) throw new AppError("Email required", 400);
 
   const normalizedEmail = email.trim().toLowerCase();
+
   const user = await User.findOne({ email: normalizedEmail });
 
-  if (!user)
+  // 🔒 Always return success to prevent email enumeration
+  if (!user) {
     return res.json({
       success: true,
       message: "If account exists, OTP sent.",
     });
+  }
+
+  /* =========================================
+     🚫 LIMIT RESET REQUESTS (IMPORTANT)
+     Max 3 OTP in 15 minutes
+  ========================================= */
+
+  const recentOtpCount = await Otp.countDocuments({
+    email: normalizedEmail,
+    type: "reset",
+    createdAt: { $gte: new Date(Date.now() - 15 * 60 * 1000) },
+  });
+
+  if (recentOtpCount >= 3) {
+    throw new AppError(
+      "Too many reset requests. Please try again after 15 minutes.",
+      429,
+    );
+  }
 
   const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
   const hashedOtp = crypto.createHash("sha256").update(rawOtp).digest("hex");
 
-  await Otp.deleteMany({ email: normalizedEmail, type: "reset" });
-
+  // ⚠ Do NOT delete previous OTPs
   await Otp.create({
     email: normalizedEmail,
     otp: hashedOtp,
@@ -301,10 +321,13 @@ export const sendResetOtp = catchAsync(async (req: Request, res: Response) => {
     from: "Suvidha Wood <no-reply@suvidhawood.com>",
     to: normalizedEmail,
     subject: "Password Reset OTP",
-    text: `Your OTP is ${rawOtp}`,
+    text: `Your OTP is ${rawOtp}. It is valid for 10 minutes.`,
   });
 
-  return res.json({ success: true });
+  return res.json({
+    success: true,
+    message: "If account exists, OTP sent.",
+  });
 });
 /* =========================================================
    LOGOUT
