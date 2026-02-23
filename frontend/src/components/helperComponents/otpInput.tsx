@@ -6,7 +6,6 @@ interface OtpInputProps {
   value: string;
   onChange: (otp: string) => void;
 }
-
 const OtpInput = ({ length = 6, value, onChange }: OtpInputProps) => {
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
@@ -17,10 +16,12 @@ const OtpInput = ({ length = 6, value, onChange }: OtpInputProps) => {
     const val = e.target.value.replace(/\D/g, "");
     if (!val) return;
 
-    const otpArray = value.split("");
+    const otpArray = Array(length)
+      .fill("")
+      .map((_, i) => value[i] || "");
+
     otpArray[index] = val[0];
-    const updatedOtp = otpArray.join("");
-    onChange(updatedOtp);
+    onChange(otpArray.join(""));
 
     if (index < length - 1) {
       inputsRef.current[index + 1]?.focus();
@@ -32,7 +33,10 @@ const OtpInput = ({ length = 6, value, onChange }: OtpInputProps) => {
     index: number,
   ) => {
     if (e.key === "Backspace") {
-      const otpArray = value.split("");
+      const otpArray = Array(length)
+        .fill("")
+        .map((_, i) => value[i] || "");
+
       otpArray[index] = "";
       onChange(otpArray.join(""));
 
@@ -42,7 +46,6 @@ const OtpInput = ({ length = 6, value, onChange }: OtpInputProps) => {
     }
   };
 
-  // 🔥 Paste full OTP support
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
     const pasteData = e.clipboardData.getData("text").replace(/\D/g, "");

@@ -6,7 +6,7 @@ import Input from "@/components/ui/Input";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import OtpInput from "@/components/helperComponents/otpInput";
 import { useDispatch } from "react-redux";
 import { setActiveUser } from "@/redux/slices/userSlice";
@@ -34,8 +34,34 @@ const SignupPage = () => {
 
   const [otpSent, setOtpSent] = useState(false);
   const [savedData, setSavedData] = useState<SignupFormValues | null>(null);
+  const [otp, setOtp] = useState("");
+
+  const [timer, setTimer] = useState(60);
+  const [canResend, setCanResend] = useState(false);
 
   const passwordValue = watch("password");
+
+  /* =============================
+     ⏳ TIMER LOGIC
+  ============================= */
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (otpSent && timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev - 1);
+      }, 1000);
+    } else if (timer === 0) {
+      setCanResend(true);
+    }
+
+    return () => clearInterval(interval);
+  }, [otpSent, timer]);
+
+  /* =============================
+     SEND OTP
+  ============================= */
 
   const handleSendOtp = async (data: SignupFormValues) => {
     if (data.password !== data.confirmPassword) {
@@ -49,35 +75,57 @@ const SignupPage = () => {
       toast.success("OTP sent to your email 📩");
       setSavedData(data);
       setOtpSent(true);
+      setTimer(60);
+      setCanResend(false);
     }
   };
 
-  const handleVerifyOtp = async (data: SignupFormValues) => {
+  /* =============================
+     VERIFY OTP
+  ============================= */
+
+  const handleVerifyOtp = async () => {
     if (!savedData) return;
+
+    if (otp.length !== 6) {
+      toast.error("Enter complete 6-digit OTP");
+      return;
+    }
 
     const res = await verifyOtp({
       name: savedData.name,
       email: savedData.email,
       password: savedData.password,
-      otp: data.otp!,
+      otp,
     });
 
     if (res?.success) {
       toast.success("Signup successful 🎉");
-
-      // Cookie already set by backend
-      router.push("/");
       dispatch(setActiveUser(res.userData));
-      router.refresh(); // re-fetch server components
+      router.replace("/");
+      router.refresh();
+    }
+  };
+
+  /* =============================
+     RESEND OTP
+  ============================= */
+
+  const handleResendOtp = async () => {
+    if (!savedData) return;
+
+    const res = await sendOtp(savedData);
+
+    if (res?.success) {
+      toast.success("OTP resent successfully 📩");
+      setTimer(60);
+      setCanResend(false);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--background)] px-4 py-8">
-      <form
-        onSubmit={handleSubmit(otpSent ? handleVerifyOtp : handleSendOtp)}
-        className="w-full max-w-md bg-[var(--card-bg)] text-[var(--foreground)] p-8 rounded-2xl shadow-md"
-      >
+      <div className="w-full max-w-md bg-[var(--card-bg)] text-[var(--foreground)] p-8 rounded-2xl shadow-md">
         <h2 className="text-3xl font-bold mb-2 text-center text-[var(--text-accent)]">
           Create Account
         </h2>
@@ -87,24 +135,20 @@ const SignupPage = () => {
         </p>
 
         {!otpSent && (
-          <div className="space-y-4">
+          <form onSubmit={handleSubmit(handleSendOtp)} className="space-y-4">
             <Input
               label="Full Name"
               name="name"
               type="text"
-              placeholder="John Doe"
               register={register("name", { required: "Name is required" })}
               error={errors.name?.message}
             />
 
             <Input
-              label="Email Address"
+              label="Email"
               name="email"
               type="email"
-              placeholder="john@example.com"
-              register={register("email", {
-                required: "Email is required",
-              })}
+              register={register("email", { required: "Email is required" })}
               error={errors.email?.message}
             />
 
@@ -112,9 +156,8 @@ const SignupPage = () => {
               label="Password"
               name="password"
               type="password"
-              placeholder="Minimum 6 characters"
               register={register("password", {
-                required: "Password is required",
+                required: "Password required",
                 minLength: { value: 6, message: "Minimum 6 characters" },
               })}
               error={errors.password?.message}
@@ -124,59 +167,64 @@ const SignupPage = () => {
               label="Confirm Password"
               name="confirmPassword"
               type="password"
-              placeholder="Re-enter password"
               register={register("confirmPassword", {
-                validate: (value) =>
-                  value === passwordValue || "Passwords do not match",
+                validate: (val) =>
+                  val === passwordValue || "Passwords do not match",
               })}
               error={errors.confirmPassword?.message}
             />
-          </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2 bg-[var(--color-accent)] text-white rounded-md"
+            >
+              {loading ? "Sending..." : "Send OTP"}
+            </button>
+          </form>
         )}
 
         {otpSent && (
-          <div className="space-y-4">
-            <label className="block text-sm font-medium text-center">
-              Enter 6 Digit OTP
-            </label>
+          <div className="space-y-5">
+            <OtpInput length={6} value={otp} onChange={setOtp} />
 
-            <OtpInput
-              value={watch("otp") || ""}
-              onChange={(val) => setValue("otp", val, { shouldValidate: true })}
-            />
+            <button
+              onClick={handleVerifyOtp}
+              disabled={loading}
+              className="w-full py-2 bg-[var(--color-accent)] text-white rounded-md"
+            >
+              {loading ? "Verifying..." : "Verify OTP"}
+            </button>
 
-            {errors.otp && (
-              <p className="text-sm text-red-500 text-center">
-                {errors.otp.message}
-              </p>
-            )}
+            <div className="text-center text-sm">
+              {!canResend ? (
+                <p className="opacity-70">Resend OTP in {timer}s</p>
+              ) : (
+                <button
+                  onClick={handleResendOtp}
+                  className="text-[var(--text-accent)] hover:underline font-medium"
+                >
+                  Resend OTP
+                </button>
+              )}
+            </div>
           </div>
         )}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-2 mt-6 bg-[var(--color-accent)] text-white rounded-md font-medium hover:opacity-90 transition-all duration-200 disabled:opacity-60"
-        >
-          {loading ? "Please wait..." : otpSent ? "Verify OTP" : "Send OTP"}
-        </button>
-
         {error && (
-          <p className="text-[var(--text-error)] mt-4 text-sm text-center">
-            {error}
-          </p>
+          <p className="text-red-500 text-center mt-4 text-sm">{error}</p>
         )}
 
         <div className="mt-6 text-sm text-center">
-          <span className="opacity-80">Already have an account? </span>
+          <span>Already have an account? </span>
           <Link
             href="/auth/login"
-            className="text-[var(--text-accent)] font-medium hover:underline"
+            className="text-[var(--text-accent)] hover:underline"
           >
             Log in
           </Link>
         </div>
-      </form>
+      </div>
     </div>
   );
 };

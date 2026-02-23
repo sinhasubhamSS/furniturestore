@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import Input from "@/components/ui/Input";
 import OtpInput from "@/components/helperComponents/otpInput";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 type ResetForm = {
   newPassword: string;
@@ -26,9 +26,61 @@ const ResetPasswordPage = () => {
 
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
+  const [timer, setTimer] = useState(60);
+  const [resending, setResending] = useState(false);
 
   const newPassword = watch("newPassword");
 
+  /* =========================
+     ⏳ Countdown Timer
+  ========================== */
+  useEffect(() => {
+    if (timer === 0) return;
+
+    const interval = setInterval(() => {
+      setTimer((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timer]);
+
+  /* =========================
+     🔄 Resend OTP
+  ========================== */
+  const handleResendOtp = async () => {
+    if (!email) return;
+
+    try {
+      setResending(true);
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/user/forgot-password`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.message || "Failed to resend OTP");
+      }
+
+      toast.success("OTP resent successfully");
+      setTimer(60);
+      setOtp("");
+    } catch (err: any) {
+      toast.error(err.message || "Error resending OTP");
+    } finally {
+      setResending(false);
+    }
+  };
+
+  /* =========================
+     🔐 Submit Reset
+  ========================== */
   const onSubmit = async (data: ResetForm) => {
     if (otp.length !== 6) {
       toast.error("Enter complete 6-digit OTP");
@@ -48,7 +100,7 @@ const ResetPasswordPage = () => {
             otp,
             newPassword: data.newPassword,
           }),
-        },
+        }
       );
 
       const result = await res.json();
@@ -80,7 +132,7 @@ const ResetPasswordPage = () => {
     <div className="flex justify-center items-center min-h-[calc(100vh-64px)] px-4">
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="w-full max-w-md p-8 bg-[var(--card-bg)] rounded-2xl shadow-md transition"
+        className="w-full max-w-md p-8 bg-[var(--card-bg)] rounded-2xl shadow-md"
       >
         <h2 className="text-2xl font-bold mb-6 text-center text-[var(--text-accent)]">
           Reset Password
@@ -88,8 +140,29 @@ const ResetPasswordPage = () => {
 
         {/* OTP INPUT */}
         <div className="mb-5">
-          <label className="block text-sm mb-2 font-medium">Enter OTP</label>
+          <label className="block text-sm mb-2 font-medium">
+            Enter OTP
+          </label>
           <OtpInput length={6} value={otp} onChange={setOtp} />
+        </div>
+
+        {/* RESEND SECTION */}
+        <div className="text-center mb-4 text-sm">
+          {timer > 0 ? (
+            <p className="text-gray-500">
+              Resend OTP in{" "}
+              <span className="font-semibold">{timer}s</span>
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={handleResendOtp}
+              disabled={resending}
+              className="text-[var(--text-accent)] hover:underline font-medium disabled:opacity-60"
+            >
+              {resending ? "Resending..." : "Resend OTP"}
+            </button>
+          )}
         </div>
 
         {/* NEW PASSWORD */}
@@ -124,7 +197,7 @@ const ResetPasswordPage = () => {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || otp.length !== 6}
           className="w-full py-2 mt-4 bg-[var(--color-accent)] text-white rounded-md font-medium hover:opacity-90 transition disabled:opacity-60"
         >
           {loading ? "Resetting..." : "Reset Password"}
