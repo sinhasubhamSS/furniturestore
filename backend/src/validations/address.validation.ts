@@ -6,7 +6,7 @@ export const createAddressSchema = z.object({
   addressLine1: z.string().min(5),
   addressLine2: z.string().optional(),
   city: z.string().min(2),
-  landmark: z.string().min(2),
+  landmark: z.string().optional(),
   state: z.string().min(2),
   pincode: z.string().regex(/^[1-9][0-9]{5}$/, "Invalid pincode"),
   country: z.string().min(2),
