@@ -1,7 +1,7 @@
 "use client";
 function assertSellingPrice(
   value: unknown,
-  context: string
+  context: string,
 ): asserts value is number {
   if (process.env.NODE_ENV !== "production") {
     if (typeof value !== "number") {
@@ -33,6 +33,7 @@ import {
 } from "@/redux/slices/checkoutSlice";
 import { CheckoutPricingResponse } from "@/types/order";
 import type { Variant } from "@/types/Product"; // adjust path if needed
+import WhatsAppDeliveryButton from "@/components/helperComponents/whatsapDelivery";
 
 /**
  * CheckoutPage
@@ -45,7 +46,7 @@ export default function CheckoutPage() {
   const router = useRouter();
 
   const { items, type, selectedAddress, isRehydrated } = useSelector(
-    (state: RootState) => state.checkout
+    (state: RootState) => state.checkout,
   );
 
   const [deliveryAvailable, setDeliveryAvailable] = useState(true);
@@ -62,7 +63,7 @@ export default function CheckoutPage() {
 
   const { data: product, isLoading: productLoading } = useGetProductByIDQuery(
     productId || "",
-    { skip: !productId || !isRehydrated }
+    { skip: !productId || !isRehydrated },
   );
 
   const {
@@ -78,7 +79,7 @@ export default function CheckoutPage() {
   }, [selectedAddress?._id]);
   const [updateQty] = useUpdateQuantityMutation();
   const [getCheckoutPricing] = useGetCheckoutPricingMutation();
-
+  const [currentPincode, setCurrentPincode] = useState<string | undefined>();
   // subtotal computation (same as before)
   const subtotal = useMemo(() => {
     // ---------- DIRECT PURCHASE ----------
@@ -96,7 +97,7 @@ export default function CheckoutPage() {
     if (type === "cart_purchase" && cartData?.items?.length) {
       return cartData.items.reduce((sum, item) => {
         const variant = item.product.variants.find(
-          (v) => v._id === item.variantId
+          (v) => v._id === item.variantId,
         );
 
         if (!variant) return sum;
@@ -116,7 +117,7 @@ export default function CheckoutPage() {
     if (type === "direct_purchase" && items.length > 0 && product) {
       const item = items[0];
       const selectedVariant = product.variants?.find(
-        (v) => v._id === item.variantId
+        (v) => v._id === item.variantId,
       );
 
       if (!selectedVariant) return [];
@@ -160,7 +161,7 @@ export default function CheckoutPage() {
   const hasOutOfStockItem = useMemo(() => {
     return checkoutItems.some((item) => {
       const variant = item.product.variants.find(
-        (v) => v._id === item.variantId
+        (v) => v._id === item.variantId,
       );
 
       if (!variant) return true;
@@ -235,7 +236,7 @@ export default function CheckoutPage() {
               packagingFee: response.packagingFee,
               deliveryCharge: response.deliveryCharge,
               totalAmount: response.checkoutTotal,
-            })
+            }),
           );
         }
 
@@ -247,7 +248,7 @@ export default function CheckoutPage() {
               percentage: response.advancePercentage,
               advanceAmount: response.advanceAmount,
               remainingAmount: response.remainingAmount,
-            })
+            }),
           );
         }
       } catch (error: any) {
@@ -291,7 +292,7 @@ export default function CheckoutPage() {
     if (!item) return;
 
     const variant = item.product.variants?.find(
-      (v: Variant) => v._id === item.variantId
+      (v: Variant) => v._id === item.variantId,
     );
     if (!variant) return;
 
@@ -320,7 +321,7 @@ export default function CheckoutPage() {
             productId: item.product._id,
             variantId: item.variantId,
             quantity: clamped,
-          })
+          }),
         );
         pricingRequestKeyRef.current = null;
 
@@ -362,9 +363,11 @@ export default function CheckoutPage() {
 
   const handleAddressSelection = (
     deliverable: boolean,
-    pricingData?: CheckoutPricingResponse
+    pricingData?: CheckoutPricingResponse,
+    pincode?: string,
   ) => {
-    // 🔁 reset old pricing first
+    setCurrentPincode(pincode); // 👈 NEW
+
     setPricingData(undefined);
     setDeliveryInfo(null);
     setDeliveryAvailable(deliverable);
@@ -591,8 +594,8 @@ export default function CheckoutPage() {
                     {loadingPricing
                       ? "Checking..."
                       : pricingData?.deliveryCharge === 0
-                      ? "FREE"
-                      : `₹${(pricingData?.deliveryCharge ?? 0).toFixed(2)}`}
+                        ? "FREE"
+                        : `₹${(pricingData?.deliveryCharge ?? 0).toFixed(2)}`}
                   </span>
                 </div>
               </div>
@@ -633,13 +636,23 @@ export default function CheckoutPage() {
                 {!selectedAddress
                   ? "Select Address"
                   : hasOutOfStockItem
-                  ? "Item Out of Stock"
-                  : !deliveryAvailable
-                  ? "Delivery Not Available"
-                  : loadingPricing
-                  ? "Calculating..."
-                  : `Proceed • ₹${finalPrice?.toFixed(2)}`}
+                    ? "Item Out of Stock"
+                    : !deliveryAvailable
+                      ? "Delivery Not Available"
+                      : loadingPricing
+                        ? "Calculating..."
+                        : `Proceed • ₹${finalPrice?.toFixed(2)}`}
               </button>
+              {!deliveryAvailable && !loadingPricing && (
+                <WhatsAppDeliveryButton
+                  pincode={currentPincode || selectedAddress?.pincode}
+                  total={finalPrice}
+                  items={checkoutItems.map((item) => ({
+                    name: item.product.name,
+                    quantity: item.quantity,
+                  }))}
+                />
+              )}
             </div>
           </aside>
         </div>

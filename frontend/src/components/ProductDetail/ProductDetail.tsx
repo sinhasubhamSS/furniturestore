@@ -91,7 +91,7 @@ const ProductDetailClient: React.FC<Props> = ({ product }) => {
 
               {/* PINCODE */}
               <div className="mt-4">
-                <PincodeChecker />
+                <PincodeChecker productName={product.name} />
               </div>
 
               {/* DIVIDER */}
