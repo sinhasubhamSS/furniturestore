@@ -6,10 +6,9 @@ import TrendingSectionClient from "@/components/homeComponents/TrendingSectionCl
 
 /* --------- HOMEPAGE METADATA (FINAL) --------- */
 export const metadata: Metadata = {
-  title:
-    "Suvidhawood by Suvidha Furniture | Furniture Store in Gumla, Jharkhand",
+  title: "Suvidhawood – Buy Premium Wooden Furniture in Gumla, Jharkhand",
   description:
-    "Suvidhawood by Suvidha Furniture is a trusted wooden furniture store in Gumla, Jharkhand. Buy premium beds, sofas, almirahs, tables and custom-made furniture with quality craftsmanship since 1995.",
+    "Upgrade your home with premium wooden furniture in Gumla, Jharkhand. Shop beds, sofas & custom designs at Suvidhawood. Order today!",
   alternates: {
     canonical: "https://suvidhawood.com/",
   },
@@ -19,7 +18,7 @@ export const metadata: Metadata = {
 async function getLatestProducts() {
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/latest`,
-    { next: { revalidate: 60 } }
+    { next: { revalidate: 60 } },
   );
   const json = await res.json();
   return json.data;
