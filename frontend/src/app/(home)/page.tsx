@@ -52,7 +52,7 @@ export default async function HomePage() {
       />
 
       {/* UI (NO CHANGE – PERFECT) */}
-      <HeroSection products={products.slice(0, 3)} />
+      <HeroSection />
       <CategorySection />
       <TrendingSectionClient data={products.slice(0, 6)} />
     </>
