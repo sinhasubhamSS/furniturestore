@@ -53,8 +53,10 @@ export default async function HomePage() {
 
       {/* UI (NO CHANGE – PERFECT) */}
       <HeroSection />
-      <CategorySection />
-      <TrendingSectionClient data={products.slice(0, 6)} />
+      <div className="max-w-[1440px] mx-auto px-4">
+        <CategorySection />
+        <TrendingSectionClient data={products.slice(0, 6)} />
+      </div>
     </>
   );
 }

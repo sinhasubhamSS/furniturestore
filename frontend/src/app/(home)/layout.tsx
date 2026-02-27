@@ -20,8 +20,8 @@ export default function MainLayout({
         <Navbar />
       </header>
 
-      {/* Main Content */}
-      <main className="flex-grow">{children}</main>
+      {/* ✅ Important: Add padding-top */}
+      <main className="flex-grow  ">{children}</main>
 
       <Footer />
     </div>
