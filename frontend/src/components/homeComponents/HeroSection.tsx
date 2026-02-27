@@ -18,7 +18,6 @@ const HeroSection = () => {
 
   const startAutoSlide = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-
     intervalRef.current = setInterval(() => {
       setCurrent((prev) => (prev + 1) % images.length);
     }, SLIDE_DURATION);
@@ -42,25 +41,25 @@ const HeroSection = () => {
   };
 
   return (
-    <section className="relative w-full h-screen min-h-[650px] overflow-hidden group">
+    <section className="relative w-full h-[100svh] min-h-[600px] overflow-hidden group">
       {/* Slides */}
       {images.map((img, index) => (
         <div
           key={index}
-          className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ease-in-out ${
+          className={`absolute inset-0 bg-cover bg-center transition-all duration-1000 ease-in-out ${
             index === current ? "opacity-100 scale-100" : "opacity-0 scale-105"
           }`}
           style={{ backgroundImage: `url(${img})` }}
         />
       ))}
 
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/10" />
+      {/* Dark Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/20" />
 
       {/* Arrows (Desktop Only) */}
       <button
         onClick={prevSlide}
-        className="hidden md:flex absolute left-8 top-1/2 -translate-y-1/2 
+        className="hidden lg:flex absolute left-8 top-1/2 -translate-y-1/2 
                    w-14 h-14 items-center justify-center
                    opacity-0 group-hover:opacity-100
                    transition-all duration-300
@@ -74,7 +73,7 @@ const HeroSection = () => {
 
       <button
         onClick={nextSlide}
-        className="hidden md:flex absolute right-8 top-1/2 -translate-y-1/2 
+        className="hidden lg:flex absolute right-8 top-1/2 -translate-y-1/2 
                    w-14 h-14 items-center justify-center
                    opacity-0 group-hover:opacity-100
                    transition-all duration-300
@@ -89,7 +88,7 @@ const HeroSection = () => {
       {/* Content */}
       <div className="relative z-10 h-full flex items-center">
         <div className="max-w-7xl mx-auto px-6 w-full">
-          <div className="max-w-2xl text-white space-y-8">
+          <div className="max-w-2xl text-white space-y-6 sm:space-y-8">
             {/* Heading */}
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
               Premium Wooden Furniture <br />
@@ -103,22 +102,21 @@ const HeroSection = () => {
             </p>
 
             {/* Buttons */}
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 pt-2">
               {/* Primary CTA */}
               <button
                 onClick={() => router.push("/products")}
-                className="bg-[var(--color-accent)] 
-                           hover:bg-white 
-                           hover:text-black
-                           transition-all duration-300 
-                           text-white 
-                           px-6 py-3 
-                           sm:px-8 sm:py-3 
+                className="bg-[var(--color-accent)]
+                           hover:bg-white hover:text-black
+                           transition-all duration-300
+                           text-white
+                           px-6 py-3
+                           sm:px-8 sm:py-3
                            md:px-10 md:py-4
-                           rounded-full 
+                           rounded-full
                            text-base sm:text-lg md:text-xl
-                           font-semibold 
-                           shadow-2xl 
+                           font-semibold
+                           shadow-2xl
                            hover:scale-105
                            active:scale-95"
               >
@@ -127,17 +125,20 @@ const HeroSection = () => {
 
               {/* Secondary CTA */}
               <button
-                onClick={() => router.push("/best-sellers")}
-                className="border border-white text-white 
-                           px-6 py-3 
+                onClick={() => router.push("/products")}
+                className="border border-white text-white
+                           hover:bg-white hover:text-black
+                           transition-all duration-300
+                           px-6 py-3
                            sm:px-8 sm:py-3
                            md:px-10 md:py-4
                            rounded-full
                            text-base sm:text-lg md:text-xl
-                           transition-all duration-300
-                           hover:bg-white hover:text-black"
+                           font-semibold
+                           hover:scale-105
+                           active:scale-95"
               >
-                View Best Sellers
+                Shop Now
               </button>
             </div>
           </div>

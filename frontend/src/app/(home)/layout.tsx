@@ -16,14 +16,13 @@ export default function MainLayout({
   return (
     <div className="min-h-screen flex flex-col">
       {/* Fixed Navbar */}
-      <header className="fixed top-0 left-0 w-full z-50 bg-transparent">
+      <header className="fixed top-0 left-0 w-full h-16 z-50">
         <Navbar />
       </header>
 
       {/* Main Content */}
       <main className="flex-grow">{children}</main>
 
-      {/* Footer */}
       <Footer />
     </div>
   );
