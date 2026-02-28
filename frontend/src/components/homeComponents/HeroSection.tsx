@@ -41,7 +41,8 @@ const HeroSection = () => {
   };
 
   return (
-    <section className="relative w-full h-[100svh] min-h-[600px] overflow-hidden group">
+    <section className="relative w-full h-[70svh] md:h-[100svh] min-h-[500px] overflow-hidden group">
+      {" "}
       {/* Slides */}
       {images.map((img, index) => (
         <div
@@ -52,10 +53,8 @@ const HeroSection = () => {
           style={{ backgroundImage: `url(${img})` }}
         />
       ))}
-
       {/* Dark Overlay */}
       <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/20" />
-
       {/* Arrows (Desktop Only) */}
       <button
         onClick={prevSlide}
@@ -70,7 +69,6 @@ const HeroSection = () => {
       >
         ‹
       </button>
-
       <button
         onClick={nextSlide}
         className="hidden lg:flex absolute right-8 top-1/2 -translate-y-1/2 
@@ -84,7 +82,6 @@ const HeroSection = () => {
       >
         ›
       </button>
-
       {/* Content */}
       <div className="relative z-10 h-full flex items-center">
         <div className="max-w-7xl mx-auto px-6 w-full">
