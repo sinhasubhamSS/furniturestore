@@ -58,7 +58,7 @@ export default function TrendingSectionClient({ data }: Props) {
         </div>
 
         {/* ---------- DESKTOP (>=1024px, ONE ROW, MAX 6, NO SCROLL) ---------- */}
-        <div className="hidden lg:grid grid-cols-6 gap-5">
+        <div className="hidden lg:grid grid-cols-3 xl:grid-cols-4 gap-8">
           {!data &&
             Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
 
@@ -108,7 +108,8 @@ function ProductCard({ product }: { product: homeProduct }) {
       )}
 
       {/* IMAGE */}
-      <div className="h-32 sm:h-36 lg:h-44 flex items-center justify-center bg-white border rounded mb-2 overflow-hidden">
+      <div className="aspect-[1/1] bg-white rounded-lg mb-3 overflow-hidden flex items-center justify-center">
+        {" "}
         <img
           src={image || "/placeholder.png"}
           alt={name}
