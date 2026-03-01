@@ -13,7 +13,7 @@ export const navigationData: NavigationSection[] = [
     links: [
       { name: "My Orders", url: "/my-orders" },
       { name: "Wishlist", url: "/wishlist" },
-      { name: "Address Book", url: "/addresses" },
+ 
     ],
   },
   {

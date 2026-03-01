@@ -1,82 +1,48 @@
 import React from "react";
 import CompanyInfo from "./sections/CompanyInfo";
 import NavigationLinks from "./sections/NavigationLinks";
-import ContactInfo from "./sections/ContactInfo"; // ✅ Fixed - Was importing CompanyInfo
-import Newsletter from "./sections/NewsLetter"; // ✅ Fixed casing - Was NewsLetter
+import Newsletter from "./sections/NewsLetter";
 import CustomerSupport from "./sections/CustomerSupport";
 import ConnectWithUs from "./sections/ConnectWithUs";
-import StoreLocator from "./sections/StoreLocator";
 import type { FooterProps } from "../../types/footer/footer";
-
+import OurStores from "./sections/OurStores";
 const Footer: React.FC<FooterProps> = ({ className = "" }) => {
   return (
-    <footer
-      style={{ backgroundColor: "var(--color-primary)" }}
-      className={`text-[--text-dark] mt-auto ${className}`}
-    >
-      {/* Newsletter Section - Full width background */}
-      <Newsletter source="website_footer" />
+    <footer className={`mt-auto ${className}`}>
+      {/* ================= NEWSLETTER ================= */}
+      <div className="bg-[var(--color-primary)] py-16">
+        <div className="max-w-[1280px] mx-auto px-4">
+          <Newsletter source="website_footer" />
+        </div>
+      </div>
 
-      {/* Main Footer Content - Full width background */}
-      <div
-        className="w-full py-12"
-        style={{ backgroundColor: "var(--color-secondary)" }}
-      >
-        {/* Content constrained to max-width */}
-        <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
-            <div className="lg:col-span-2">
-              <CompanyInfo />
-            </div>
-            <div className="lg:col-span-1">
-              <NavigationLinks />
-            </div>
-            <div className="lg:col-span-1">
+      {/* ================= MAIN FOOTER ================= */}
+      <div className="bg-[var(--color-secondary)] py-16">
+        <div className="max-w-[1280px] mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+            {" "}
+            <CompanyInfo />
+            <NavigationLinks />
+            <div className="space-y-10">
               <CustomerSupport />
-            </div>
-            <div className="lg:col-span-1">
-              <ConnectWithUs />
+              <OurStores />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Store Locator Section - Full width background */}
-      <StoreLocator />
+      {/* ================= BOTTOM BAR ================= */}
+      <div className="bg-[var(--color-accent)] text-white py-5">
+        <div className="max-w-[1280px] mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4 text-sm">
+          <p>© 2025 Suvidha Furniture. All rights reserved.</p>
 
-      {/* Contact Info - Full width background */}
-      <ContactInfo />
-
-      {/* Footer Bottom - Full width background */}
-      <div
-        className="w-full text-[--text-light] py-4"
-        style={{ backgroundColor: "var(--color-accent)" }}
-      >
-        <div className="max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <p className="text-sm">
-              &copy; 2025 Suvidha Furniture. All rights reserved.
-            </p>
-            <div className="flex space-x-6 text-sm">
-              <a
-                href="/policies/privacy"
-                className="hover:text-[--color-primary] transition-colors"
-              >
-                Privacy Policy
-              </a>
-              <a
-                href="/policies/terms"
-                className="hover:text-[--color-primary] transition-colors"
-              >
-                Terms of Use
-              </a>
-              <a
-                href="/policies/returns&refunds"
-                className="hover:text-[--color-primary] transition-colors"
-              >
-                Returns & Refunds
-              </a>
-            </div>
+          <div className="flex gap-6">
+            <a href="/policies/privacy" className="hover:opacity-80 transition">
+              Privacy Policy
+            </a>
+            <a href="/policies/terms" className="hover:opacity-80 transition">
+              Terms
+            </a>
           </div>
         </div>
       </div>
