@@ -33,7 +33,8 @@ const WishlistItem = ({
     "/placeholder.jpg";
 
   return (
-    <div className="flex gap-3 sm:gap-4 bg-white px-3 py-3 sm:py-4">
+    <div className="flex gap-3 bg-white px-3 py-3">
+      
       {/* IMAGE */}
       <div className="h-16 w-16 sm:h-20 sm:w-20 flex-shrink-0 border rounded-md flex items-center justify-center bg-gray-50">
         <Image
@@ -47,16 +48,16 @@ const WishlistItem = ({
 
       {/* INFO */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm sm:text-base font-medium truncate">
+        <p className="text-sm sm:text-base font-medium line-clamp-2 leading-tight">
           {product.name}
         </p>
 
-        <p className="text-sm text-gray-600 mt-1">
+        <p className="text-sm text-gray-700 mt-1 font-medium">
           ₹{variant.sellingPrice.toLocaleString()}
         </p>
 
         {isOutOfStock && (
-          <span className="inline-block mt-1 text-xs text-red-600">
+          <span className="text-xs text-red-600">
             Out of stock
           </span>
         )}
@@ -64,20 +65,25 @@ const WishlistItem = ({
 
       {/* ACTIONS */}
       <div className="flex flex-col sm:flex-row items-center gap-2">
+
         {onAddToCart && (
           <Button
             onClick={onAddToCart}
             disabled={isAdding || isOutOfStock}
             className="
               h-8 sm:h-9
-              px-3
+              px-2 sm:px-3
               text-xs sm:text-sm
               rounded-md
               flex items-center gap-1
             "
           >
             <ShoppingCart size={14} />
-            {isOutOfStock ? "Out" : "Add"}
+
+            {/* small screen icon only */}
+            <span className="hidden sm:inline">
+              {isOutOfStock ? "Out" : "Add"}
+            </span>
           </Button>
         )}
 
@@ -93,7 +99,6 @@ const WishlistItem = ({
             hover:bg-red-50
             transition
           "
-          title="Remove from wishlist"
         >
           <Trash2 size={14} />
         </button>
