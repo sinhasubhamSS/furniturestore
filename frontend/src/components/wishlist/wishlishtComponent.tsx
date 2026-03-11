@@ -34,7 +34,6 @@ const WishlistItem = ({
 
   return (
     <div className="flex gap-3 bg-white px-3 py-3">
-      
       {/* IMAGE */}
       <div className="h-16 w-16 sm:h-20 sm:w-20 flex-shrink-0 border rounded-md flex items-center justify-center bg-gray-50">
         <Image
@@ -48,35 +47,34 @@ const WishlistItem = ({
 
       {/* INFO */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm sm:text-base font-medium line-clamp-2 leading-tight">
+        <p className="text-xs sm:text-sm font-medium leading-tight line-clamp-2 break-words">
           {product.name}
         </p>
-
         <p className="text-sm text-gray-700 mt-1 font-medium">
           ₹{variant.sellingPrice.toLocaleString()}
         </p>
 
         {isOutOfStock && (
-          <span className="text-xs text-red-600">
-            Out of stock
-          </span>
+          <span className="text-xs text-red-600">Out of stock</span>
         )}
       </div>
 
       {/* ACTIONS */}
       <div className="flex flex-col sm:flex-row items-center gap-2">
-
         {onAddToCart && (
           <Button
             onClick={onAddToCart}
             disabled={isAdding || isOutOfStock}
             className="
-              h-8 sm:h-9
-              px-2 sm:px-3
-              text-xs sm:text-sm
-              rounded-md
-              flex items-center gap-1
-            "
+    h-8 sm:h-9
+    px-2 sm:px-3
+    text-xs sm:text-sm
+    rounded-md
+    flex items-center gap-1
+    bg-[var(--color-accent)] 
+    text-white
+    hover:opacity-90
+  "
           >
             <ShoppingCart size={14} />
 

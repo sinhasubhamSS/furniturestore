@@ -102,7 +102,7 @@ const HeroSection = () => {
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 pt-2">
               {/* Primary CTA */}
               <button
-                onClick={() => router.push("/products")}
+                onClick={() => router.push("/category")}
                 className="bg-[var(--color-accent)]
                            hover:bg-white hover:text-black
                            transition-all duration-300

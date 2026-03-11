@@ -14,7 +14,6 @@ type Props = {
 
 const ProductCartItem = React.memo(
   ({ item, onRemove, onQuantityChange }: Props) => {
-    // ✅ Guaranteed by backend
     const variant = item.product.variants[0]!;
 
     const image =
@@ -23,11 +22,11 @@ const ProductCartItem = React.memo(
       "/placeholder.jpg";
 
     return (
-      <div className="bg-[var(--color-card)] rounded shadow-sm border border-[var(--color-border-custom)]">
-        <div className="flex gap-4 p-3">
+      <div className="bg-[var(--color-card)] rounded-lg border border-[var(--color-border-custom)]">
+        <div className="flex items-start gap-3 p-3">
           {/* IMAGE + QTY */}
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-24 h-24 rounded bg-[var(--color-secondary)] overflow-hidden border">
+          <div className="flex flex-col items-center gap-2 shrink-0">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded bg-[var(--color-secondary)] overflow-hidden border">
               <Image
                 src={image}
                 alt={item.product.name}
@@ -37,29 +36,46 @@ const ProductCartItem = React.memo(
               />
             </div>
 
-            <div className="flex items-center border rounded">
+            {/* QUANTITY CONTROL */}
+            <div className="flex items-center border border-[var(--color-accent)] rounded-md overflow-hidden">
               <ActionButton
                 icon={Minus}
                 size="sm"
+                className="
+    bg-transparent
+    hover:bg-transparent
+    !text-[var(--color-accent)]
+  "
                 onClick={() =>
                   item.quantity > 1 && onQuantityChange(item.quantity - 1)
                 }
                 disabled={item.quantity <= 1}
               />
-              <span className="px-2 text-sm font-medium">{item.quantity}</span>
+
+              <span className="px-2 text-sm font-semibold">
+                {item.quantity}
+              </span>
+
               <ActionButton
                 icon={Plus}
                 size="sm"
+                className="
+    bg-transparent
+    hover:bg-transparent
+    !text-[var(--color-accent)]
+  "
                 onClick={() => onQuantityChange(item.quantity + 1)}
               />
             </div>
           </div>
 
-          {/* INFO */}
-          <div className="flex-1">
-            <h3 className="font-semibold truncate">{item.product.name}</h3>
+          {/* PRODUCT INFO */}
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-sm sm:text-base leading-tight line-clamp-2 break-words">
+              {item.product.name}
+            </h3>
 
-            <p className="text-sm text-[var(--text-accent)]">
+            <p className="text-xs sm:text-sm text-[var(--text-accent)] mt-1">
               {[
                 variant.attributes?.finish,
                 variant.attributes?.size,
@@ -71,8 +87,8 @@ const ProductCartItem = React.memo(
             </p>
 
             {/* PRICE */}
-            <div className="mt-2 flex items-center gap-2">
-              <span className="text-lg font-bold">
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <span className="text-lg font-bold text-[var(--color-accent)]">
                 ₹{variant.sellingPrice!.toLocaleString()}
               </span>
 
@@ -81,6 +97,7 @@ const ProductCartItem = React.memo(
                   <span className="line-through text-gray-500 text-sm">
                     ₹{variant.listingPrice!.toLocaleString()}
                   </span>
+
                   <span className="text-green-600 text-xs font-semibold">
                     {variant.discountPercent}% OFF
                   </span>
@@ -90,7 +107,11 @@ const ProductCartItem = React.memo(
 
             <button
               onClick={onRemove}
-              className="text-red-600 text-sm mt-2 hover:underline"
+              className="
+                text-sm mt-2
+                text-[var(--color-accent)]
+                hover:underline
+              "
             >
               Remove
             </button>
@@ -102,4 +123,5 @@ const ProductCartItem = React.memo(
 );
 
 ProductCartItem.displayName = "ProductCartItem";
+
 export default ProductCartItem;

@@ -82,15 +82,16 @@ const ActionButtons: React.FC<Props> = ({ productId }) => {
         onClick={handleBuyNow}
         disabled={isOutOfStock || !isVariantSelected}
         className="
-          flex-1 min-w-0
-          bg-[--color-accent] text-white hover:bg-[--color-accent-dark]
-          py-2.5 sm:py-3 md:py-4
-          text-[13px] sm:text-sm md:text-base lg:text-lg
-          font-semibold
-          rounded-md sm:rounded-lg
-          transition
-          disabled:opacity-60 disabled:cursor-not-allowed
-        "
+    flex-1 min-w-0
+    bg-[var(--color-accent)] text-white
+    hover:opacity-90
+    py-2.5 sm:py-3 md:py-4
+    text-[13px] sm:text-sm md:text-base lg:text-lg
+    font-semibold
+    rounded-md sm:rounded-lg
+    transition
+    disabled:opacity-60 disabled:cursor-not-allowed
+  "
       >
         Buy Now
       </Button>
