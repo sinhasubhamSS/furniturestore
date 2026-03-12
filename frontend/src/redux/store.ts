@@ -1,7 +1,7 @@
 import { configureStore, combineReducers } from "@reduxjs/toolkit";
 import userReducer from "./slices/userSlice";
 import checkoutReducer from "./slices/checkoutSlice";
-
+import { injectDispatch } from "../../utils/axios";
 
 import {
   persistStore,
@@ -42,7 +42,6 @@ const rootReducer = combineReducers({
   user: userReducer,
   checkout: checkoutReducer,
   productDetail: productDetailReducer,
-
 
   [adminProductApi.reducerPath]: adminProductApi.reducer,
   [adminCategoryApi.reducerPath]: adminCategoryApi.reducer,
@@ -89,9 +88,11 @@ export const store = configureStore({
       returnApi.middleware,
       deliveryApi.middleware,
       orderadminApi.middleware,
-      adminReturnApi.middleware
+      adminReturnApi.middleware,
     ),
 });
+
+injectDispatch(store.dispatch);
 
 export const persistor = persistStore(store);
 
